@@ -47,6 +47,7 @@ import {
 } from "../../lib/agent-wallets";
 import { fetchWithBudget, payingWalletFor } from "../../lib/x402/buyer";
 import { MIMIR_ABI, WINNER_SIDE, STATE, BPS_DIVISOR } from "../../lib/mimir-abi";
+import { reportingPoll } from "../../lib/ops/heartbeat";
 import { unitsToUsdc, usdcToUnits, ERC20_ABI, USDC_ADDRESS } from "../../lib/usdc";
 import { fetchDecodedClaim, type DecodedClaim } from "../../lib/claim-codec";
 import {
@@ -712,13 +713,9 @@ async function main(): Promise<void> {
   console.log(`  Auto-challenge: ${AUTO_CHALLENGE ? `YES (≥${CHALLENGE_CONFIDENCE}% confidence, ${CHALLENGE_STAKE_USDC} USDC/claim)` : "OFF (set AUTO_CHALLENGE=1 to enable)"}`);
   console.log("═══════════════════════════════════════════════\n");
 
-  const safePoll = async () => {
-    try {
-      await poll();
-    } catch (err) {
-      console.error("[oracle] Poll failed, will retry next interval:", err);
-    }
-  };
+  // Reports a heartbeat either way, so a crash-looping oracle shows as alive and
+  // failing on /api/health rather than merely stale.
+  const safePoll = () => reportingPoll("oracle", "oracle", POLL_INTERVAL_MS / 1000, poll);
 
   await safePoll();
   setInterval(safePoll, POLL_INTERVAL_MS);

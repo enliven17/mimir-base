@@ -20,8 +20,7 @@ const NOW = 1_800_000_000_000;
 function healthy(overrides: Partial<HealthSnapshot> = {}): HealthSnapshot {
   return {
     workers: MONITORED_WORKERS.map((name) => ({ name, lastBeatAtMs: NOW - 10_000 })),
-    indexHeadBlock: 1_000,
-    chainHeadBlock: 1_002,
+    indexLastSyncAgeSec: 45,
     oldestQueuedJobAgeSec: 5,
     oldestOverdueSettlementSec: 0,
     oracleBacklog: 0,
@@ -67,6 +66,35 @@ test("staleness escalates warn then critical", () => {
   assert.equal(at(DEFAULT_THRESHOLDS.workerStaleWarnSec - 1).status, "ok");
   assert.equal(at(DEFAULT_THRESHOLDS.workerStaleWarnSec).status, "warn");
   assert.equal(at(DEFAULT_THRESHOLDS.workerStaleCriticalSec).status, "critical");
+});
+
+test("a slow worker is judged against its own interval", () => {
+  // The market creator runs every six hours; the default three-minute bar would
+  // alarm permanently and teach everyone to ignore worker alarms.
+  const sixHours = 6 * 3600;
+  const at = (ageSec: number) =>
+    evaluateHealth(
+      healthy({
+        workers: [
+          { name: "market_creator", lastBeatAtMs: NOW - ageSec * 1000, expectedIntervalSec: sixHours },
+        ],
+      }),
+      NOW,
+    ).status;
+  assert.equal(at(sixHours), "ok");
+  assert.equal(at(sixHours * 2), "warn");
+  assert.equal(at(sixHours * 4), "critical");
+});
+
+test("declaring a short interval cannot make a worker alarm-happy", () => {
+  // Two cycles of a 10s poll is 20s, well under the default bar; the default wins.
+  const report = evaluateHealth(
+    healthy({
+      workers: [{ name: "oracle", lastBeatAtMs: NOW - 60_000, expectedIntervalSec: 10 }],
+    }),
+    NOW,
+  );
+  assert.equal(report.status, "ok");
 });
 
 test("a worker beating with an error is alive and broken, not healthy", () => {
@@ -150,17 +178,19 @@ test("oracle backlog and settlement age are separate alarms", () => {
 
 // ── Lag ───────────────────────────────────────────────────────────────────────
 
-test("index lag is measured in blocks behind the head", () => {
-  const report = evaluateHealth(healthy({ indexHeadBlock: 700, chainHeadBlock: 1_002 }), NOW);
-  assert.equal(report.measurements.indexLagBlocks, 302);
+test("a stale read-index escalates", () => {
+  assert.equal(evaluateHealth(healthy({ indexLastSyncAgeSec: 299 }), NOW).status, "ok");
+  assert.equal(evaluateHealth(healthy({ indexLastSyncAgeSec: 300 }), NOW).status, "warn");
+  const report = evaluateHealth(healthy({ indexLastSyncAgeSec: 1_800 }), NOW);
   assert.equal(report.status, "critical");
+  assert.deepEqual(report.alarms.map((a) => a.id), ["index.stale"]);
 });
 
-test("an index ahead of the chain head reports zero lag, not negative", () => {
-  // Happens across a reorg, and a negative lag would render as a healthy -5.
-  const report = evaluateHealth(healthy({ indexHeadBlock: 1_010, chainHeadBlock: 1_000 }), NOW);
-  assert.equal(report.measurements.indexLagBlocks, 0);
-  assert.equal(report.status, "ok");
+test("an index that never synced is critical, not fresh", () => {
+  const report = evaluateHealth(healthy({ indexLastSyncAgeSec: null }), NOW);
+  assert.equal(report.status, "critical");
+  assert.deepEqual(report.alarms.map((a) => a.id), ["index.never_synced"]);
+  assert.equal(report.measurements.indexLastSyncAgeSec, null);
 });
 
 test("queue lag escalates", () => {
@@ -193,7 +223,7 @@ test("every alarm carries the value and the threshold it crossed", () => {
 
 test("measurements are present even when nothing alarms", () => {
   const report = evaluateHealth(healthy(), NOW);
-  assert.equal(report.measurements.indexLagBlocks, 2);
+  assert.equal(report.measurements.indexLastSyncAgeSec, 45);
   assert.equal(Object.keys(report.measurements.workerAgesSec).length, MONITORED_WORKERS.length);
 });
 
@@ -229,8 +259,21 @@ test("a probe returns 503 only when something is actually broken", () => {
 // ── Heartbeat storage ─────────────────────────────────────────────────────────
 
 test("a heartbeat round-trips", () => {
-  const decoded = decodeHeartbeat(encodeHeartbeat({ atMs: NOW, error: "boom" }));
-  assert.deepEqual(decoded, { atMs: NOW, error: "boom" });
+  const decoded = decodeHeartbeat(encodeHeartbeat({ atMs: NOW, error: "boom", intervalSec: 60 }));
+  assert.deepEqual(decoded, { atMs: NOW, error: "boom", intervalSec: 60 });
+});
+
+test("a worker reports its own cadence with the beat", () => {
+  // The reader would otherwise have to guess it from another process's env.
+  const decoded = decodeHeartbeat(encodeHeartbeat({ atMs: NOW, intervalSec: 21_600 }));
+  assert.equal(decoded?.intervalSec, 21_600);
+});
+
+test("a nonsensical interval is dropped rather than trusted", () => {
+  // A zero or negative interval would compute a staleness bar of zero.
+  assert.equal(decodeHeartbeat('{"atMs":1,"intervalSec":0}')?.intervalSec, undefined);
+  assert.equal(decodeHeartbeat('{"atMs":1,"intervalSec":-5}')?.intervalSec, undefined);
+  assert.equal(decodeHeartbeat('{"atMs":1,"intervalSec":"soon"}')?.intervalSec, undefined);
 });
 
 test("heartbeat keys are namespaced per worker", () => {
@@ -248,5 +291,5 @@ test("a corrupt heartbeat decodes to never-reported instead of throwing", () => 
 });
 
 test("an empty error string is dropped rather than reported as an error", () => {
-  assert.deepEqual(decodeHeartbeat('{"atMs":1,"error":""}'), { atMs: 1, error: undefined });
+  assert.equal(decodeHeartbeat('{"atMs":1,"error":""}')?.error, undefined);
 });

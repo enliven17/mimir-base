@@ -272,7 +272,7 @@ declare global {
   var __mimirDbReady: Promise<Pool> | undefined;
 }
 
-function isDbConfigured(): boolean {
+export function isDbConfigured(): boolean {
   return Boolean((process.env.DATABASE_URL ?? process.env.TURSO_DATABASE_URL)?.trim());
 }
 
@@ -686,6 +686,35 @@ export async function getExpiringClaims(withinSeconds: number): Promise<ClaimRow
     args: ["public", "open", "active", nowSeconds, nowSeconds + withinSeconds],
   });
   return result.rows.map((row) => normalizeClaimRow(row as Record<string, unknown>));
+}
+
+/**
+ * Markets whose deadline has passed and that are still unsettled.
+ *
+ * Two numbers, not one: a large backlog cleared promptly and a single ancient
+ * stuck market are different failures wanting different responses. The age is
+ * taken from the OLDEST overdue market rather than an average over settled ones,
+ * because an average improves precisely when settlement is stuck.
+ */
+export async function getSettlementBacklog(
+  nowSeconds = Math.floor(Date.now() / 1000),
+): Promise<{ count: number; oldestOverdueSec: number }> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT COUNT(*) AS overdue, MIN(deadline) AS oldest
+      FROM claims
+      WHERE is_final = 0
+        AND state IN (?, ?)
+        AND deadline < ?`,
+    args: ["open", "active", nowSeconds],
+  });
+  const row = (result.rows[0] ?? {}) as Record<string, unknown>;
+  const count = Number(row.overdue ?? 0);
+  const oldest = row.oldest === null || row.oldest === undefined ? null : Number(row.oldest);
+  return {
+    count: Number.isFinite(count) ? count : 0,
+    oldestOverdueSec: oldest === null ? 0 : Math.max(0, nowSeconds - oldest),
+  };
 }
 
 export async function getClaimsByParent(parentId: number): Promise<ClaimRow[]> {

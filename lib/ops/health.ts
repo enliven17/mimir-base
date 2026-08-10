@@ -38,6 +38,14 @@ export interface WorkerBeat {
   lastBeatAtMs: number | null;
   /** Set when the worker reported a beat but with an error attached. */
   lastError?: string;
+  /**
+   * How often this worker is supposed to report.
+   *
+   * Required for anything slower than the default bar: the market creator runs
+   * every six hours, so judging it against a three-minute staleness threshold
+   * would alarm permanently and train everyone to ignore worker alarms.
+   */
+  expectedIntervalSec?: number;
 }
 
 export interface FailureWindow {
@@ -47,9 +55,14 @@ export interface FailureWindow {
 
 export interface HealthSnapshot {
   workers: WorkerBeat[];
-  /** Read-index sync cursor vs the chain head. */
-  indexHeadBlock: number;
-  chainHeadBlock: number;
+  /**
+   * Seconds since the read-index last completed a sync, or null if it never has.
+   *
+   * Freshness rather than block lag, because the index syncs by claim count and
+   * has no block cursor to compare against a chain head. Freshness is also the
+   * signal that survives a change of sync strategy.
+   */
+  indexLastSyncAgeSec: number | null;
   /** Age of the oldest job still waiting in a worker queue. */
   oldestQueuedJobAgeSec: number;
   /** Age of the oldest market whose deadline has passed and is still unsettled. */
@@ -65,8 +78,8 @@ export interface HealthSnapshot {
 export interface Thresholds {
   workerStaleWarnSec: number;
   workerStaleCriticalSec: number;
-  indexLagWarnBlocks: number;
-  indexLagCriticalBlocks: number;
+  indexStaleWarnSec: number;
+  indexStaleCriticalSec: number;
   queueLagWarnSec: number;
   queueLagCriticalSec: number;
   settlementWarnSec: number;
@@ -81,8 +94,8 @@ export interface Thresholds {
 }
 
 /**
- * Base blocks are 2s, so a lag of 30 blocks is a minute behind — noticeable but
- * survivable; 300 blocks is ten minutes and the explorer is visibly wrong.
+ * The index syncs about once a minute, so five minutes stale is noticeable but
+ * survivable and half an hour means the explorer is visibly wrong.
  *
  * Settlement thresholds are generous because the oracle batches: 15 minutes past
  * a deadline is late, an hour means a human should look.
@@ -90,8 +103,8 @@ export interface Thresholds {
 export const DEFAULT_THRESHOLDS: Thresholds = {
   workerStaleWarnSec: 180,
   workerStaleCriticalSec: 900,
-  indexLagWarnBlocks: 30,
-  indexLagCriticalBlocks: 300,
+  indexStaleWarnSec: 300,
+  indexStaleCriticalSec: 1800,
   queueLagWarnSec: 300,
   queueLagCriticalSec: 1800,
   settlementWarnSec: 900,
@@ -161,7 +174,7 @@ export interface HealthReport {
   alarms: Alarm[];
   /** Every measurement, alarming or not, so a graph has data before an incident. */
   measurements: {
-    indexLagBlocks: number;
+    indexLastSyncAgeSec: number | null;
     oldestQueuedJobAgeSec: number;
     oldestOverdueSettlementSec: number;
     oracleBacklog: number;
@@ -199,11 +212,15 @@ export function evaluateHealth(
     // and it must not go negative either; treat it as fresh-but-clamped.
     const ageSec = Math.max(0, Math.round((nowMs - worker.lastBeatAtMs) / 1000));
     workerAgesSec[worker.name] = ageSec;
+    // A slow worker sets its own bar: two missed cycles warn, four are critical.
+    // Never tighter than the global default, so declaring a short interval cannot
+    // make a worker alarm-happy.
+    const interval = worker.expectedIntervalSec ?? 0;
     const stale = threshold(
       `worker.${worker.name}.stale`,
       ageSec,
-      t.workerStaleWarnSec,
-      t.workerStaleCriticalSec,
+      Math.max(t.workerStaleWarnSec, interval * 2),
+      Math.max(t.workerStaleCriticalSec, interval * 4),
       "seconds",
       (level) => `worker ${worker.name} last reported ${ageSec}s ago (${level})`,
     );
@@ -222,16 +239,27 @@ export function evaluateHealth(
     }
   }
 
-  const indexLagBlocks = Math.max(0, snapshot.chainHeadBlock - snapshot.indexHeadBlock);
-  const lag = threshold(
-    "index.lag",
-    indexLagBlocks,
-    t.indexLagWarnBlocks,
-    t.indexLagCriticalBlocks,
-    "blocks",
-    (level) => `read-index is ${indexLagBlocks} blocks behind the chain head (${level})`,
-  );
-  if (lag) alarms.push(lag);
+  if (snapshot.indexLastSyncAgeSec === null) {
+    // Rule 1 again: an index that has never synced is empty, not fresh.
+    alarms.push({
+      id: "index.never_synced",
+      severity: "critical",
+      message: "read-index has never completed a sync",
+      observed: 0,
+      threshold: t.indexStaleCriticalSec,
+      unit: "seconds",
+    });
+  } else {
+    const stale = threshold(
+      "index.stale",
+      snapshot.indexLastSyncAgeSec,
+      t.indexStaleWarnSec,
+      t.indexStaleCriticalSec,
+      "seconds",
+      (level) => `read-index last synced ${snapshot.indexLastSyncAgeSec}s ago (${level})`,
+    );
+    if (stale) alarms.push(stale);
+  }
 
   const queue = threshold(
     "queue.lag",
@@ -294,7 +322,7 @@ export function evaluateHealth(
     // Critical first so a truncated pager message still carries the worst news.
     alarms: alarms.sort((a, b) => severityRank(b.severity) - severityRank(a.severity)),
     measurements: {
-      indexLagBlocks,
+      indexLastSyncAgeSec: snapshot.indexLastSyncAgeSec,
       oldestQueuedJobAgeSec: snapshot.oldestQueuedJobAgeSec,
       oldestOverdueSettlementSec: snapshot.oldestOverdueSettlementSec,
       oracleBacklog: snapshot.oracleBacklog,
@@ -333,6 +361,13 @@ export function heartbeatKey(worker: MonitoredWorker): string {
 export interface HeartbeatPayload {
   atMs: number;
   error?: string;
+  /**
+   * The worker's own poll cadence, reported with the beat.
+   *
+   * The worker knows its cadence; the reader would have to guess it from another
+   * process's environment variables.
+   */
+  intervalSec?: number;
 }
 
 export function encodeHeartbeat(payload: HeartbeatPayload): string {
@@ -352,7 +387,15 @@ export function decodeHeartbeat(raw: string | null): HeartbeatPayload | null {
     const atMs = (parsed as { atMs?: unknown }).atMs;
     if (typeof atMs !== "number" || !Number.isFinite(atMs)) return null;
     const error = (parsed as { error?: unknown }).error;
-    return { atMs, error: typeof error === "string" && error.length > 0 ? error : undefined };
+    const intervalSec = (parsed as { intervalSec?: unknown }).intervalSec;
+    return {
+      atMs,
+      error: typeof error === "string" && error.length > 0 ? error : undefined,
+      intervalSec:
+        typeof intervalSec === "number" && Number.isFinite(intervalSec) && intervalSec > 0
+          ? intervalSec
+          : undefined,
+    };
   } catch {
     return null;
   }

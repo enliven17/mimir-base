@@ -43,6 +43,7 @@ import {
 } from "../../lib/base";
 import { unitsToUsdc } from "../../lib/usdc";
 import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
+import { reportingPoll } from "../../lib/ops/heartbeat";
 import { fetchDecodedClaim } from "../../lib/claim-codec";
 import { activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint } from "../../lib/llm";
 import {
@@ -265,13 +266,7 @@ async function main(): Promise<void> {
   }
   console.log("═══════════════════════════════════════════════\n");
 
-  const safePoll = async () => {
-    try {
-      await poll();
-    } catch (err) {
-      console.error("[council] poll failed, will retry next interval:", err);
-    }
-  };
+  const safePoll = () => reportingPoll("council", "council", POLL_INTERVAL_MS / 1000, poll);
 
   await safePoll();
   setInterval(safePoll, POLL_INTERVAL_MS);

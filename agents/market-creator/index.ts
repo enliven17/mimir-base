@@ -43,6 +43,7 @@ import {
 } from "../../lib/agent-wallets";
 import { payingWalletFor } from "../../lib/x402/buyer";
 import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
+import { reportingPoll } from "../../lib/ops/heartbeat";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../lib/usdc";
 import { gatherCouncilPreflight } from "./council-preflight";
 
@@ -874,13 +875,8 @@ async function main(): Promise<void> {
   console.log(`  Interval   : every ${RUN_INTERVAL_HOURS}h`);
   console.log("═══════════════════════════════════════════════\n");
 
-  const safeRun = async () => {
-    try {
-      await run();
-    } catch (err) {
-      console.error("[market-creator] Run failed, will retry next interval:", err);
-    }
-  };
+  const safeRun = () =>
+    reportingPoll("market_creator", "market-creator", RUN_INTERVAL_HOURS * 3600, run);
 
   await safeRun();
   setInterval(safeRun, RUN_INTERVAL_HOURS * 3600 * 1000);
