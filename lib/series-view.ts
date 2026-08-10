@@ -40,6 +40,8 @@ export interface SeriesView {
   /** True when a malformed parent chain was detected, so the UI can stay quiet. */
   cycleDetected: boolean;
   branched: boolean;
+  /** Parallel rematches off this line. Counted so the UI can say so, never scored. */
+  branchCount: number;
 }
 
 /**
@@ -94,6 +96,7 @@ export function buildSeriesView(currentId: number, chain: VSData[]): SeriesView 
     nextRound: series.nextRound,
     cycleDetected: series.cycleDetected,
     branched: series.branchedAt.length > 0,
+    branchCount: series.branchRounds.length,
   };
 }
 

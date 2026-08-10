@@ -98,16 +98,17 @@ test("the series is found from any member, not just the tail", () => {
 });
 
 test("siblings created in the same block still order deterministically", () => {
-  // Same createdAt: id breaks the tie, so the UI does not flicker.
+  // Same createdAt: id breaks the tie, so the line chosen does not flicker.
   const claims = [
     claim({ id: 1, parentId: 0 }),
     claim({ id: 7, parentId: 1, createdAt: 5_000 }),
     claim({ id: 4, parentId: 1, createdAt: 5_000 }),
   ];
-  const a = buildSeries(1, claims).rounds.map((r) => r.claimId);
-  const b = buildSeries(1, [...claims].reverse()).rounds.map((r) => r.claimId);
-  assert.deepEqual(a, b);
-  assert.deepEqual(a, [1, 4, 7]);
+  const a = buildSeries(1, claims);
+  const b = buildSeries(1, [...claims].reverse());
+  assert.deepEqual(a.rounds.map((r) => r.claimId), b.rounds.map((r) => r.claimId));
+  assert.deepEqual(a.rounds.map((r) => r.claimId), [1, 4]);
+  assert.deepEqual(a.branchRounds.map((r) => r.claimId), [7]);
 });
 
 test("a single claim with no parent is a one-round series", () => {
@@ -122,11 +123,42 @@ test("two rematches from one parent are reported as a branch", () => {
   // Parallel rematches are not one sequence, and the UI must not draw them as one.
   const series = buildSeries(1, [
     claim({ id: 1, parentId: 0 }),
-    claim({ id: 2, parentId: 1 }),
-    claim({ id: 3, parentId: 1 }),
+    claim({ id: 2, parentId: 1, createdAt: 1_000 }),
+    claim({ id: 3, parentId: 1, createdAt: 2_000 }),
   ]);
   assert.deepEqual(series.branchedAt, [1]);
-  assert.equal(series.rounds.filter((r) => r.round === 2).length, 2);
+  // One round per depth on the main line; the sibling is recorded separately.
+  assert.equal(series.rounds.filter((r) => r.round === 2).length, 1);
+  assert.deepEqual(series.branchRounds.map((r) => r.claimId), [3]);
+});
+
+test("an abandoned branch cannot pad the score", () => {
+  // Anyone may rematch a settled parent, so scoring every branch would let someone
+  // spawn rematches they expect to win and abandon the rest.
+  const series = buildSeries(1, [
+    claim({ id: 1, parentId: 0, state: "resolved", winnerSide: "creator" }),
+    claim({ id: 2, parentId: 1, createdAt: 1_000, state: "resolved", winnerSide: "challengers" }),
+    claim({ id: 3, parentId: 1, createdAt: 2_000, state: "resolved", winnerSide: "creator" }),
+    claim({ id: 4, parentId: 1, createdAt: 3_000, state: "resolved", winnerSide: "creator" }),
+  ]);
+  assert.equal(series.creatorWins, 1);
+  assert.equal(series.challengerWins, 1);
+  assert.equal(series.branchRounds.length, 2);
+});
+
+test("the series follows the line the viewed claim is on", () => {
+  // Viewing a later sibling must not drop it out of its own series.
+  const claims = [
+    claim({ id: 1, parentId: 0, state: "resolved", winnerSide: "creator" }),
+    claim({ id: 2, parentId: 1, createdAt: 1_000, state: "resolved", winnerSide: "creator" }),
+    claim({ id: 3, parentId: 1, createdAt: 2_000, state: "resolved", winnerSide: "challengers" }),
+    claim({ id: 4, parentId: 3, createdAt: 3_000, state: "resolved", winnerSide: "challengers" }),
+  ];
+  const viewed = buildSeries(4, claims);
+  assert.deepEqual(viewed.rounds.map((r) => r.claimId), [1, 3, 4]);
+  assert.equal(viewed.challengerWins, 2);
+  // From the other sibling, the other line is the series.
+  assert.deepEqual(buildSeries(2, claims).rounds.map((r) => r.claimId), [1, 2]);
 });
 
 test("a straight line reports no branches", () => {

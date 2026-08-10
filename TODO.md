@@ -285,7 +285,7 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
   metadata'sını devral; stake ve deadline'ı yeniden seçtir.
 - [x] Zayıf settlement rule'u otomatik kopyalamadan önce kullanıcıya düzeltme
   adımı göster.
-- [ ] Aynı parent'tan paralel rematch oluşması için branch/series policy belirle.
+- [x] Aynı parent'tan paralel rematch oluşması için branch/series policy belirle.
 
 ### 6.6 Streak Mode — P1 off-chain scoring modifier
 

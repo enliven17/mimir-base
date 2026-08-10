@@ -858,6 +858,7 @@
     "seriesChallengersWon": "Challengers won",
     "seriesRefunded": "Refunded",
     "seriesRefundNote": "{count} round(s) returned every stake and are not counted in the score.",
+    "seriesBranchNote": "{count} parallel rematch(es) branch off this line. They are not counted in this score.",
     "provenVerifies": "Mimir verifies automatically",
     "source": "Source",
     "privateLink": "Private link",

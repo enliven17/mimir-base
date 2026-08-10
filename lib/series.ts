@@ -39,7 +39,17 @@ export interface SeriesRound {
 export interface Series {
   /** The oldest ancestor reachable from the queried claim. */
   rootId: number;
+  /** The main line: one round per depth, scored. */
   rounds: SeriesRound[];
+  /**
+   * Parallel rematches off the main line — shown, never scored.
+   *
+   * Branch policy: at a branch point the series follows the FIRST-created child.
+   * Anyone can create a rematch from the same settled parent, so scoring every
+   * branch would let someone inflate a rivalry record by spawning rematches they
+   * were confident of winning and abandoning the rest. One line, one score.
+   */
+  branchRounds: SeriesRound[];
   creatorWins: number;
   challengerWins: number;
   /** Rounds that settled without a winner — shown, but not scored. */
@@ -104,6 +114,23 @@ export function findRoot(
 }
 
 /**
+ * Every id from `claimId` up to its root, cycle-guarded.
+ *
+ * Used to pick which branch is the main line, so the claim being viewed is always
+ * part of the series it belongs to.
+ */
+function ancestryOf(claimId: number, byId: Map<number, SeriesClaim>): Set<number> {
+  const path = new Set<number>([claimId]);
+  let current = claimId;
+  for (;;) {
+    const claim = byId.get(current);
+    if (!claim || claim.parentId <= 0 || path.has(claim.parentId)) return path;
+    path.add(claim.parentId);
+    current = claim.parentId;
+  }
+}
+
+/**
  * Build the series containing `claimId`.
  *
  * Rounds are ordered by depth from the root, then by creation time, then by id —
@@ -113,6 +140,10 @@ export function findRoot(
 export function buildSeries(claimId: number, claims: SeriesClaim[]): Series {
   const byId = new Map(claims.map((claim) => [claim.id, claim]));
   const { rootId, cycleDetected: rootCycle } = findRoot(claimId, byId);
+  // The main line is the one the QUERIED claim sits on. Choosing branches without
+  // this would drop the very market the user is looking at out of its own series
+  // whenever an earlier sibling rematch existed.
+  const onQueriedPath = ancestryOf(claimId, byId);
 
   const childrenOf = new Map<number, SeriesClaim[]>();
   for (const claim of claims) {
@@ -125,6 +156,7 @@ export function buildSeries(claimId: number, claims: SeriesClaim[]): Series {
 
   const branchedAt: number[] = [];
   const rounds: SeriesRound[] = [];
+  const branchRounds: SeriesRound[] = [];
   const visited = new Set<number>();
 
   // Breadth-first from the root so depth IS the round number.
@@ -158,16 +190,36 @@ export function buildSeries(claimId: number, claims: SeriesClaim[]): Series {
         decided: winner !== "none",
       });
 
-      const children = childrenOf.get(claim.id) ?? [];
+      const children = [...(childrenOf.get(claim.id) ?? [])].sort(
+        (a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0) || a.id - b.id,
+      );
       // More than one child from a single claim is a branch, not a line: the UI
       // must not present parallel rematches as one sequence.
       if (children.length > 1) branchedAt.push(claim.id);
+      // Branch policy: one child continues the series — the one the queried claim
+      // descends from, else the first created. The rest are recorded so the UI can
+      // show them, but they never score, otherwise spawning several rematches off
+      // one parent and abandoning the losers would inflate a rivalry record.
+      const continuing =
+        children.find((child) => onQueriedPath.has(child.id))?.id ?? children[0]?.id;
       for (const child of children) {
         if (visited.has(child.id)) {
           cycleDetected = true;
           continue;
         }
-        next.push(child);
+        if (child.id === continuing) {
+          next.push(child);
+        } else {
+          visited.add(child.id);
+          const branchWinner = roundWinner(child);
+          branchRounds.push({
+            claimId: child.id,
+            round: round + 1,
+            winner: branchWinner,
+            refunded: isRefundedOutcome(child),
+            decided: branchWinner !== "none",
+          });
+        }
       }
     }
 
@@ -181,6 +233,7 @@ export function buildSeries(claimId: number, claims: SeriesClaim[]): Series {
   return {
     rootId,
     rounds,
+    branchRounds,
     creatorWins,
     challengerWins,
     refundedRounds: rounds.filter((r) => r.refunded).length,

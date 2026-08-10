@@ -133,6 +133,10 @@ test("a branched chain is flagged so the UI can call it a tree, not a line", () 
     claim(3, 1, "resolved", "challengers"),
   ]);
   assert.equal(view.branched, true);
+  assert.equal(view.branchCount, 1);
+  // The viewed claim's own line is the series, and the sibling does not score.
+  assert.deepEqual(view.rows.map((r) => r.claim.id), [1, 2]);
+  assert.equal(view.scoreLabel, "2-0");
 });
 
 test("the next round number continues the chain", () => {

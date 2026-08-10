@@ -2364,6 +2364,15 @@ export default function VSDetailPage() {
                               </p>
                             )}
 
+                            {/* Anyone can rematch a settled parent, so a rivalry can
+                                fork. Said out loud rather than folded into the score,
+                                which would let abandoned branches pad a record. */}
+                            {seriesView.branchCount > 0 && (
+                              <p className="pt-2 text-[11px] leading-relaxed text-pv-muted/80">
+                                {t("seriesBranchNote", { count: seriesView.branchCount })}
+                              </p>
+                            )}
+
                             {canLoadMoreRivalry ? (
                               <div className="pt-3 text-center">
                                 <button
