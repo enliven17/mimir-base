@@ -1,12 +1,11 @@
 /**
- * Payments revenue ledger — tracks the native-BOT payments Mimir's paid
+ * Payments revenue ledger — tracks the x402 USDC settlements Mimir's paid
  * endpoints earn.
  *
- * Durable: writes each verified payment to Neon (payments table) so the
- * dashboard survives restarts. The on-chain transfers remain the ultimate
- * source of truth. When DATABASE_URL is unset (local dev), it transparently
- * falls back to an in-memory ring buffer (last 1000 events) — never breaks
- * serving.
+ * Accounting is done on atomic integers (`amount_atomic`, USDC 6dp). Decimal
+ * conversion happens in the API/UI layer only — never in the ledger, never in
+ * the SUMs. Durable in Neon (payments_v2); falls back to an in-memory ring
+ * buffer (last 1000 events) when DATABASE_URL is unset, so serving never breaks.
  */
 
 import {
@@ -14,45 +13,77 @@ import {
   getPaymentsRevenueSummary,
   type PaymentsRevenueSummary,
 } from "./db";
+import { USDC_DECIMALS, USDC_SYMBOL, unitsToUsdc } from "./usdc";
 
 export interface PaymentEvent {
-  resource: string; // which endpoint earned it (e.g. /api/premium/price)
-  amountUsdc: number; // BOT, e.g. 0.001
-  payer: string | null; // buyer address
-  seller: string | null; // wallet that received the payment
-  txHash: string | null; // on-chain transfer hash
-  at: number; // ms epoch
+  /** Which endpoint earned it (e.g. /api/premium/price). */
+  resource: string;
+  scheme: string;
+  /** CAIP-2, e.g. eip155:84532. */
+  network: string;
+  assetAddress: string;
+  /** Settled amount in atomic token units. */
+  amountAtomic: bigint;
+  payer: string | null;
+  seller: string | null;
+  transactionHash: string | null;
+  /** x402 authorization/settlement id — the idempotency key. */
+  paymentIdentifier: string;
+  facilitator: string;
+  settledAt: number;
 }
 
 const MAX = 1000;
 const events: PaymentEvent[] = [];
 
 /**
- * Record a verified payment. Never throws — accounting must not break serving.
+ * Record a settled payment. Never throws — accounting must not break serving.
  * Returns the durable-write promise so callers can `await` it: on Vercel the
  * serverless function is frozen right after the response returns, which drops
- * any fire-and-forget insert still in flight. Await it to keep the function
- * alive until the row lands.
+ * any fire-and-forget insert still in flight.
  */
 export function recordPayment(e: PaymentEvent): Promise<void> {
   // In-memory mirror (instant, and the only store when no DB is configured).
   try {
-    events.push(e);
-    if (events.length > MAX) events.splice(0, events.length - MAX);
+    if (!events.some((x) => x.paymentIdentifier === e.paymentIdentifier)) {
+      events.push(e);
+      if (events.length > MAX) events.splice(0, events.length - MAX);
+    }
   } catch {
     /* ignore */
   }
-  // Durable write — swallow errors (e.g. DB not configured) but log them.
+  // Durable write — swallow errors (e.g. DB not configured) but log them. The
+  // unique (network, payment_identifier) index makes a retry idempotent.
   return insertPayment({
     resource: e.resource,
-    amount_bot: e.amountUsdc,
+    scheme: e.scheme,
+    network: e.network,
+    asset_address: e.assetAddress,
+    asset_symbol: USDC_SYMBOL,
+    asset_decimals: USDC_DECIMALS,
+    amount_atomic: e.amountAtomic,
     payer: e.payer,
     seller: e.seller,
-    tx_id: e.txHash,
-    at: e.at,
+    transaction_hash: e.transactionHash,
+    payment_identifier: e.paymentIdentifier,
+    facilitator: e.facilitator,
+    settled_at: e.settledAt,
+    created_at: Date.now(),
   }).catch((err) => {
     console.warn("[payments] durable write failed:", err instanceof Error ? err.message : err);
   });
+}
+
+/** One recent payment, decimals applied for display. */
+export interface RevenuePaymentView {
+  resource: string;
+  network: string;
+  assetSymbol: string;
+  amountUsdc: number;
+  payer: string | null;
+  seller: string | null;
+  transactionHash: string | null;
+  at: number;
 }
 
 export interface RevenueSummary {
@@ -64,14 +95,15 @@ export interface RevenueSummary {
   baselineUsdc: number;
   uniquePayers: number;
   uniqueSellers: number;
-  byResource: Array<{ resource: string; calls: number; bot: number }>;
-  bySeller: Array<{ seller: string; calls: number; bot: number }>;
-  recent: PaymentEvent[];
+  byResource: Array<{ resource: string; calls: number; usdc: number }>;
+  bySeller: Array<{ seller: string; calls: number; usdc: number }>;
+  recent: RevenuePaymentView[];
 }
 
 /**
- * Volume served before a database reset/migration. Those rows may be gone, so
- * displayed totals resume on top of these figures instead of restarting at zero.
+ * Volume served before a database reset. Those rows may be gone, so displayed
+ * totals resume on top of these figures instead of restarting at zero. Left
+ * unset for the Base migration — the counter starts fresh on Base Sepolia USDC.
  */
 function positiveEnvNumber(key: string): number {
   const n = Number(process.env[key] ?? 0);
@@ -91,58 +123,80 @@ function fromDbSummary(s: PaymentsRevenueSummary): RevenueSummary {
     totalCalls: s.totalCalls,
     baselineCalls: 0,
     baselineUsdc: 0,
-    totalUsdc: s.totalUsdc,
+    totalUsdc: unitsToUsdc(s.totalAtomic),
     uniquePayers: s.uniquePayers,
     uniqueSellers: s.uniqueSellers,
-    byResource: s.byResource,
-    bySeller: s.bySeller,
+    byResource: s.byResource.map((r) => ({
+      resource: r.resource,
+      calls: r.calls,
+      usdc: unitsToUsdc(r.amountAtomic),
+    })),
+    bySeller: s.bySeller.map((r) => ({
+      seller: r.seller,
+      calls: r.calls,
+      usdc: unitsToUsdc(r.amountAtomic),
+    })),
     recent: s.recent.map((r) => ({
       resource: r.resource,
-      amountUsdc: r.amount_bot,
+      network: r.network,
+      assetSymbol: r.asset_symbol,
+      amountUsdc: unitsToUsdc(r.amount_atomic),
       payer: r.payer,
       seller: r.seller,
-      txHash: r.tx_id,
-      at: r.at,
+      transactionHash: r.transaction_hash,
+      at: r.settled_at,
     })),
   };
 }
 
 function inMemorySummary(limit: number): RevenueSummary {
-  const byResource = new Map<string, { calls: number; bot: number }>();
-  const bySeller = new Map<string, { calls: number; bot: number }>();
+  const byResource = new Map<string, { calls: number; atomic: bigint }>();
+  const bySeller = new Map<string, { calls: number; atomic: bigint }>();
   const payers = new Set<string>();
   const sellers = new Set<string>();
-  let totalUsdc = 0;
+  let totalAtomic = 0n;
   for (const e of events) {
-    totalUsdc += e.amountUsdc;
+    totalAtomic += e.amountAtomic;
     if (e.payer) payers.add(e.payer.toLowerCase());
     if (e.seller) {
       const seller = e.seller.toLowerCase();
       sellers.add(seller);
-      const s = bySeller.get(seller) ?? { calls: 0, bot: 0 };
+      const s = bySeller.get(seller) ?? { calls: 0, atomic: 0n };
       s.calls += 1;
-      s.bot += e.amountUsdc;
+      s.atomic += e.amountAtomic;
       bySeller.set(seller, s);
     }
-    const r = byResource.get(e.resource) ?? { calls: 0, bot: 0 };
+    const r = byResource.get(e.resource) ?? { calls: 0, atomic: 0n };
     r.calls += 1;
-    r.bot += e.amountUsdc;
+    r.atomic += e.amountAtomic;
     byResource.set(e.resource, r);
   }
   return {
     totalCalls: events.length,
     baselineCalls: 0,
     baselineUsdc: 0,
-    totalUsdc: Math.round(totalUsdc * 1e6) / 1e6,
+    totalUsdc: unitsToUsdc(totalAtomic),
     uniquePayers: payers.size,
     uniqueSellers: sellers.size,
     byResource: [...byResource.entries()]
-      .map(([resource, v]) => ({ resource, calls: v.calls, bot: Math.round(v.bot * 1e6) / 1e6 }))
-      .sort((a, b) => b.bot - a.bot),
+      .map(([resource, v]) => ({ resource, calls: v.calls, usdc: unitsToUsdc(v.atomic) }))
+      .sort((a, b) => b.usdc - a.usdc),
     bySeller: [...bySeller.entries()]
-      .map(([seller, v]) => ({ seller, calls: v.calls, bot: Math.round(v.bot * 1e6) / 1e6 }))
-      .sort((a, b) => b.bot - a.bot),
-    recent: events.slice(-limit).reverse(),
+      .map(([seller, v]) => ({ seller, calls: v.calls, usdc: unitsToUsdc(v.atomic) }))
+      .sort((a, b) => b.usdc - a.usdc),
+    recent: events
+      .slice(-limit)
+      .reverse()
+      .map((e) => ({
+        resource: e.resource,
+        network: e.network,
+        assetSymbol: USDC_SYMBOL,
+        amountUsdc: unitsToUsdc(e.amountAtomic),
+        payer: e.payer,
+        seller: e.seller,
+        transactionHash: e.transactionHash,
+        at: e.settledAt,
+      })),
   };
 }
 
@@ -150,14 +204,14 @@ function inMemorySummary(limit: number): RevenueSummary {
 export async function getRevenueSummary(limit = 25): Promise<RevenueSummary> {
   const withBaseline = (s: RevenueSummary): RevenueSummary => {
     const calls = baselineCalls();
-    const bot = baselineUsdc();
-    if (calls === 0 && bot === 0) return s;
+    const usdc = baselineUsdc();
+    if (calls === 0 && usdc === 0) return s;
     return {
       ...s,
       totalCalls: s.totalCalls + calls,
       baselineCalls: calls,
-      totalUsdc: Math.round((s.totalUsdc + bot) * 1e6) / 1e6,
-      baselineUsdc: bot,
+      totalUsdc: Math.round((s.totalUsdc + usdc) * 1e6) / 1e6,
+      baselineUsdc: usdc,
     };
   };
   try {

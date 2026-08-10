@@ -7,7 +7,7 @@
  */
 
 import { COUNCIL_PERSONAS } from "../council/personas";
-import { fetchWithBudget, type PayingWallet } from "../../lib/paid-client";
+import { fetchWithBudget, type PayingWallet } from "../../lib/x402/buyer";
 import { usdcToUnits } from "../../lib/usdc";
 
 export interface ClaimCandidateForPreflight {

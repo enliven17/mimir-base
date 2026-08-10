@@ -22,7 +22,7 @@
  */
 
 import { COUNCIL_PERSONAS, type PersonaSpec } from "../council/personas";
-import { fetchWithBudget, type PayingWallet } from "../../lib/paid-client";
+import { fetchWithBudget, type PayingWallet } from "../../lib/x402/buyer";
 import { transferUsdc, type AgentWallet } from "../../lib/agent-wallets";
 import { usdcToUnits } from "../../lib/usdc";
 import { isVerdict, type Verdict } from "../../lib/verdict";
@@ -34,7 +34,7 @@ export interface CouncilVote {
   displayName: string;
   verdict: Verdict;
   confidence: number;
-  pricePaidUnits: string | null; // wei (18dp USDC), null if free/unsettled
+  pricePaidUnits: string | null; // USDC atomic units (6dp), null if free/unsettled
   /** Persona wallet that received the vote fee (bonus transfer target). */
   walletAddress?: string;
   /** q_t = P(CHALLENGERS_WIN) implied by this report (self-resolving mode). */
@@ -131,7 +131,7 @@ export function allocateBonus(scores: number[], poolUsdc: number): number[] {
   const positives = scores.map((s) => (s > 0 ? s : 0));
   const total = positives.reduce((a, b) => a + b, 0);
   if (total <= 0 || poolUsdc <= 0) return scores.map(() => 0);
-  // Integer micro-BOT with a float-noise epsilon: floors guarantee the sum
+  // Integer micro-USDC with a float-noise epsilon: floors guarantee the sum
   // never exceeds the pool.
   const poolMicro = Math.round(poolUsdc * 1e6);
   return positives.map((s) => {

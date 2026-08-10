@@ -856,7 +856,7 @@ export default function VSDetailPage() {
     const resolveTxHash = pendingResolveTxHash as `0x${string}`;
 
     async function watchResolveTransaction() {
-      // BOT Chain has sub-second finality — just wait for the EVM receipt.
+      // Base blocks are ~2s — just wait for the EVM receipt.
       const client = createBasePublicClient();
       try {
         const receipt = await client.waitForTransactionReceipt({ hash: resolveTxHash });

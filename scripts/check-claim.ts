@@ -1,4 +1,4 @@
-/** Quick read of claim #1 state on BOT Chain. Run: npx tsx --env-file=.env.local scripts/check-claim.ts */
+/** Quick read of claim #1 state on Base Sepolia. Run: npx tsx --env-file=.env.local scripts/check-claim.ts */
 import { createBasePublicClient, getContractAddress } from "../lib/base";
 import { MIMIR_ABI, STATE } from "../lib/mimir-abi";
 

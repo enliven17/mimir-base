@@ -2,7 +2,7 @@
  * Mimir Council Worker
  *
  * Boots a single Node process that runs 10 AI personas as autonomous
- * economic actors on BOT Chain. Every cycle:
+ * economic actors on Base. Every cycle:
  *
  *   1. Reads claimCount + each open/active claim from the contract.
  *   2. Builds a per-cycle evidence cache so 10 personas share 1 HTTP

@@ -35,7 +35,7 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.log("BOT Chain Testnet balances (gas ETH + stake USDC):\n");
+  console.log("Base Sepolia balances (gas ETH + stake USDC):\n");
   console.log(`USDC token: ${USDC_ADDRESS}\n`);
   for (const row of rows) {
     const bot = await client.getBalance({ address: row.address });

@@ -157,7 +157,7 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
     PRIMARY KEY (claim_id, address)
   )` },
   { sql: "CREATE INDEX IF NOT EXISTS idx_challengers_address ON challengers(address)" },
-  // Stakes/payouts are BOT floats (e.g. 5.53), not whole numbers — BIGINT
+  // Stakes/payouts are USDC decimals (e.g. 5.53), not whole numbers — BIGINT
   // columns rejected every fractional write, silently dropping challenger
   // rows (upsertChallengers wraps delete+inserts in one transaction, so a
   // single fractional stake rolled the whole claim's challenger list back).
@@ -199,20 +199,33 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   { sql: "CREATE INDEX IF NOT EXISTS idx_challenge_opportunities_locale ON challenge_opportunities(locale)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_challenge_opportunities_expires_at ON challenge_opportunities(expires_at)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_challenge_opportunities_action ON challenge_opportunities(action)" },
-  { sql: `CREATE TABLE IF NOT EXISTS payments (
+  // x402 settlement ledger. Amounts are ATOMIC token units, never floats — a
+  // DOUBLE PRECISION column cannot hold 6dp money without rounding drift, and
+  // SUM() over it compounds it. The old float `payments` table is deliberately
+  // not migrated: revenue restarts from zero on Base Sepolia USDC.
+  { sql: `CREATE TABLE IF NOT EXISTS payments_v2 (
     id BIGSERIAL PRIMARY KEY,
     resource TEXT NOT NULL,
-    amount_bot DOUBLE PRECISION NOT NULL DEFAULT 0,
+    scheme TEXT NOT NULL DEFAULT 'exact',
+    network TEXT NOT NULL,
+    asset_address TEXT NOT NULL,
+    asset_symbol TEXT NOT NULL DEFAULT 'USDC',
+    asset_decimals SMALLINT NOT NULL DEFAULT 6,
+    amount_atomic NUMERIC(78,0) NOT NULL,
     payer TEXT,
     seller TEXT,
-    tx_id TEXT,
-    at BIGINT NOT NULL DEFAULT 0
+    transaction_hash TEXT,
+    payment_identifier TEXT NOT NULL,
+    facilitator TEXT,
+    settled_at BIGINT NOT NULL DEFAULT 0,
+    created_at BIGINT NOT NULL DEFAULT 0
   )` },
-  { sql: "ALTER TABLE payments ADD COLUMN IF NOT EXISTS seller TEXT" },
-  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_at ON payments(at DESC)" },
-  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_resource ON payments(resource)" },
-  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_seller ON payments(seller)" },
-  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_tx_id ON payments(tx_id)" },
+  // One row per x402 authorization: a retried settle must not double-count.
+  { sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_payments_v2_identifier ON payments_v2(network, payment_identifier)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_settled_at ON payments_v2(settled_at DESC)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_resource ON payments_v2(resource)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_seller ON payments_v2(seller)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_tx ON payments_v2(network, transaction_hash, resource)" },
   {
     sql: "INSERT INTO sync_meta(key, value) VALUES($1, $2) ON CONFLICT(key) DO NOTHING",
     args: ["last_claim_count", "0"],
@@ -848,96 +861,135 @@ export async function getActiveChallengeOpportunities(args?: {
   return result.rows.map((row) => normalizeChallengeOpportunityRow(row as Record<string, unknown>));
 }
 
-// ── Paid-resource payment ledger ──────────────────────────────────────────────
-// Durable record of every verified pay-per-request. The on-chain BOT transfers
-// are the ultimate source of truth; this powers the /revenue dashboard and
-// survives restarts (unlike the in-memory ring buffer).
+// ── x402 payment ledger ───────────────────────────────────────────────────────
+// Durable record of every settled x402 payment. The chain settlements are the
+// ultimate source of truth; this powers /revenue and survives restarts (unlike
+// the in-memory ring buffer). Every amount here is ATOMIC token units.
 
 export interface PaymentRow {
   resource: string;
-  amount_bot: number;
+  scheme: string;
+  network: string;
+  asset_address: string;
+  asset_symbol: string;
+  asset_decimals: number;
+  amount_atomic: bigint;
   payer: string | null;
   seller: string | null;
-  tx_id: string | null;
-  at: number;
+  transaction_hash: string | null;
+  payment_identifier: string;
+  facilitator: string | null;
+  settled_at: number;
+  created_at: number;
 }
 
 export interface PaymentsRevenueSummary {
   totalCalls: number;
-  totalUsdc: number;
+  /** Sum of amount_atomic across the ledger. */
+  totalAtomic: bigint;
   uniquePayers: number;
   uniqueSellers: number;
-  byResource: Array<{ resource: string; calls: number; bot: number }>;
-  bySeller: Array<{ seller: string; calls: number; bot: number }>;
+  byResource: Array<{ resource: string; calls: number; amountAtomic: bigint }>;
+  bySeller: Array<{ seller: string; calls: number; amountAtomic: bigint }>;
   recent: PaymentRow[];
+}
+
+/** NUMERIC(78,0) comes back as a string from pg — parse it, never via Number(). */
+function getBigInt(value: unknown): bigint {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number") return BigInt(Math.trunc(value));
+  if (typeof value === "string" && value.trim().length > 0) return BigInt(value.trim());
+  return 0n;
 }
 
 export async function insertPayment(e: PaymentRow): Promise<void> {
   const pool = await getDb();
   await execute(pool, {
-    sql: "INSERT INTO payments(resource, amount_bot, payer, seller, tx_id, at) VALUES (?, ?, ?, ?, ?, ?)",
-    args: [e.resource, e.amount_bot, e.payer, e.seller, e.tx_id, e.at],
+    sql: `INSERT INTO payments_v2 (
+      resource, scheme, network, asset_address, asset_symbol, asset_decimals,
+      amount_atomic, payer, seller, transaction_hash, payment_identifier,
+      facilitator, settled_at, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(network, payment_identifier) DO NOTHING`,
+    args: [
+      e.resource,
+      e.scheme,
+      e.network,
+      e.asset_address.toLowerCase(),
+      e.asset_symbol,
+      e.asset_decimals,
+      // NUMERIC accepts the decimal string; bigint is not a pg wire type.
+      e.amount_atomic.toString(),
+      e.payer?.toLowerCase() ?? null,
+      e.seller?.toLowerCase() ?? null,
+      e.transaction_hash?.toLowerCase() ?? null,
+      e.payment_identifier.toLowerCase(),
+      e.facilitator,
+      e.settled_at,
+      e.created_at,
+    ],
   });
-}
-
-/** True when this transfer hash was already spent on a paid resource (replay guard). */
-export async function hasPaymentTx(txId: string): Promise<boolean> {
-  const pool = await getDb();
-  const res = await execute(pool, {
-    sql: "SELECT 1 AS one FROM payments WHERE tx_id = ? LIMIT 1",
-    args: [txId.toLowerCase()],
-  });
-  return res.rows.length > 0;
 }
 
 export async function getPaymentsRevenueSummary(limit = 25): Promise<PaymentsRevenueSummary> {
   const pool = await getDb();
-  const [totals, byResource, recent] = await Promise.all([
+  const [totals, byResource, bySeller, recent] = await Promise.all([
     execute(pool, {
-      sql: `SELECT COUNT(*) AS calls, COALESCE(SUM(amount_bot), 0) AS bot,
-              COUNT(DISTINCT LOWER(payer)) FILTER (WHERE payer IS NOT NULL) AS payers,
-              COUNT(DISTINCT LOWER(seller)) FILTER (WHERE seller IS NOT NULL) AS sellers
-            FROM payments`,
+      sql: `SELECT COUNT(*) AS calls, COALESCE(SUM(amount_atomic), 0) AS atomic,
+              COUNT(DISTINCT payer) FILTER (WHERE payer IS NOT NULL) AS payers,
+              COUNT(DISTINCT seller) FILTER (WHERE seller IS NOT NULL) AS sellers
+            FROM payments_v2`,
     }),
     execute(pool, {
-      sql: `SELECT resource, COUNT(*) AS calls, COALESCE(SUM(amount_bot), 0) AS bot
-            FROM payments GROUP BY resource ORDER BY bot DESC`,
+      sql: `SELECT resource, COUNT(*) AS calls, COALESCE(SUM(amount_atomic), 0) AS atomic
+            FROM payments_v2 GROUP BY resource ORDER BY atomic DESC`,
     }),
     execute(pool, {
-      sql: "SELECT resource, amount_bot, payer, seller, tx_id, at FROM payments ORDER BY at DESC, id DESC LIMIT ?",
+      sql: `SELECT seller, COUNT(*) AS calls, COALESCE(SUM(amount_atomic), 0) AS atomic
+            FROM payments_v2
+            WHERE seller IS NOT NULL
+            GROUP BY seller
+            ORDER BY atomic DESC`,
+    }),
+    execute(pool, {
+      sql: `SELECT resource, scheme, network, asset_address, asset_symbol, asset_decimals,
+              amount_atomic, payer, seller, transaction_hash, payment_identifier,
+              facilitator, settled_at, created_at
+            FROM payments_v2 ORDER BY settled_at DESC, id DESC LIMIT ?`,
       args: [limit],
     }),
   ]);
-  const bySeller = await execute(pool, {
-    sql: `SELECT seller, COUNT(*) AS calls, COALESCE(SUM(amount_bot), 0) AS bot
-          FROM payments
-          WHERE seller IS NOT NULL
-          GROUP BY seller
-          ORDER BY bot DESC`,
-  });
   const t = totals.rows[0] ?? {};
   return {
     totalCalls: getNumber(t.calls),
-    totalUsdc: Math.round(getNumber(t.bot) * 1e6) / 1e6,
+    totalAtomic: getBigInt(t.atomic),
     uniquePayers: getNumber(t.payers),
     uniqueSellers: getNumber(t.sellers),
     byResource: byResource.rows.map((r) => ({
       resource: getString(r.resource),
       calls: getNumber(r.calls),
-      bot: Math.round(getNumber(r.bot) * 1e6) / 1e6,
+      amountAtomic: getBigInt(r.atomic),
     })),
     bySeller: bySeller.rows.map((r) => ({
       seller: getString(r.seller),
       calls: getNumber(r.calls),
-      bot: Math.round(getNumber(r.bot) * 1e6) / 1e6,
+      amountAtomic: getBigInt(r.atomic),
     })),
     recent: recent.rows.map((r) => ({
       resource: getString(r.resource),
-      amount_bot: getNumber(r.amount_bot),
+      scheme: getString(r.scheme),
+      network: getString(r.network),
+      asset_address: getString(r.asset_address),
+      asset_symbol: getString(r.asset_symbol),
+      asset_decimals: getNumber(r.asset_decimals),
+      amount_atomic: getBigInt(r.amount_atomic),
       payer: getNullableString(r.payer),
       seller: getNullableString(r.seller),
-      tx_id: getNullableString(r.tx_id),
-      at: getNumber(r.at),
+      transaction_hash: getNullableString(r.transaction_hash),
+      payment_identifier: getString(r.payment_identifier),
+      facilitator: getNullableString(r.facilitator),
+      settled_at: getNumber(r.settled_at),
+      created_at: getNumber(r.created_at),
     })),
   };
 }

@@ -46,7 +46,7 @@ export interface PersonaSpec {
   ruleEvaluator?: RuleEvaluator;
   /** Minimum LLM confidence to stake. Defaults to 75. Statistician is strict; Yapper is loose. */
   minConfidence?: number;
-  /** BOT per stake. Defaults to 2. */
+  /** USDC per stake. Defaults to 2. */
   stakeUsdc?:     number;
   /** Tailwind accent classes for cards/badges. */
   accent: {

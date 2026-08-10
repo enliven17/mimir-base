@@ -1,33 +1,27 @@
 /**
- * Premium price oracle — sold per request (0.001 BOT / call).
+ * Premium price oracle — sold per request over x402 ($0.001 in USDC / call).
  *
  * GET /api/premium/price?symbol=bitcoin
  *
- * This is the SELL side of Mimir's payment economy: a paywalled data source
- * any agent can buy from. Mimir's own oracle pays this endpoint when a claim's
- * resolution URL points here — closing the loop where one agent earns BOT by
+ * This is the SELL side of Mimir's payment economy: a paywalled data source any
+ * agent can buy from. Mimir's own oracle pays this endpoint when a claim's
+ * resolution URL points here — closing the loop where one agent earns USDC by
  * serving another agent's data need.
  *
- * Unpaid requests get a 402 with payment requirements; paid requests get a
+ * Unpaid requests get a PAYMENT-REQUIRED 402; a signed retry gets a
  * deterministic price snapshot suitable for on-chain settlement.
  */
 
-import { requireBotPayment, json } from "@/lib/paid-server";
+import { NextResponse, type NextRequest } from "next/server";
+import { paidRoute } from "@/lib/x402/server";
+import { PRICES } from "@/lib/x402/config";
 
 const COINGECKO = "https://api.coingecko.com/api/v3";
-const PRICE_BOT = "0.001";
 
-export async function GET(req: Request): Promise<Response> {
-  // 1. Gate behind payment. 402 until the caller pays.
-  const gate = await requireBotPayment(req, PRICE_BOT);
-  if (!gate.paid) return gate.response;
-
-  // 2. Paid — serve the data.
-  const symbol = (new URL(req.url).searchParams.get("symbol") ?? "bitcoin")
-    .toLowerCase()
-    .trim();
+async function handler(req: NextRequest): Promise<NextResponse> {
+  const symbol = (req.nextUrl.searchParams.get("symbol") ?? "bitcoin").toLowerCase().trim();
   if (!/^[a-z0-9-]+$/.test(symbol)) {
-    return json({ error: "invalid symbol" }, { status: 400, headers: gate.responseHeaders });
+    return NextResponse.json({ error: "invalid symbol" }, { status: 400 });
   }
 
   try {
@@ -40,31 +34,29 @@ export async function GET(req: Request): Promise<Response> {
       { headers, cache: "no-store", signal: AbortSignal.timeout(10_000) },
     );
     if (!res.ok) {
-      return json(
-        { error: `upstream ${res.status}` },
-        { status: 502, headers: gate.responseHeaders },
-      );
+      return NextResponse.json({ error: `upstream ${res.status}` }, { status: 502 });
     }
     const payload = (await res.json()) as Record<string, { usd?: number; last_updated_at?: number }>;
     const row = payload[symbol];
     if (!row || typeof row.usd !== "number") {
-      return json({ error: "unknown symbol" }, { status: 404, headers: gate.responseHeaders });
+      return NextResponse.json({ error: "unknown symbol" }, { status: 404 });
     }
 
     // Deterministic, LLM-friendly snapshot — the same shape the oracle expects.
-    return json(
-      {
-        source: "Mimir Premium Price Oracle",
-        symbol,
-        price_usd: row.usd,
-        last_updated_at: row.last_updated_at ?? null,
-        fetched_at: Math.floor(Date.now() / 1000),
-        paid: `${PRICE_BOT} BOT`,
-      },
-      { headers: gate.responseHeaders },
-    );
+    return NextResponse.json({
+      source: "Mimir Premium Price Oracle",
+      symbol,
+      price_usd: row.usd,
+      last_updated_at: row.last_updated_at ?? null,
+      fetched_at: Math.floor(Date.now() / 1000),
+      paid: PRICES.premiumPrice,
+    });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "fetch failed";
-    return json({ error: msg }, { status: 502, headers: gate.responseHeaders });
+    return NextResponse.json({ error: msg }, { status: 502 });
   }
 }
+
+// Settlement only happens when the handler returns < 400, so an upstream 502
+// costs the buyer nothing.
+export const GET = paidRoute("premiumPrice", handler);

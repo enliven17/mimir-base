@@ -1,30 +1,39 @@
 /**
- * Council subscription — one payment buys a window of free council reads.
+ * Council pass — one payment buys a window of free council reads.
  *
- * POST /api/council/subscribe   (0.01 BOT → platform seller)
+ * POST /api/council/subscribe   ($0.01 USDC → platform seller)
  *   → { pass, expiresAt, plan }
  *
- * Pass the returned token to /api/council/reasoning?...&pass=<pass> and reads
- * are free until it expires (default 10 min). This is the recurring/streaming
- * access tier on top of the per-read payment. Unpaid → 402.
+ * Pass the returned token to /api/council/reasoning?...&pass=<pass> and reads are
+ * free until it expires (default 10 min). This is the bundled-access tier on top
+ * of the per-read payment; it is deliberately NOT a recurring subscription —
+ * per-request x402 and real recurring billing are separate payment products.
+ * Unpaid → PAYMENT-REQUIRED 402.
  */
 
-import { requireBotPayment, json } from "@/lib/paid-server";
+import { NextResponse, type NextRequest } from "next/server";
+import { paidRoute, paymentPayer } from "@/lib/x402/server";
+import { PRICES } from "@/lib/x402/config";
 import { issuePass } from "@/lib/paid-pass";
 
-const PRICE = "0.01";
 const PLAN = "council";
 const TTL_MS = Number(process.env.COUNCIL_PASS_TTL_MS ?? 10 * 60 * 1000);
 
-export async function POST(req: Request): Promise<Response> {
-  const gate = await requireBotPayment(req, PRICE);
-  if (!gate.paid) return gate.response;
-
-  // Bind the pass to whoever paid (verified on-chain sender).
-  const payer = gate.payer;
+async function handler(req: NextRequest): Promise<NextResponse> {
+  // Bind the pass to whoever signed the payment the paywall just verified.
+  const payer = paymentPayer(req);
+  if (!payer) {
+    return NextResponse.json({ error: "could not read payer from payment" }, { status: 400 });
+  }
   const { pass, expiresAt } = issuePass(payer, PLAN, TTL_MS);
-  return json(
-    { plan: PLAN, payer, pass, expiresAt, ttlMs: TTL_MS, price: `${PRICE} BOT` },
-    { headers: gate.responseHeaders },
-  );
+  return NextResponse.json({
+    plan: PLAN,
+    payer,
+    pass,
+    expiresAt,
+    ttlMs: TTL_MS,
+    price: PRICES.councilSubscribe,
+  });
 }
+
+export const POST = paidRoute("councilSubscribe", handler);

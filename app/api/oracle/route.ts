@@ -1,23 +1,24 @@
 /**
  * Mimir Oracle-as-a-Service — sell the oracle's verdict per call.
  *
- * POST /api/oracle   (0.005 BOT / verdict)
+ * POST /api/oracle   ($0.005 in USDC / verdict, over x402)
  *   body: { question, sideA, sideB, evidenceUrl, settlementRule? }
  *
  * This monetizes Mimir's core competency — reading evidence and judging an
- * outcome — as a standalone, pay-per-call service. Any agent or app pays a
- * small BOT transfer and gets back a verdict with confidence + an evidence
- * hash they can verify themselves.
+ * outcome — as a standalone, pay-per-call service. Any agent or app signs a
+ * small USDC authorization and gets back a verdict with confidence + an
+ * evidence hash they can verify themselves.
  *
- * Unpaid → 402 with payment requirements. Paid → the verdict.
+ * Unpaid → PAYMENT-REQUIRED 402. Signed retry → the verdict.
  */
 
 import { keccak256, toBytes } from "viem";
-import { requireBotPayment, json } from "@/lib/paid-server";
+import { NextResponse, type NextRequest } from "next/server";
+import { paidRoute } from "@/lib/x402/server";
+import { PRICES } from "@/lib/x402/config";
 import { callLLM, extractJson } from "@/lib/llm";
 import { fetchEvidence } from "@/lib/server/evidence-fetcher";
 
-const PRICE = "0.005";
 const MAX_EVIDENCE_CHARS = 8_000;
 
 interface VerdictRequest {
@@ -28,33 +29,28 @@ interface VerdictRequest {
   settlementRule?: string;
 }
 
-export async function POST(req: Request): Promise<Response> {
-  // 1. Payment gate.
-  const gate = await requireBotPayment(req, PRICE);
-  if (!gate.paid) return gate.response;
-
-  // 2. Parse + validate the question (body untouched by the payment shim).
+async function handler(req: NextRequest): Promise<NextResponse> {
   let body: VerdictRequest;
   try {
     body = (await req.json()) as VerdictRequest;
   } catch {
-    return json({ error: "invalid JSON body" }, { status: 400, headers: gate.responseHeaders });
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
   }
   const question = body.question?.trim();
   const sideA = body.sideA?.trim();
   const sideB = body.sideB?.trim();
   const evidenceUrl = body.evidenceUrl?.trim();
   if (!question || !sideA || !sideB || !evidenceUrl) {
-    return json(
+    return NextResponse.json(
       { error: "question, sideA, sideB, evidenceUrl are required" },
-      { status: 400, headers: gate.responseHeaders },
+      { status: 400 },
     );
   }
   if (!/^https?:\/\//.test(evidenceUrl)) {
-    return json({ error: "evidenceUrl must be http(s)" }, { status: 400, headers: gate.responseHeaders });
+    return NextResponse.json({ error: "evidenceUrl must be http(s)" }, { status: 400 });
   }
 
-  // 3. Fetch evidence + judge. Same evidence-hash discipline as on-chain settle.
+  // Fetch evidence + judge. Same evidence-hash discipline as on-chain settle.
   let evidenceText = "(no evidence)";
   let fetcher = "none";
   try {
@@ -99,15 +95,14 @@ Return JSON only:
     /* keep defaults */
   }
 
-  return json(
-    {
-      verdict,
-      confidence,
-      explanation,
-      evidenceHash: keccak256(toBytes(evidenceText)),
-      evidenceFetcher: fetcher,
-      price: `${PRICE} BOT`,
-    },
-    { headers: gate.responseHeaders },
-  );
+  return NextResponse.json({
+    verdict,
+    confidence,
+    explanation,
+    evidenceHash: keccak256(toBytes(evidenceText)),
+    evidenceFetcher: fetcher,
+    price: PRICES.oracle,
+  });
 }
+
+export const POST = paidRoute("oracle", handler);

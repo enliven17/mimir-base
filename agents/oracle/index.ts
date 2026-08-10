@@ -1,12 +1,12 @@
 /**
- * Mimir Oracle Agent — AI economic actor on BOT Chain
+ * Mimir Oracle Agent — AI economic actor on Base
  *
  * Two roles:
  *   1. SETTLER: resolves expired active claims (pays out winners)
  *   2. CHALLENGER: evaluates open claims early and auto-stakes on mispriced ones
  *
  * This makes the oracle a genuine economic participant — not just a judge,
- * but a player that puts BOT on the line when it's confident.
+ * but a player that puts USDC on the line when it's confident.
  *
  * Signs all transactions with a local private key (ORACLE_PRIVATE_KEY).
  *
@@ -14,7 +14,7 @@
  * Env: ORACLE_PRIVATE_KEY, NEXT_PUBLIC_CONTRACT_ADDRESS
  *      + one of: GEMINI_API_KEY (preferred) OR ANTHROPIC_API_KEY
  *      AUTO_CHALLENGE=1        (enable auto-challenger, default off)
- *      CHALLENGE_STAKE_BOT=2  (stake per challenge, default 2 BOT)
+ *      CHALLENGE_STAKE_USDC=2 (stake per challenge, default 2 USDC)
  *      CHALLENGE_CONFIDENCE=80 (min confidence to challenge, default 80)
  *      ORACLE_LLM_THROTTLE_MS=0 (min ms between LLM calls; raise to stay
  *                                under free-tier RPM, e.g. 5000 ≈ 12 RPM)
@@ -45,7 +45,7 @@ import {
   agentContractWrite,
   getOracleWallet,
 } from "../../lib/agent-wallets";
-import { fetchWithBudget, payingWalletFor } from "../../lib/paid-client";
+import { fetchWithBudget, payingWalletFor } from "../../lib/x402/buyer";
 import { MIMIR_ABI, WINNER_SIDE, STATE, BPS_DIVISOR } from "../../lib/mimir-abi";
 import { unitsToUsdc, usdcToUnits, ERC20_ABI, USDC_ADDRESS } from "../../lib/usdc";
 import { fetchDecodedClaim, type DecodedClaim } from "../../lib/claim-codec";
@@ -70,13 +70,13 @@ const MAX_CONTENT_CHARS     = 8_000;
 const CONTRACT_ADDRESS      = getContractAddress();
 const AUTO_CHALLENGE        = process.env.AUTO_CHALLENGE === "1";
 const CHALLENGE_STAKE_USDC = Number(
-  process.env.CHALLENGE_STAKE_USDC ?? process.env.CHALLENGE_STAKE_BOT ?? "2"
+  process.env.CHALLENGE_STAKE_USDC ?? "2"
 );
 const CHALLENGE_CONFIDENCE  = Number(process.env.CHALLENGE_CONFIDENCE ?? "80");
 const LLM_THROTTLE_MS       = Number(process.env.ORACLE_LLM_THROTTLE_MS ?? "8000");
 
 // HTTP 402 paid-evidence config. The oracle becomes a PAYING agent: when a
-// resolution source answers 402, it buys the data with a sub-cent BOT
+// resolution source answers 402, it buys the data with a sub-cent USDC
 // nanopayment — only up to a budget tied to what's actually at stake.
 const PAY_EVIDENCE        = process.env.PAY_EVIDENCE !== "0"; // on by default
 const EVIDENCE_POOL_BPS   = Number(process.env.EVIDENCE_POOL_BPS ?? "50");   // 0.5% of pot
@@ -84,7 +84,7 @@ const EVIDENCE_MAX_USDC   = Number(process.env.EVIDENCE_MAX_USDC ?? "0.05"); // 
 const EVIDENCE_MIN_USDC   = Number(process.env.EVIDENCE_MIN_USDC ?? "0.001");// floor (still pay tiny sources)
 
 // Council-as-jury settlement. When on, the oracle buys each eligible persona's
-// verdict via HTTP 402 BOT payment (into the persona's wallet) and settles by
+// verdict via x402 USDC payment (into the persona's wallet) and settles by
 // their tally — multi-agent consensus, on-chain. Falls back to the solo verdict
 // if too few jurors vote. Off by default so a missing web server never blocks settlement.
 const COUNCIL_SETTLEMENT  = process.env.COUNCIL_SETTLEMENT === "1";
@@ -244,7 +244,7 @@ async function evaluateClaim(
     `Resolution URL: ${claim.resolutionUrl}`,
   ].filter(Boolean).join("\n"));
 
-  const prompt = `You are Mimir, an impartial AI oracle for a BOT prediction market on BOT Chain.
+  const prompt = `You are Mimir, an impartial AI oracle for a USDC prediction market on Base.
 
 ${INJECTION_GUARD}
 
@@ -561,7 +561,7 @@ async function challengeIfMispriced(claim: ClaimOnChain): Promise<void> {
     return;
   }
 
-  // Check oracle USDC balance (stakes) — gas is separate native BOT
+  // Check oracle USDC balance (stakes) — gas is separate native ETH
   const usdcBal = (await publicClient.readContract({
     address: USDC_ADDRESS,
     abi: ERC20_ABI,

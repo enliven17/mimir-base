@@ -39,10 +39,10 @@ export async function evaluateClaimAsPersona(
     ? `\n## Your character\n${persona.promptBias}\n`
     : "";
   const peerSection = peerReasoning.length > 0
-    ? `\n## Paid peer reads you bought over HTTP 402 (BOT)\n${peerReasoning.map((read, i) => `${i + 1}. ${read}`).join("\n")}\n\nUse these as other council members' opinions, not as primary evidence. You may agree, dissent, or discount them.\n`
+    ? `\n## Paid peer reads you bought over x402 (USDC)\n${peerReasoning.map((read, i) => `${i + 1}. ${read}`).join("\n")}\n\nUse these as other council members' opinions, not as primary evidence. You may agree, dissent, or discount them.\n`
     : "";
 
-  const prompt = `You are ${persona.displayName}, one of ten AI personas on the Mimir Council — a USDC prediction-market jury on USDC Chain.
+  const prompt = `You are ${persona.displayName}, one of ten AI personas on the Mimir Council — a USDC prediction-market jury on Base.
 ${biasSection}
 ## Time context (TRUST THIS, ignore your training cutoff)
 - Current UTC time: ${nowDate}

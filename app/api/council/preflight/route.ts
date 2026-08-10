@@ -1,19 +1,20 @@
 /**
  * Council preflight, pay-per-read.
  *
- * POST /api/council/preflight?persona=optimist   (0.001 BOT / read)
+ * POST /api/council/preflight?persona=optimist   ($0.001 USDC / read)
  *
  * The market-creator buys persona opinions before opening a market. This is
  * different from /api/council/vote: preflight judges whether a candidate is
  * worth creating, while vote judges an already-created claim at settlement.
  */
 
-import { requireBotPayment, json } from "@/lib/paid-server";
+import { NextResponse, type NextRequest } from "next/server";
+import { paidRoute, queryParam } from "@/lib/x402/server";
+import type { HTTPRequestContext } from "@x402/core/http";
+import { PRICES } from "@/lib/x402/config";
 import { COUNCIL_PERSONAS } from "@/agents/council/personas";
 import { getCouncilAddress } from "@/lib/agent-wallets";
 import { callLLM } from "@/lib/llm";
-
-const PRICE = "0.001";
 
 interface CandidatePayload {
   question?: string;
@@ -26,8 +27,12 @@ interface CandidatePayload {
   qualityScore?: number;
 }
 
-function personaAddress(slug: string): string | undefined {
-  return getCouncilAddress(slug);
+/** Recipient of this opinion's fee — the persona itself, not the platform. */
+function personaAddress(ctx: HTTPRequestContext): string {
+  const slug = queryParam(ctx, "persona").toLowerCase().trim();
+  const payTo = getCouncilAddress(slug);
+  if (!payTo) throw new Error(`persona '${slug}' has no wallet configured`);
+  return payTo;
 }
 
 function cleanCandidate(value: unknown): CandidatePayload | null {
@@ -88,16 +93,15 @@ function parseModelJson(text: string): {
   }
 }
 
-export async function POST(req: Request): Promise<Response> {
-  const { searchParams } = new URL(req.url);
-  const slug = (searchParams.get("persona") ?? "").toLowerCase().trim();
+async function handler(req: NextRequest): Promise<NextResponse> {
+  const slug = (req.nextUrl.searchParams.get("persona") ?? "").toLowerCase().trim();
 
   const persona = COUNCIL_PERSONAS.find((p) => p.slug === slug);
-  if (!persona) return json({ error: `unknown persona '${slug}'` }, { status: 400 });
+  if (!persona) return NextResponse.json({ error: `unknown persona '${slug}'` }, { status: 400 });
 
-  const payTo = personaAddress(slug);
+  const payTo = getCouncilAddress(slug);
   if (!payTo) {
-    return json({ error: `persona '${slug}' has no wallet configured` }, { status: 503 });
+    return NextResponse.json({ error: `persona '${slug}' has no wallet configured` }, { status: 503 });
   }
 
   let candidate: CandidatePayload | null = null;
@@ -107,29 +111,23 @@ export async function POST(req: Request): Promise<Response> {
     candidate = null;
   }
   if (!candidate) {
-    return json({ error: "candidate payload is required" }, { status: 400 });
+    return NextResponse.json({ error: "candidate payload is required" }, { status: 400 });
   }
-
-  const gate = await requireBotPayment(req, PRICE, { payTo });
-  if (!gate.paid) return gate.response;
 
   const category = candidate.category?.toLowerCase() ?? "";
   if (
     persona.categoryFilter &&
     !persona.categoryFilter.some((c) => c.toLowerCase() === category)
   ) {
-    return json(
-      {
-        persona: { slug, name: persona.displayName, emoji: persona.emoji },
-        decision: "skip",
-        score: 30,
-        confidence: 80,
-        reasoning: `${persona.displayName} skips ${category || "uncategorized"} markets outside its domain.`,
-        paidTo: payTo,
-        price: `${PRICE} BOT`,
-      },
-      { headers: gate.responseHeaders },
-    );
+    return NextResponse.json({
+      persona: { slug, name: persona.displayName, emoji: persona.emoji },
+      decision: "skip",
+      score: 30,
+      confidence: 80,
+      reasoning: `${persona.displayName} skips ${category || "uncategorized"} markets outside its domain.`,
+      paidTo: payTo,
+      price: PRICES.councilPreflight,
+    });
   }
 
   const personaFrame =
@@ -171,13 +169,13 @@ Score the candidate as a market to create, not as a final outcome. Favor clear, 
     };
   }
 
-  return json(
-    {
-      persona: { slug, name: persona.displayName, emoji: persona.emoji },
-      ...result,
-      paidTo: payTo,
-      price: `${PRICE} BOT`,
-    },
-    { headers: gate.responseHeaders },
-  );
+  return NextResponse.json({
+    persona: { slug, name: persona.displayName, emoji: persona.emoji },
+    ...result,
+    paidTo: payTo,
+    price: PRICES.councilPreflight,
+  });
 }
+
+// Dynamic payTo: each persona is paid into its own wallet.
+export const POST = paidRoute("councilPreflight", handler, { payTo: personaAddress });

@@ -16,7 +16,7 @@
  *
  * Run: npx tsx agents/market-creator/index.ts
  * Env: CREATOR_PRIVATE_KEY, NEXT_PUBLIC_CONTRACT_ADDRESS, ANTHROPIC_API_KEY
- *      CREATOR_STAKE_BOT=2      (stake per market, default 2 BOT)
+ *      CREATOR_STAKE_USDC=2     (stake per market, default 2 USDC)
  *      MAX_CLAIMS_PER_RUN=5      (max new claims per run, default 5)
  *      MAX_ACTIVE_CLAIMS=30      (skip run if joinable on-chain claims >= this)
  *      RUN_INTERVAL_HOURS=6      (hours between runs, default 6h)
@@ -41,7 +41,7 @@ import {
   agentContractWrite,
   getCreatorWallet,
 } from "../../lib/agent-wallets";
-import { payingWalletFor } from "../../lib/paid-client";
+import { payingWalletFor } from "../../lib/x402/buyer";
 import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../lib/usdc";
 import { gatherCouncilPreflight } from "./council-preflight";
@@ -49,7 +49,7 @@ import { gatherCouncilPreflight } from "./council-preflight";
 // ── Config ────────────────────────────────────────────────────────────────────
 const CONTRACT_ADDRESS    = getContractAddress();
 const CREATOR_STAKE_USDC = Number(
-  process.env.CREATOR_STAKE_USDC ?? process.env.CREATOR_STAKE_BOT ?? "2"
+  process.env.CREATOR_STAKE_USDC ?? "2"
 );
 const MAX_CLAIMS_PER_RUN  = Number(process.env.MAX_CLAIMS_PER_RUN ?? "5");
 const MAX_ACTIVE_CLAIMS   = Number(process.env.MAX_ACTIVE_CLAIMS ?? "30");
@@ -63,7 +63,7 @@ const PREFLIGHT_ENABLED =
   process.env.MARKET_CREATOR_PREFLIGHT === "1" || Boolean(process.env.MIMIR_BASE_URL?.trim());
 const PREFLIGHT_BASE_URL = process.env.MIMIR_BASE_URL ?? "http://localhost:3000";
 const PREFLIGHT_MIN_SCORE = Number(process.env.MARKET_CREATOR_PREFLIGHT_MIN_SCORE ?? "60");
-const PREFLIGHT_CAP_BOT = Number(process.env.MARKET_CREATOR_PREFLIGHT_CAP_USDC ?? "0.005");
+const PREFLIGHT_CAP_USDC = Number(process.env.MARKET_CREATOR_PREFLIGHT_CAP_USDC ?? "0.005");
 const PREFLIGHT_PERSONAS = process.env.MARKET_CREATOR_PREFLIGHT_PERSONAS;
 const PREFLIGHT_DELAY_MS = Number(process.env.MARKET_CREATOR_PREFLIGHT_DELAY_MS ?? "30000");
 
@@ -275,7 +275,7 @@ async function applyCouncilPreflight(candidates: ClaimCandidate[]): Promise<Clai
       baseUrl: PREFLIGHT_BASE_URL,
       payer: CREATOR_PAYER,
       personaCsv: PREFLIGHT_PERSONAS,
-      capUsdc: PREFLIGHT_CAP_BOT,
+      capUsdc: PREFLIGHT_CAP_USDC,
       delayMs: PREFLIGHT_DELAY_MS,
     }).catch((err) => {
       console.warn(
@@ -485,7 +485,7 @@ async function draftClaimCandidates(sourceData: {
     ),
   ].join("\n");
 
-  const prompt = `You are Mimir, an AI that creates high-quality prediction market claims for a BOT market on BOT Chain.
+  const prompt = `You are Mimir, an AI that creates high-quality prediction market claims for a USDC market on Base.
 
 ## Current Data Sources
 
@@ -639,7 +639,7 @@ async function createClaim(candidate: ClaimCandidate): Promise<string | null> {
   const deadline = BigInt(Math.floor(Date.now() / 1000 + candidate.deadlineHours * 3600));
   const stake    = usdcToUnits(CREATOR_STAKE_USDC);
 
-  // Check USDC balance (stakes). Gas is separate native BOT.
+  // Check USDC balance (stakes). Gas is separate native ETH.
   const usdcBal = (await publicClient.readContract({
     address: USDC_ADDRESS,
     abi: ERC20_ABI,

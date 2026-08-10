@@ -37,7 +37,7 @@ export interface ClaimOnChain {
  */
 export interface PersonaDecision {
   shouldStake:   boolean;
-  /** BOT amount staked. Only meaningful when shouldStake is true. */
+  /** USDC amount staked. Only meaningful when shouldStake is true. */
   stakeUsdc:     number;
   /** Human-readable reason — surfaced in the activity log and /council. */
   rationale:     string;

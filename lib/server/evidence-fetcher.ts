@@ -46,7 +46,7 @@ export interface EvidencePayment {
   txHash: string;
 }
 
-/** Budgeted paying fetch injected by the caller (oracle wires lib/paid-client). */
+/** Budgeted paying fetch injected by the caller (oracle wires lib/x402/buyer). */
 export type PaidFetch = (
   url: string,
   init?: RequestInit,
@@ -86,7 +86,7 @@ export interface FetchEvidenceOptions {
   /**
    * When set, a 402 Payment Required from the source is paid via this budgeted
    * fetch (native BOT payment) instead of failing. The caller owns the budget cap
-   * and the paying wallet — see lib/paid-client.ts fetchWithBudget. Absent → 402 behaves
+   * and the paying wallet — see lib/x402/buyer.ts fetchWithBudget. Absent → 402 behaves
    * like any other error (falls through to Jina / failure).
    */
   paidFetch?: PaidFetch;

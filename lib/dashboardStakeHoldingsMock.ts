@@ -3,7 +3,7 @@ import type { CategoryId } from "@/lib/constants";
 /**
  * Demo dashboard holdings (Canelo / Colapinto / Álvarez) used to seed the UI
  * before real on-chain data existed. Now empty — the dashboard only renders
- * the user's actual BOT Chain claims.
+ * the user's actual on-chain claims.
  *
  * The type stays a non-empty string literal so existing consumers compile;
  * `DASHBOARD_STAKE_HOLDING_IDS` is an empty array so nothing actually renders.

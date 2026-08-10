@@ -6,7 +6,7 @@
  * ten isolated voters.
  */
 
-import { fetchWithBudget, payingWalletFor, type PayingWallet } from "../../../lib/paid-client";
+import { fetchWithBudget, payingWalletFor, type PayingWallet } from "../../../lib/x402/buyer";
 import { getCouncilWallet } from "../../../lib/agent-wallets";
 import { usdcToUnits } from "../../../lib/usdc";
 import {
