@@ -260,6 +260,7 @@ export default function CreatePage() {
   const [rematchSource, setRematchSource] = useState<VSData | null>(null);
   const [hydratedFromRematch, setHydratedFromRematch] = useState(false);
   const [rematchId, setRematchId] = useState<number | null>(null);
+  const [bestOf, setBestOf] = useState<number | null>(null);
   const [isCreateDemoUrl, setIsCreateDemoUrl] = useState(false);
   const [mockOverlayPhase, setMockOverlayPhase] =
     useState<CreateMockOverlayPhase>("closed");
@@ -600,6 +601,11 @@ export default function CreatePage() {
     const rawRematchId = Number(searchParams.get("rematch") ?? "");
     const rawSourceUrl = searchParams.get("source") ?? "";
     setRematchId(Number.isInteger(rawRematchId) && rawRematchId > 0 ? rawRematchId : null);
+    // Best-of is an intention the two sides carry into the next round, not chain
+    // state: nothing on chain records it, and the read-index has to stay a pure
+    // fold of chain events. Only odd targets, so a series cannot end level.
+    const rawBestOf = Number(searchParams.get("bestOf") ?? "");
+    setBestOf(rawBestOf === 3 || rawBestOf === 5 ? rawBestOf : null);
     const normalizedSourceSeed = normalizeResolutionSource(rawSourceUrl);
     if (normalizedSourceSeed) {
       setUrl(normalizedSourceSeed);
@@ -1238,6 +1244,11 @@ export default function CreatePage() {
                   {/* A vague settlement rule or a missing source is what made the
                       first round contentious; inheriting it silently reproduces the
                       argument. Named explicitly so the user fixes it here. */}
+                  {bestOf !== null && (
+                    <p className="mt-2 text-sm font-semibold text-pv-emerald/85">
+                      {t("bestOfTarget", { n: bestOf, wins: Math.floor(bestOf / 2) + 1 })}
+                    </p>
+                  )}
                   {rematchNeedsReview.length > 0 && (
                     <ul className="mt-3 space-y-1 text-sm text-amber-200">
                       {rematchNeedsReview.map((field) => (

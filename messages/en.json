@@ -436,7 +436,8 @@
       }
     },
     "totalReturnLabel": "Total return promised to challengers",
-    "totalReturnHint": "Challengers get {multiple}x their stake back on a win, funded from your stake. At this multiple your market can absorb about {capacity} USDC of challenges."
+    "totalReturnHint": "Challengers get {multiple}x their stake back on a win, funded from your stake. At this multiple your market can absorb about {capacity} USDC of challenges.",
+    "bestOfTarget": "Best of {n}: the first side to {wins} wins takes the series. Draws and refunds do not count toward it."
   },
   "explore": {
     "title": "THE ARENA",
@@ -949,7 +950,8 @@
     "invalidChallengeStakeMin": "Enter a stake of at least {amount} USDC",
     "minimumStakeHint": "Minimum stake is {amount} USDC.",
     "underdogBadge": "Underdog",
-    "underdogBadgeHint": "The challenger side is the thin one here: a win returns about {multiple}x your stake. Payout asymmetry only — not a statement about what is likely to happen."
+    "underdogBadgeHint": "The challenger side is the thin one here: a win returns about {multiple}x your stake. Payout asymmetry only — not a statement about what is likely to happen.",
+    "bestOfCta": "Best of {n}"
   },
   "stamp": {
     "provenDecided": "Mimir has decided",

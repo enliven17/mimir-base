@@ -2287,16 +2287,27 @@ export default function VSDetailPage() {
 
                           {!isSampleVS &&
                             (vs.state === "resolved" || vs.state === "cancelled") && (
-                              <div className="w-full flex justify-center">
+                              <div className="flex w-full flex-wrap justify-center gap-2">
                                 <Link href={`/vs/create?rematch=${vs.id}`}>
-                                  <Button
-                                    variant="emerald"
-                                    fullWidth={false}
-                                    size="sm"
-                                  >
+                                  <Button variant="emerald" fullWidth={false} size="sm">
                                     {t("createRematch")}
                                   </Button>
                                 </Link>
+                                {/* Best-of is a target the two sides agree on, not
+                                    chain state — nothing on chain stores it, and the
+                                    read-index must stay a pure fold of chain events.
+                                    So these carry the intent into the create screen
+                                    and the score below is what actually settles it. */}
+                                {[3, 5].map((bestOf) => (
+                                  <Link
+                                    key={bestOf}
+                                    href={`/vs/create?rematch=${vs.id}&bestOf=${bestOf}`}
+                                  >
+                                    <Button variant="ghost" fullWidth={false} size="sm">
+                                      {t("bestOfCta", { n: bestOf })}
+                                    </Button>
+                                  </Link>
+                                ))}
                               </div>
                             )}
                         </div>

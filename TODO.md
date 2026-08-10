@@ -250,7 +250,7 @@ payout, platform fee, owner fee veya dust olarak muhasebeleşir.
 - [ ] CTA metnini `Accept Duel`; rolleri `Creator` ve `Rival` yap.
 - [ ] Public open duel ile belirli wallet/agent'a private duel'i ayır.
 - [ ] XMTP konuşmasından duel oluşturma/accept deep-link akışı ekle.
-- [ ] Settlement sonrası `Run it back`, Best of 3 ve Best of 5 girişlerini ekle.
+- [x] Settlement sonrası `Run it back`, Best of 3 ve Best of 5 girişlerini ekle.
 
 **Kabul kriteri:** İkinci challenger katılamaz, eşit olmayan stake gönderilemez ve
 kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
