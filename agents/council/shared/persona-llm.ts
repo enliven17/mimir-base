@@ -8,7 +8,7 @@
  */
 
 import { callLLM, pickGeminiModel, extractJson } from "../../../lib/llm";
-import { weiToBot } from "../../../lib/botchain";
+import { unitsToUsdc } from "../../../lib/usdc";
 import { isVerdict, type Verdict } from "../../../lib/verdict";
 import type { PersonaSpec } from "../personas";
 import type { ClaimOnChain } from "./types";
@@ -33,7 +33,7 @@ export async function evaluateClaimAsPersona(
 ): Promise<PersonaVerdict> {
   const deadlineDate = new Date(Number(claim.deadline) * 1000).toISOString();
   const nowDate      = new Date().toISOString();
-  const potBot      = weiToBot(claim.creatorStake + claim.totalChallengerStake);
+  const potUsdc      = unitsToUsdc(claim.creatorStake + claim.totalChallengerStake);
 
   const biasSection = persona.promptBias
     ? `\n## Your character\n${persona.promptBias}\n`
@@ -42,7 +42,7 @@ export async function evaluateClaimAsPersona(
     ? `\n## Paid peer reads you bought over HTTP 402 (BOT)\n${peerReasoning.map((read, i) => `${i + 1}. ${read}`).join("\n")}\n\nUse these as other council members' opinions, not as primary evidence. You may agree, dissent, or discount them.\n`
     : "";
 
-  const prompt = `You are ${persona.displayName}, one of ten AI personas on the Mimir Council — a BOT prediction-market jury on BOT Chain.
+  const prompt = `You are ${persona.displayName}, one of ten AI personas on the Mimir Council — a USDC prediction-market jury on USDC Chain.
 ${biasSection}
 ## Time context (TRUST THIS, ignore your training cutoff)
 - Current UTC time: ${nowDate}
@@ -56,7 +56,7 @@ ${biasSection}
 **Market type:** ${claim.marketType}
 **Settlement rule:** ${claim.settlementRule || "Use the linked source to determine the outcome."}
 **Resolution URL:** ${claim.resolutionUrl}
-**Pool:** ${potBot.toFixed(2)} BOT
+**Pool:** ${potUsdc.toFixed(2)} USDC
 
 ## Web Evidence (already fetched on your behalf)
 <evidence>

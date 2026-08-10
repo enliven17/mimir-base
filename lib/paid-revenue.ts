@@ -17,7 +17,7 @@ import {
 
 export interface PaymentEvent {
   resource: string; // which endpoint earned it (e.g. /api/premium/price)
-  amountBot: number; // BOT, e.g. 0.001
+  amountUsdc: number; // BOT, e.g. 0.001
   payer: string | null; // buyer address
   seller: string | null; // wallet that received the payment
   txHash: string | null; // on-chain transfer hash
@@ -45,7 +45,7 @@ export function recordPayment(e: PaymentEvent): Promise<void> {
   // Durable write — swallow errors (e.g. DB not configured) but log them.
   return insertPayment({
     resource: e.resource,
-    amount_bot: e.amountBot,
+    amount_bot: e.amountUsdc,
     payer: e.payer,
     seller: e.seller,
     tx_id: e.txHash,
@@ -59,9 +59,9 @@ export interface RevenueSummary {
   totalCalls: number;
   /** Portion of totalCalls carried over from an earlier deployment (0 when unset). */
   baselineCalls: number;
-  totalBot: number;
-  /** Portion of totalBot carried over from an earlier deployment (0 when unset). */
-  baselineBot: number;
+  totalUsdc: number;
+  /** Portion of totalUsdc carried over from an earlier deployment (0 when unset). */
+  baselineUsdc: number;
   uniquePayers: number;
   uniqueSellers: number;
   byResource: Array<{ resource: string; calls: number; bot: number }>;
@@ -82,23 +82,23 @@ export function baselineCalls(): number {
   return Math.floor(positiveEnvNumber("PAYMENTS_BASELINE_CALLS"));
 }
 
-export function baselineBot(): number {
-  return Math.round(positiveEnvNumber("PAYMENTS_BASELINE_BOT") * 1e6) / 1e6;
+export function baselineUsdc(): number {
+  return Math.round(positiveEnvNumber("PAYMENTS_BASELINE_USDC") * 1e6) / 1e6;
 }
 
 function fromDbSummary(s: PaymentsRevenueSummary): RevenueSummary {
   return {
     totalCalls: s.totalCalls,
     baselineCalls: 0,
-    baselineBot: 0,
-    totalBot: s.totalBot,
+    baselineUsdc: 0,
+    totalUsdc: s.totalUsdc,
     uniquePayers: s.uniquePayers,
     uniqueSellers: s.uniqueSellers,
     byResource: s.byResource,
     bySeller: s.bySeller,
     recent: s.recent.map((r) => ({
       resource: r.resource,
-      amountBot: r.amount_bot,
+      amountUsdc: r.amount_bot,
       payer: r.payer,
       seller: r.seller,
       txHash: r.tx_id,
@@ -112,28 +112,28 @@ function inMemorySummary(limit: number): RevenueSummary {
   const bySeller = new Map<string, { calls: number; bot: number }>();
   const payers = new Set<string>();
   const sellers = new Set<string>();
-  let totalBot = 0;
+  let totalUsdc = 0;
   for (const e of events) {
-    totalBot += e.amountBot;
+    totalUsdc += e.amountUsdc;
     if (e.payer) payers.add(e.payer.toLowerCase());
     if (e.seller) {
       const seller = e.seller.toLowerCase();
       sellers.add(seller);
       const s = bySeller.get(seller) ?? { calls: 0, bot: 0 };
       s.calls += 1;
-      s.bot += e.amountBot;
+      s.bot += e.amountUsdc;
       bySeller.set(seller, s);
     }
     const r = byResource.get(e.resource) ?? { calls: 0, bot: 0 };
     r.calls += 1;
-    r.bot += e.amountBot;
+    r.bot += e.amountUsdc;
     byResource.set(e.resource, r);
   }
   return {
     totalCalls: events.length,
     baselineCalls: 0,
-    baselineBot: 0,
-    totalBot: Math.round(totalBot * 1e6) / 1e6,
+    baselineUsdc: 0,
+    totalUsdc: Math.round(totalUsdc * 1e6) / 1e6,
     uniquePayers: payers.size,
     uniqueSellers: sellers.size,
     byResource: [...byResource.entries()]
@@ -150,14 +150,14 @@ function inMemorySummary(limit: number): RevenueSummary {
 export async function getRevenueSummary(limit = 25): Promise<RevenueSummary> {
   const withBaseline = (s: RevenueSummary): RevenueSummary => {
     const calls = baselineCalls();
-    const bot = baselineBot();
+    const bot = baselineUsdc();
     if (calls === 0 && bot === 0) return s;
     return {
       ...s,
       totalCalls: s.totalCalls + calls,
       baselineCalls: calls,
-      totalBot: Math.round((s.totalBot + bot) * 1e6) / 1e6,
-      baselineBot: bot,
+      totalUsdc: Math.round((s.totalUsdc + bot) * 1e6) / 1e6,
+      baselineUsdc: bot,
     };
   };
   try {

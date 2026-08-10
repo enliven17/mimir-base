@@ -1,21 +1,21 @@
 /**
- * Post-deploy on-chain smoke (USDT stakes):
- *   1. Read oracle / usdt / claimCount
- *   2. Creator createClaim (2 USDT, short deadline)
- *   3. Oracle challengeClaim (2 USDT)
+ * Post-deploy on-chain smoke (USDC stakes):
+ *   1. Read oracle / usdc / claimCount
+ *   2. Creator createClaim (2 USDC, short deadline)
+ *   3. Oracle challengeClaim (2 USDC)
  *   4. Read claim state
  *
  *   npx tsx --env-file=.env.local scripts/onchain-smoke.ts
  */
 import {
-  createBotchainPublicClient,
+  createBasePublicClient,
   getContractAddress,
   getExplorerTxUrl,
-  weiToBot,
-} from "../lib/botchain";
+  weiToEth,
+} from "../lib/base";
 import { agentContractWrite, getCreatorWallet, getOracleWallet } from "../lib/agent-wallets";
 import { MIMIR_ABI, STATE } from "../lib/mimir-abi";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
 import { fetchDecodedClaim } from "../lib/claim-codec";
 
 function cleanKeys() {
@@ -28,40 +28,40 @@ function cleanKeys() {
 
 async function main() {
   cleanKeys();
-  const client = createBotchainPublicClient();
+  const client = createBasePublicClient();
   const contract = getContractAddress();
   const creator = getCreatorWallet();
   const oracle = getOracleWallet();
 
   console.log("── On-chain smoke ──");
   console.log(`Contract: ${contract}`);
-  console.log(`USDT    : ${USDT_ADDRESS}`);
+  console.log(`USDC    : ${USDC_ADDRESS}`);
   console.log(`Creator : ${creator.address}`);
   console.log(`Oracle  : ${oracle.address}`);
 
-  const [onOracle, onUsdt, claimCount] = await Promise.all([
+  const [onOracle, onUsdc, claimCount] = await Promise.all([
     client.readContract({ address: contract, abi: MIMIR_ABI, functionName: "oracle" }) as Promise<`0x${string}`>,
-    client.readContract({ address: contract, abi: MIMIR_ABI, functionName: "usdt" }) as Promise<`0x${string}`>,
+    client.readContract({ address: contract, abi: MIMIR_ABI, functionName: "usdc" }) as Promise<`0x${string}`>,
     client.readContract({ address: contract, abi: MIMIR_ABI, functionName: "claimCount" }) as Promise<bigint>,
   ]);
 
   console.log(`\n[1] config`);
   console.log(`  oracle()     = ${onOracle}`);
-  console.log(`  usdt()       = ${onUsdt}`);
+  console.log(`  usdc()       = ${onUsdc}`);
   console.log(`  claimCount() = ${claimCount}`);
 
   if (onOracle.toLowerCase() !== oracle.address.toLowerCase()) {
     throw new Error(`oracle mismatch: contract=${onOracle} expected=${oracle.address}`);
   }
-  if (onUsdt.toLowerCase() !== USDT_ADDRESS.toLowerCase()) {
-    throw new Error(`usdt mismatch: contract=${onUsdt} expected=${USDT_ADDRESS}`);
+  if (onUsdc.toLowerCase() !== USDC_ADDRESS.toLowerCase()) {
+    throw new Error(`usdc mismatch: contract=${onUsdc} expected=${USDC_ADDRESS}`);
   }
-  console.log("  ✓ oracle + usdt match");
+  console.log("  ✓ oracle + usdc match");
 
-  const stake = usdtToUnits(2);
+  const stake = usdcToUnits(2);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
-  console.log(`\n[2] createClaim (2 USDT)…`);
+  console.log(`\n[2] createClaim (2 USDC)…`);
   const createTx = await agentContractWrite({
     wallet: creator,
     contractAddress: contract,
@@ -85,7 +85,7 @@ async function main() {
       false,
       "",
     ],
-    amountUsdt: "2",
+    amountUsdc: "2",
   });
   console.log(`  create: ${getExplorerTxUrl(createTx)}`);
 
@@ -97,14 +97,14 @@ async function main() {
   const claimId = Number(newCount);
   console.log(`  claimId = #${claimId}`);
 
-  console.log(`\n[3] challengeClaim (2 USDT from oracle)…`);
+  console.log(`\n[3] challengeClaim (2 USDC from oracle)…`);
   const challengeTx = await agentContractWrite({
     wallet: oracle,
     contractAddress: contract,
     abi: MIMIR_ABI,
     functionName: "challengeClaim",
     args: [BigInt(claimId), stake, ""],
-    amountUsdt: "2",
+    amountUsdc: "2",
   });
   console.log(`  challenge: ${getExplorerTxUrl(challengeTx)}`);
 
@@ -113,8 +113,8 @@ async function main() {
   if (!decoded) throw new Error("claim not found after create");
 
   console.log(`  state            = ${decoded.state} (expect ACTIVE=${STATE.ACTIVE})`);
-  console.log(`  creatorStake     = ${unitsToUsdt(decoded.creatorStake)} USDT`);
-  console.log(`  challengerStake  = ${unitsToUsdt(decoded.totalChallengerStake)} USDT`);
+  console.log(`  creatorStake     = ${unitsToUsdc(decoded.creatorStake)} USDC`);
+  console.log(`  challengerStake  = ${unitsToUsdc(decoded.totalChallengerStake)} USDC`);
   console.log(`  challengerCount  = ${decoded.challengerCount}`);
 
   if (Number(decoded.state) !== STATE.ACTIVE) {
@@ -125,26 +125,26 @@ async function main() {
   }
   const chCount = Number(decoded.challengerCount);
   if (chCount < 1) throw new Error("expected at least 1 challenger");
-  if (unitsToUsdt(decoded.creatorStake) !== 2) {
-    throw new Error(`creator stake expected 2 USDT, got ${unitsToUsdt(decoded.creatorStake)}`);
+  if (unitsToUsdc(decoded.creatorStake) !== 2) {
+    throw new Error(`creator stake expected 2 USDC, got ${unitsToUsdc(decoded.creatorStake)}`);
   }
-  if (unitsToUsdt(decoded.totalChallengerStake) !== 2) {
-    throw new Error(`challenger stake expected 2 USDT, got ${unitsToUsdt(decoded.totalChallengerStake)}`);
+  if (unitsToUsdc(decoded.totalChallengerStake) !== 2) {
+    throw new Error(`challenger stake expected 2 USDC, got ${unitsToUsdc(decoded.totalChallengerStake)}`);
   }
 
   const pot = (await client.readContract({
-    address: USDT_ADDRESS,
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [contract],
   })) as bigint;
-  console.log(`  contract USDT bal = ${unitsToUsdt(pot)} (expect 4)`);
-  if (unitsToUsdt(pot) < 4) throw new Error("contract should hold 4 USDT pot");
+  console.log(`  contract USDC bal = ${unitsToUsdc(pot)} (expect 4)`);
+  if (unitsToUsdc(pot) < 4) throw new Error("contract should hold 4 USDC pot");
 
-  const creatorBot = await client.getBalance({ address: creator.address });
-  const oracleBot = await client.getBalance({ address: oracle.address });
-  console.log(`\n  creator gas left: ${weiToBot(creatorBot).toFixed(4)} BOT`);
-  console.log(`  oracle  gas left: ${weiToBot(oracleBot).toFixed(4)} BOT`);
+  const creatorEth = await client.getBalance({ address: creator.address });
+  const oracleEth = await client.getBalance({ address: oracle.address });
+  console.log(`\n  creator gas left: ${weiToEth(creatorEth).toFixed(4)} ETH`);
+  console.log(`  oracle  gas left: ${weiToEth(oracleEth).toFixed(4)} ETH`);
 
   console.log("\n✓ ON-CHAIN SMOKE PASSED");
 }

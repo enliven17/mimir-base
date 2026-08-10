@@ -1,13 +1,13 @@
 /**
- * Quick read of every Mimir agent wallet on BOT Chain Testnet.
- * Shows native BOT (gas) and USDT (stake) balances.
+ * Quick read of every Mimir agent wallet on ETH Chain Testnet.
+ * Shows native ETH (gas) and USDC (stake) balances.
  *
  * Run: npx tsx --env-file-if-exists=.env.local scripts/check-agent-balances.ts
  */
 import { privateKeyToAccount } from "viem/accounts";
-import { createBotchainPublicClient, weiToBot, getExplorerAddressUrl } from "../lib/botchain";
+import { createBasePublicClient, weiToEth, getExplorerAddressUrl } from "../lib/base";
 import { COUNCIL_PERSONAS, personaPrivateKeyEnv, personaAddressEnv } from "../agents/council/personas";
-import { ERC20_ABI, USDT_ADDRESS, unitsToUsdt } from "../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, unitsToUsdc } from "../lib/usdc";
 
 function addressFromKeyEnv(keyEnv: string): `0x${string}` | null {
   const key = process.env[keyEnv]?.trim();
@@ -16,7 +16,7 @@ function addressFromKeyEnv(keyEnv: string): `0x${string}` | null {
 }
 
 async function main(): Promise<void> {
-  const client = createBotchainPublicClient();
+  const client = createBasePublicClient();
 
   const rows: Array<{ label: string; address: `0x${string}` }> = [];
   const oracle = addressFromKeyEnv("ORACLE_PRIVATE_KEY") ?? (process.env.ORACLE_ADDRESS as `0x${string}` | undefined);
@@ -35,18 +35,18 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  console.log("BOT Chain Testnet balances (gas BOT + stake USDT):\n");
-  console.log(`USDT token: ${USDT_ADDRESS}\n`);
+  console.log("BOT Chain Testnet balances (gas ETH + stake USDC):\n");
+  console.log(`USDC token: ${USDC_ADDRESS}\n`);
   for (const row of rows) {
     const bot = await client.getBalance({ address: row.address });
-    const usdt = (await client.readContract({
-      address: USDT_ADDRESS,
+    const usdc = (await client.readContract({
+      address: USDC_ADDRESS,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [row.address],
     })) as bigint;
     console.log(
-      `  ${row.label.padEnd(26)} ${weiToBot(bot).toFixed(4).padStart(8)} BOT  ${unitsToUsdt(usdt).toFixed(2).padStart(10)} USDT  ${row.address}`
+      `  ${row.label.padEnd(26)} ${weiToEth(bot).toFixed(4).padStart(8)} ETH  ${unitsToUsdc(usdc).toFixed(2).padStart(10)} USDC  ${row.address}`
     );
   }
   console.log(`\n${getExplorerAddressUrl(rows[0].address)}`);

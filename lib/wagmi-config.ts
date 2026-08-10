@@ -1,16 +1,16 @@
 /**
- * wagmi config for Mimir on BOT Chain
+ * wagmi config for Mimir on Base Sepolia
  *
- * Supports: MetaMask, Coinbase Wallet, Rainbow, Phantom, Trust, Brave,
- * any EIP-6963 injected wallet, and WalletConnect QR (380+ mobile wallets).
- * Connect UX is a lightweight picker in lib/wallet.tsx (wagmi v3 native).
+ * Supports: Base Account, MetaMask, Coinbase Wallet, Rainbow, Phantom, Trust,
+ * Brave, any EIP-6963 injected wallet, and WalletConnect QR (380+ mobile
+ * wallets). Connect UX is a lightweight picker in lib/wallet.tsx (wagmi v3).
  *
- * Primary chain: BOT Chain Testnet (968), BOT native (18 decimals).
+ * Only chain: Base Sepolia (84532). Gas in ETH, stakes in USDC.
  */
 import { createConfig, http } from "wagmi";
 // Import from wagmi's own re-export so connector types match createConfig (wagmi v3).
 import { coinbaseWallet, injected, metaMask, walletConnect } from "wagmi/connectors";
-import { botchainTestnet, getBotchainRpcUrl } from "./botchain";
+import { baseSepolia, getBaseRpcUrl } from "./base";
 
 // WalletConnect Cloud project id — get one free at https://cloud.walletconnect.com.
 // When the var is missing we skip the walletconnect connector so local dev still
@@ -19,13 +19,13 @@ const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
 
 const APP_METADATA = {
   name:        "Mimir",
-  description: "AI-settled BOT claim markets on BOT Chain",
+  description: "AI-settled USDC claim markets on Base",
   url:         "https://mimir.app",
   icons:       ["https://mimir.app/logo.png"],
 };
 
 export const wagmiConfig = createConfig({
-  chains: [botchainTestnet],
+  chains: [baseSepolia],
   connectors: [
     metaMask(),
     coinbaseWallet({
@@ -47,7 +47,7 @@ export const wagmiConfig = createConfig({
   // (HTTP 429) when wagmi's react-query layer fans out useReadContract calls
   // — every claim card on the feed page would otherwise issue its own POST.
   transports: {
-    [botchainTestnet.id]: http(getBotchainRpcUrl(), {
+    [baseSepolia.id]: http(getBaseRpcUrl(), {
       batch: { batchSize: 200, wait: 16 },
       retryCount: 3,
       retryDelay: 300,

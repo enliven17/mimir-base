@@ -864,7 +864,7 @@ export interface PaymentRow {
 
 export interface PaymentsRevenueSummary {
   totalCalls: number;
-  totalBot: number;
+  totalUsdc: number;
   uniquePayers: number;
   uniqueSellers: number;
   byResource: Array<{ resource: string; calls: number; bot: number }>;
@@ -918,7 +918,7 @@ export async function getPaymentsRevenueSummary(limit = 25): Promise<PaymentsRev
   const t = totals.rows[0] ?? {};
   return {
     totalCalls: getNumber(t.calls),
-    totalBot: Math.round(getNumber(t.bot) * 1e6) / 1e6,
+    totalUsdc: Math.round(getNumber(t.bot) * 1e6) / 1e6,
     uniquePayers: getNumber(t.payers),
     uniqueSellers: getNumber(t.sellers),
     byResource: byResource.rows.map((r) => ({

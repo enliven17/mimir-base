@@ -8,7 +8,7 @@ This repository contains Mimir, an AI-settled prediction market on **BOT Chain**
 |------|---------|
 | `contracts/Mimir.sol` | Solidity smart contract (EVM, BOT Chain Testnet) |
 | `lib/mimir-abi.ts` | ABI + state constants for Mimir.sol |
-| `lib/botchain.ts` | BOT Chain config (viem, chain ID 968, BOT helpers) |
+| `lib/base.ts` | BOT Chain config (viem, chain ID 968, BOT helpers) |
 | `lib/contract.ts` | TypeScript contract client (read + write) |
 | `lib/wallet.tsx` | Wallet context (frontend, wagmi v3 connector picker) |
 | `lib/wagmi-config.ts` | wagmi config — BOT Chain Testnet only |

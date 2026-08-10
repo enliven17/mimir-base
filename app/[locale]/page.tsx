@@ -203,7 +203,7 @@ function AnimatedStatNumber({
 export default function HomePage() {
   const [allVS, setAllVS]     = useState<VSData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rev, setRev] = useState<{ totalCalls: number; totalBot: number; uniqueSellers: number } | null>(null);
+  const [rev, setRev] = useState<{ totalCalls: number; totalUsdc: number; uniqueSellers: number } | null>(null);
   const t  = useTranslations("home");
   const tStamp = useTranslations("stamp");
 
@@ -230,7 +230,7 @@ export default function HomePage() {
   useEffect(() => {
     fetch("/api/payments/revenue")
       .then((r) => r.json())
-      .then((s) => setRev({ totalCalls: s.totalCalls, totalBot: s.totalBot, uniqueSellers: s.uniqueSellers }))
+      .then((s) => setRev({ totalCalls: s.totalCalls, totalUsdc: s.totalUsdc, uniqueSellers: s.uniqueSellers }))
       .catch(() => setRev(null));
   }, []);
 
@@ -404,7 +404,7 @@ export default function HomePage() {
                 labelPosition="below"
                 size="lg"
                 color="gold"
-                suffix="USDT"
+                suffix="USDC"
                   labelClassName="text-[12px]"
                 className="items-center"
               />
@@ -427,7 +427,7 @@ export default function HomePage() {
               </div>
               <div className="p-5 sm:p-6 text-center bg-pv-bg">
                 <LiveStat
-                  value={rev.totalBot}
+                  value={rev.totalUsdc}
                   format={(n) => n.toFixed(2)}
                   label={t("botEarned")}
                   labelPosition="below"

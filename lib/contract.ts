@@ -1,7 +1,7 @@
 /**
- * Mimir contract client (BOT Chain / viem)
+ * Mimir contract client (Base Sepolia / viem)
  *
- * Market stakes are USDT (ERC-20, 6 decimals). Gas is native BOT.
+ * Market stakes are USDC (ERC-20, 6 decimals). Gas is native ETH.
  * create/challenge require the caller to approve the Mimir contract first.
  */
 import {
@@ -16,28 +16,28 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 
 import {
-  botchainTestnet,
-  getBotchainRpcUrl,
+  baseSepolia,
+  getBaseRpcUrl,
   getContractAddress,
   getExplorerTxUrl,
-  ensureBotChain,
+  ensureBaseSepolia,
   RPC_BATCH_SIZE,
-} from "./botchain";
+} from "./base";
 import {
   ERC20_ABI,
-  USDT_ADDRESS,
-  usdtToUnits,
-  unitsToUsdt,
-  MIN_STAKE_USDT,
-} from "./usdt";
+  USDC_ADDRESS,
+  usdcToUnits,
+  unitsToUsdc,
+  MIN_STAKE_USDC,
+} from "./usdc";
 import { MIMIR_ABI, STATE, WINNER_SIDE, BPS_DIVISOR } from "./mimir-abi";
 import { normalizeCategoryId, ZERO_ADDRESS } from "./constants";
 import { decodeClaimTuple } from "./claim-codec";
 import type { VSCacheFreshness } from "./vs-freshness";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-// MIN_STAKE in display USDT (matches Mimir.sol: 2 * 10^6 = 2 USDT)
-export { MIN_STAKE_USDT as MIN_STAKE };
+// MIN_STAKE in display USDC (matches Mimir.sol: 2 * 10^6 = 2 USDC)
+export { MIN_STAKE_USDC as MIN_STAKE };
 
 export const CONTRACT_ADDRESS = getContractAddress();
 
@@ -81,11 +81,11 @@ export interface ClaimData {
   challenger_addresses?: string[];
   total_pot: number;
   evidence_hash?: string;          // keccak256 of oracle evidence — on-chain reasoning trace
-  /** @deprecated not used on BOT Chain — oracle resolves automatically */
+  /** @deprecated not used — the oracle resolves automatically */
   resolve_attempts?: number;
-  /** @deprecated not used on BOT Chain */
+  /** @deprecated not used — the oracle resolves automatically */
   creator_requested_resolve?: boolean;
-  /** @deprecated not used on BOT Chain */
+  /** @deprecated not used — the oracle resolves automatically */
   challenger_requested_resolve?: boolean;
 }
 
@@ -136,7 +136,7 @@ export interface CreateClaimParams {
   counter_position: string;
   resolution_url: string;
   deadline: number;
-  stake_amount: number;         // in whole BOT (e.g. 5 = 5 BOT)
+  stake_amount: number;         // whole USDC (e.g. 5 = 5 USDC)
   category?: string;
   parent_id?: number;
   market_type?: string;
@@ -194,14 +194,14 @@ function mapWinnerSide(n: number): ClaimData["winner_side"] {
 }
 
 // ── viem public client (singleton per process) ────────────────────────────────
-// Uses the same JSON-RPC batching transport as createBotchainPublicClient — see
-// lib/botchain.ts BOTCHAIN_HTTP_OPTS for the rationale.
+// Uses the same JSON-RPC batching transport as createBasePublicClient — see
+// lib/base.ts BASE_HTTP_OPTS for the rationale.
 let _publicClient: PublicClient | null = null;
 function getPublicClient(): PublicClient {
   if (!_publicClient) {
     _publicClient = createPublicClient({
-      chain: botchainTestnet,
-      transport: http(getBotchainRpcUrl(), {
+      chain: baseSepolia,
+      transport: http(getBaseRpcUrl(), {
         batch: { batchSize: RPC_BATCH_SIZE, wait: 16 },
         retryCount: 3,
         retryDelay: 300,
@@ -213,7 +213,7 @@ function getPublicClient(): PublicClient {
 }
 
 // ── Bulk-read concurrency limiter ─────────────────────────────────────────────
-// Public BOT Chain RPCs return 429 when hit with hundreds of parallel
+// Public Base RPCs return 429 when hit with hundreds of parallel
 // readContract calls. Every claim costs 3 RPC calls (getClaim +
 // getClaimMarketConfig + getChallengerList), so `Promise.all` over 100+ claims
 // = ~300 parallel requests = throttled.
@@ -311,22 +311,22 @@ export async function readClaimRaw(claimId: number): Promise<ClaimData | null> {
     const decoded = decodeClaimTuple(claimId, base, market);
     if (!decoded) return null;
 
-    const creatorStakeBot = unitsToUsdt(decoded.creatorStake);
-    const totalChStakeBot = unitsToUsdt(decoded.totalChallengerStake);
-    const reservedBot     = unitsToUsdt(decoded.reservedCreatorLiability);
+    const creatorStakeUsdc = unitsToUsdc(decoded.creatorStake);
+    const totalChStakeUsdc = unitsToUsdc(decoded.totalChallengerStake);
+    const reservedUsdc     = unitsToUsdc(decoded.reservedCreatorLiability);
 
     const [chAddrs, chStakes] = challengerData;
     const payBps  = Number(decoded.challengerPayoutBps);
     const isFixed = decoded.oddsMode === "fixed";
     const challengers: ClaimChallenger[] = chAddrs.map((addr, i) => {
-      const stake  = unitsToUsdt(chStakes[i]);
+      const stake  = unitsToUsdc(chStakes[i]);
       const payout = isFixed
         ? (stake * payBps) / BPS_DIVISOR
-        : stake + (totalChStakeBot > 0 ? (stake / totalChStakeBot) * creatorStakeBot : 0);
+        : stake + (totalChStakeUsdc > 0 ? (stake / totalChStakeUsdc) * creatorStakeUsdc : 0);
       return { address: addr, stake, potential_payout: payout };
     });
 
-    const availLiab = Math.max(0, creatorStakeBot - reservedBot);
+    const availLiab = Math.max(0, creatorStakeUsdc - reservedUsdc);
 
     return {
       id:                         claimId,
@@ -335,9 +335,9 @@ export async function readClaimRaw(claimId: number): Promise<ClaimData | null> {
       creator_position:           decoded.creatorPosition,
       counter_position:           decoded.counterPosition,
       resolution_url:             decoded.resolutionUrl,
-      creator_stake:              creatorStakeBot,
-      total_challenger_stake:     totalChStakeBot,
-      reserved_creator_liability: reservedBot,
+      creator_stake:              creatorStakeUsdc,
+      total_challenger_stake:     totalChStakeUsdc,
+      reserved_creator_liability: reservedUsdc,
       available_creator_liability: availLiab,
       deadline:                   Number(decoded.deadline),
       state:                      mapState(decoded.state),
@@ -360,7 +360,7 @@ export async function readClaimRaw(claimId: number): Promise<ClaimData | null> {
       challengers,
       first_challenger:           chAddrs[0] ?? ZERO_ADDRESS,
       challenger_addresses:       chAddrs,
-      total_pot:                  creatorStakeBot + totalChStakeBot,
+      total_pot:                  creatorStakeUsdc + totalChStakeUsdc,
     };
   } catch (err) {
     console.warn(`[readClaimRaw] decode failed for claim ${claimId}`, err);
@@ -432,7 +432,7 @@ export async function getPlatformStats(): Promise<{
   return {
     total_claims:   Number(totalClaims),
     total_resolved: Number(resolved),
-    total_pool:     unitsToUsdt(balance),
+    total_pool:     unitsToUsdc(balance),
   };
 }
 
@@ -453,7 +453,7 @@ export async function getAllVSDirect(): Promise<VSFeedSnapshot> {
 
   // Single concurrency-limited read across all IDs — paginating then
   // Promise.all-ing pages just multiplied the concurrent request burst by
-  // page-count and was the main 429 source on BOT Chain RPC.
+  // page-count and was the main 429 source on the public RPC.
   const all = await readClaimsRange(1, count);
   return {
     items: (all.filter(Boolean) as ClaimData[])
@@ -510,8 +510,8 @@ export async function getVSFull(
   return { item: claim ? mapClaimToVS(claim) : null, cache: makeLiveFreshness() };
 }
 
-// ── USDT allowance ────────────────────────────────────────────────────────────
-async function ensureUsdtAllowance(
+// ── USDC allowance ────────────────────────────────────────────────────────────
+async function ensureUsdcAllowance(
   walletClient: WalletClient,
   owner: `0x${string}`,
   amountUnits: bigint
@@ -519,7 +519,7 @@ async function ensureUsdtAllowance(
   if (amountUnits <= 0n) return;
   const client = getPublicClient();
   const current = (await client.readContract({
-    address: USDT_ADDRESS,
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "allowance",
     args: [owner, CONTRACT_ADDRESS],
@@ -527,41 +527,41 @@ async function ensureUsdtAllowance(
   if (current >= amountUnits) return;
 
   const hash = await walletClient.writeContract({
-    address: USDT_ADDRESS,
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [CONTRACT_ADDRESS, maxUint256],
     account: owner,
-    chain: botchainTestnet,
+    chain: baseSepolia,
   });
   const receipt = await client.waitForTransactionReceipt({ hash });
-  if (receipt.status === "reverted") throw new Error("USDT approve reverted");
+  if (receipt.status === "reverted") throw new Error("USDC approve reverted");
 }
 
 // ── Write: browser (wagmi / injected wallet) ──────────────────────────────────
 async function sendBrowserTx(
   functionName: string,
   args: unknown[],
-  stakeUsdt: number
+  stakeUsdc: number
 ): Promise<ContractWriteResult> {
   const ethereum =
     typeof window !== "undefined" ? (window as any).ethereum : undefined;
   if (!ethereum) throw new Error("No wallet connected. Please connect a wallet first.");
 
-  await ensureBotChain(ethereum);
+  await ensureBaseSepolia(ethereum);
 
   const accounts: string[] = await ethereum.request({ method: "eth_accounts" });
   if (!accounts.length) throw new Error("Wallet not connected");
   const account = accounts[0] as `0x${string}`;
 
   const wc = createWalletClient({
-    chain:     botchainTestnet,
+    chain:     baseSepolia,
     transport: custom(ethereum),
     account,
   });
 
-  if (stakeUsdt > 0) {
-    await ensureUsdtAllowance(wc, account, usdtToUnits(stakeUsdt));
+  if (stakeUsdc > 0) {
+    await ensureUsdcAllowance(wc, account, usdcToUnits(stakeUsdc));
   }
 
   const txHash = await wc.writeContract({
@@ -570,10 +570,10 @@ async function sendBrowserTx(
     functionName: functionName as any,
     args:         args as any,
     account,
-    chain:        botchainTestnet,
+    chain:        baseSepolia,
   });
 
-  // BOT Chain has sub-second finality — receipt arrives quickly
+  // Base blocks are ~2s — the receipt normally arrives well inside the timeout
   try {
     const receipt = await Promise.race([
       getPublicClient().waitForTransactionReceipt({ hash: txHash }),
@@ -594,17 +594,17 @@ async function sendServerTx(
   privateKey: string,
   functionName: string,
   args: unknown[],
-  stakeUsdt: number
+  stakeUsdc: number
 ): Promise<ContractWriteResult> {
   const account = privateKeyToAccount(privateKey as `0x${string}`);
   const walletClient = createWalletClient({
-    chain:     botchainTestnet,
-    transport: http(getBotchainRpcUrl()),
+    chain:     baseSepolia,
+    transport: http(getBaseRpcUrl()),
     account,
   });
 
-  if (stakeUsdt > 0) {
-    await ensureUsdtAllowance(walletClient, account.address, usdtToUnits(stakeUsdt));
+  if (stakeUsdc > 0) {
+    await ensureUsdcAllowance(walletClient, account.address, usdcToUnits(stakeUsdc));
   }
 
   const txHash = await walletClient.writeContract({
@@ -613,7 +613,7 @@ async function sendServerTx(
     functionName: functionName as any,
     args:         args as any,
     account,
-    chain:        botchainTestnet,
+    chain:        baseSepolia,
   });
 
   const receipt = await getPublicClient().waitForTransactionReceipt({ hash: txHash });
@@ -669,7 +669,7 @@ export async function challengeClaim(
   }
   const result = await sendBrowserTx(
     "challengeClaim",
-    [BigInt(claimId), usdtToUnits(stakeAmount), inviteKey],
+    [BigInt(claimId), usdcToUnits(stakeAmount), inviteKey],
     stakeAmount
   );
   return { ...result, claimId };
@@ -682,7 +682,7 @@ export async function resolveClaim(
   if (isDemoMode()) {
     return sendDemoTx("resolve_claim", { claimId });
   }
-  // Browser resolution is not supported — resolution is oracle-only on BOT Chain.
+  // Browser resolution is not supported — resolution is oracle-only.
   // This path allows demo/test only.
   throw new Error(
     "Claims are resolved by the Mimir oracle agent. Connect as oracle to resolve manually."
@@ -710,7 +710,7 @@ export async function createRematch(
   }
   const result = await sendBrowserTx(
     "createRematch",
-    [BigInt(parentId), BigInt(params.deadline), usdtToUnits(params.stake_amount), params.invite_key ?? ""],
+    [BigInt(parentId), BigInt(params.deadline), usdcToUnits(params.stake_amount), params.invite_key ?? ""],
     params.stake_amount
   );
   const count = await getClaimCount().catch(() => null);
@@ -737,7 +737,7 @@ export async function executeDemoWrite(
     const { claimId, stakeAmount, inviteKey = "" } = params as any;
     const result = await sendServerTx(
       privateKey, "challengeClaim",
-      [BigInt(claimId), usdtToUnits(stakeAmount), inviteKey],
+      [BigInt(claimId), usdcToUnits(stakeAmount), inviteKey],
       stakeAmount
     );
     return { ...result, claimId: Number(claimId) };
@@ -746,7 +746,7 @@ export async function executeDemoWrite(
   if (action === "resolve_claim") {
     // Demo resolve: oracle agent handles real resolution; demo just simulates
     const { claimId } = params as any;
-    throw new Error(`Claim ${claimId}: use the oracle agent to resolve on BOT Chain.`);
+    throw new Error(`Claim ${claimId}: use the oracle agent to resolve.`);
   }
 
   if (action === "cancel_claim") {
@@ -759,7 +759,7 @@ export async function executeDemoWrite(
     const { parentId, deadline, stake_amount, invite_key = "" } = params as any;
     const result = await sendServerTx(
       privateKey, "createRematch",
-      [BigInt(parentId), BigInt(deadline), usdtToUnits(stake_amount), invite_key],
+      [BigInt(parentId), BigInt(deadline), usdcToUnits(stake_amount), invite_key],
       stake_amount
     );
     const count = await getClaimCount().catch(() => null);
@@ -777,7 +777,7 @@ function buildCreateArgs(p: CreateClaimParams): unknown[] {
     p.counter_position,
     p.resolution_url,
     BigInt(p.deadline),
-    usdtToUnits(p.stake_amount),
+    usdcToUnits(p.stake_amount),
     p.category ?? "custom",
     BigInt(p.parent_id ?? 0),
     p.market_type ?? "binary",
@@ -1051,7 +1051,7 @@ export async function getAllVSSnapshot(
   opts?: { forceRefresh?: boolean }
 ): Promise<VSFeedSnapshot> {
   // In the browser this MUST go through /api/vs (the indexed cache): reading
-  // every claim directly from the public BOT Chain RPC (~3 calls per claim) trips
+  // every claim directly from the public Base RPC (~3 calls per claim) trips
   // its per-client rate limit and the whole feed comes back empty.
   if (typeof window !== "undefined") {
     const res = await fetch(opts?.forceRefresh ? "/api/vs?refresh=1" : "/api/vs");
@@ -1120,7 +1120,7 @@ export async function getRivalryChain(claimId: number): Promise<number[]> {
 }
 
 /**
- * On BOT Chain, resolution is handled by the off-chain oracle agent automatically.
+ * Resolution is handled by the off-chain oracle agent automatically.
  * This stub is kept for UI compatibility — it no longer sends a transaction.
  */
 export async function requestResolveVS(
@@ -1133,11 +1133,11 @@ export async function requestResolveVS(
   );
 }
 
-/** Kept for UI compatibility — no-op on BOT Chain. */
+/** Kept for UI compatibility — no-op. */
 export async function resetVSResolveRequest(
   _wallet: string,
   _claimId: number,
   _inviteKey = ""
 ): Promise<ClaimWriteResult> {
-  throw new Error("Not applicable on BOT Chain — oracle resolves automatically.");
+  throw new Error("Not applicable — the oracle resolves automatically.");
 }

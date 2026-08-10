@@ -2,7 +2,7 @@
  * Seed Claims Script — Creates 15 demo claims across all categories
  *
  * These claims are designed to be immediately resolvable by the oracle agent,
- * demonstrating real traction on BOT Chain Testnet.
+ * demonstrating real traction on ETH Chain Testnet.
  *
  * Run AFTER deploying the contract:
  *   DEPLOYER_PRIVATE_KEY=0x... npx tsx scripts/seed-claims.ts
@@ -13,22 +13,22 @@
 
 import { maxUint256 } from "viem";
 import {
-  createBotchainPublicClient,
-  createBotchainWalletClientWithKey,
-  botchainTestnet,
+  createBasePublicClient,
+  createBaseWalletClientWithKey,
+  baseSepolia,
   getContractAddress,
   getExplorerTxUrl,
-  weiToBot,
-} from "../lib/botchain";
+  weiToEth,
+} from "../lib/base";
 import { MIMIR_ABI } from "../lib/mimir-abi";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
 import { agentContractWrite } from "../lib/agent-wallets";
 import { privateKeyToAccount } from "viem/accounts";
 
 const CONTRACT_ADDRESS    = getContractAddress();
 const PRIVATE_KEY         = process.env.DEPLOYER_PRIVATE_KEY as `0x${string}`;
 const DRY_RUN             = process.env.DRY_RUN === "1";
-const STAKE_USDT         = 2;
+const STAKE_USDC         = 2;
 const SHORT_DEADLINE_SECS = 3600;      // 1h — for claims that resolve immediately
 const MED_DEADLINE_SECS   = 86400;     // 24h
 const LONG_DEADLINE_SECS  = 604800;    // 7d
@@ -217,14 +217,14 @@ const SEED_CLAIMS: SeedClaim[] = [
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 async function main(): Promise<void> {
-  const stake = usdtToUnits(STAKE_USDT);
+  const stake = usdcToUnits(STAKE_USDC);
 
   if (DRY_RUN) {
     console.log("═══════════════════════════════════════════════");
-    console.log("  Mimir Seed Claims — DRY RUN (USDT stakes)");
+    console.log("  Mimir Seed Claims — DRY RUN (USDC stakes)");
     console.log(`  ${SEED_CLAIMS.length} claims would be created`);
-    console.log(`  Each stake: ${STAKE_USDT} USDT`);
-    console.log(`  Total USDT needed: ~${SEED_CLAIMS.length * STAKE_USDT} USDT`);
+    console.log(`  Each stake: ${STAKE_USDC} USDC`);
+    console.log(`  Total USDC needed: ~${SEED_CLAIMS.length * STAKE_USDC} USDC`);
     console.log("═══════════════════════════════════════════════\n");
     SEED_CLAIMS.forEach((c, i) => {
       console.log(`${i + 1}. [${c.category.toUpperCase()}] ${c.label}`);
@@ -235,30 +235,30 @@ async function main(): Promise<void> {
     return;
   }
 
-  const publicClient = createBotchainPublicClient();
+  const publicClient = createBasePublicClient();
   const wallet = {
     account: privateKeyToAccount(PRIVATE_KEY),
-    client: createBotchainWalletClientWithKey(PRIVATE_KEY),
+    client: createBaseWalletClientWithKey(PRIVATE_KEY),
     address: privateKeyToAccount(PRIVATE_KEY).address,
   };
   const account = wallet.address;
   const gasBal  = await publicClient.getBalance({ address: account });
-  const usdtBal = (await publicClient.readContract({
-    address: USDT_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [account],
+  const usdcBal = (await publicClient.readContract({
+    address: USDC_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [account],
   })) as bigint;
 
   console.log("═══════════════════════════════════════════════");
-  console.log("  Mimir Seed Claims (USDT)");
+  console.log("  Mimir Seed Claims (USDC)");
   console.log(`  Contract : ${CONTRACT_ADDRESS}`);
   console.log(`  Creator  : ${account}`);
-  console.log(`  Gas BOT  : ${weiToBot(gasBal).toFixed(4)}`);
-  console.log(`  USDT     : ${unitsToUsdt(usdtBal).toFixed(2)}`);
+  console.log(`  Gas ETH  : ${weiToEth(gasBal).toFixed(4)}`);
+  console.log(`  USDC     : ${unitsToUsdc(usdcBal).toFixed(2)}`);
   console.log(`  Claims   : ${SEED_CLAIMS.length}`);
-  console.log(`  Stake/ea : ${STAKE_USDT} USDT`);
+  console.log(`  Stake/ea : ${STAKE_USDC} USDC`);
   console.log("═══════════════════════════════════════════════\n");
 
-  if (usdtBal < stake * BigInt(SEED_CLAIMS.length)) {
-    console.error(`Insufficient USDT! Need ~${SEED_CLAIMS.length * STAKE_USDT}, have ${unitsToUsdt(usdtBal).toFixed(2)}`);
+  if (usdcBal < stake * BigInt(SEED_CLAIMS.length)) {
+    console.error(`Insufficient USDC! Need ~${SEED_CLAIMS.length * STAKE_USDC}, have ${unitsToUsdc(usdcBal).toFixed(2)}`);
     process.exit(1);
   }
 
@@ -293,7 +293,7 @@ async function main(): Promise<void> {
           false,
           "",
         ],
-        amountUsdt: String(STAKE_USDT),
+        amountUsdc: String(STAKE_USDC),
       });
 
       console.log(`  ✓ ${getExplorerTxUrl(txHash)}`);

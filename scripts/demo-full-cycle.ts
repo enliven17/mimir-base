@@ -1,9 +1,9 @@
 /**
- * End-to-end demo of the full Mimir cycle on BOT Chain Testnet with an LLM
- * settling. Stakes are USDT (ERC-20); gas is native BOT.
+ * End-to-end demo of the full Mimir cycle on ETH Chain Testnet with an LLM
+ * settling. Stakes are USDC (ERC-20); gas is native ETH.
  *
- *   1. market-creator wallet  → createClaim (2 USDT stake, 150s deadline)
- *   2. oracle wallet          → challengeClaim (2 USDT counter-stake)
+ *   1. market-creator wallet  → createClaim (2 USDC stake, 150s deadline)
+ *   2. oracle wallet          → challengeClaim (2 USDC counter-stake)
  *   3. wait for deadline
  *   4. oracle wallet (LLM)    → resolveClaim with on-chain payout
  *
@@ -12,36 +12,36 @@
 
 import { keccak256, toBytes } from "viem";
 import {
-  createBotchainPublicClient, getContractAddress, getExplorerTxUrl, weiToBot,
-} from "../lib/botchain";
+  createBasePublicClient, getContractAddress, getExplorerTxUrl, weiToEth,
+} from "../lib/base";
 import {
   agentContractWrite, getCreatorWallet, getOracleWallet,
 } from "../lib/agent-wallets";
 import { callLLM, activeLLMProvider, activeLLMModel } from "../lib/llm";
 import { MIMIR_ABI, STATE, WINNER_SIDE } from "../lib/mimir-abi";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
 
 const DEADLINE_SECONDS = 150;
-const STAKE_USDT       = 2;
+const STAKE_USDC       = 2;
 
 async function main(): Promise<void> {
-  const client          = createBotchainPublicClient();
+  const client          = createBasePublicClient();
   const contractAddress = getContractAddress();
   const oracle          = getOracleWallet();
   const creator         = getCreatorWallet();
 
-  console.log("─── Mimir full-cycle demo (USDT stakes) ───");
+  console.log("─── Mimir full-cycle demo (USDC stakes) ───");
   console.log(`Contract: ${contractAddress}`);
-  console.log(`USDT    : ${USDT_ADDRESS}`);
+  console.log(`USDC    : ${USDC_ADDRESS}`);
   console.log(`LLM     : ${activeLLMProvider()} / ${activeLLMModel()}`);
   console.log(`Creator : ${creator.address}`);
   console.log(`Oracle  : ${oracle.address}`);
 
-  const stakeUnits = usdtToUnits(STAKE_USDT);
+  const stakeUnits = usdcToUnits(STAKE_USDC);
   const deadline = BigInt(Math.floor(Date.now() / 1000) + DEADLINE_SECONDS);
 
   // 1. CREATE
-  console.log(`\n[1/4] Creating claim (deadline in ${DEADLINE_SECONDS}s, stake ${STAKE_USDT} USDT)…`);
+  console.log(`\n[1/4] Creating claim (deadline in ${DEADLINE_SECONDS}s, stake ${STAKE_USDC} USDC)…`);
   const createTx = await agentContractWrite({
     wallet:          creator,
     contractAddress,
@@ -59,7 +59,7 @@ async function main(): Promise<void> {
       "Settle from CoinGecko BTC USD spot price at deadline",
       100n, false, "",
     ],
-    amountUsdt: String(STAKE_USDT),
+    amountUsdc: String(STAKE_USDC),
   });
   console.log(`  create tx: ${getExplorerTxUrl(createTx)}`);
 
@@ -70,14 +70,14 @@ async function main(): Promise<void> {
   console.log(`  claim id : #${claimId}`);
 
   // 2. CHALLENGE
-  console.log(`\n[2/4] Oracle challenges (stakes ${STAKE_USDT} USDT on Side B)…`);
+  console.log(`\n[2/4] Oracle challenges (stakes ${STAKE_USDC} USDC on Side B)…`);
   const challengeTx = await agentContractWrite({
     wallet:          oracle,
     contractAddress,
     abi:             MIMIR_ABI,
     functionName:    "challengeClaim",
     args:            [claimId, stakeUnits, ""],
-    amountUsdt:      String(STAKE_USDT),
+    amountUsdc:      String(STAKE_USDC),
   });
   console.log(`  challenge tx: ${getExplorerTxUrl(challengeTx)}`);
 
@@ -125,18 +125,18 @@ async function main(): Promise<void> {
   console.log(`  resolve tx: ${getExplorerTxUrl(resolveTx)}`);
   console.log(`  verdict   : ${verdict} (${confidence}%)`);
 
-  const creatorUsdt = (await client.readContract({
-    address: USDT_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [creator.address],
+  const creatorUsdc = (await client.readContract({
+    address: USDC_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [creator.address],
   })) as bigint;
-  const oracleUsdt = (await client.readContract({
-    address: USDT_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [oracle.address],
+  const oracleUsdc = (await client.readContract({
+    address: USDC_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [oracle.address],
   })) as bigint;
-  const oracleBot = await client.getBalance({ address: oracle.address });
-  const creatorBot = await client.getBalance({ address: creator.address });
+  const oracleEth = await client.getBalance({ address: oracle.address });
+  const creatorEth = await client.getBalance({ address: creator.address });
 
   console.log("\n─── Done ───");
-  console.log(`Creator USDT : ${unitsToUsdt(creatorUsdt).toFixed(2)}  gas ${weiToBot(creatorBot).toFixed(4)} BOT`);
-  console.log(`Oracle  USDT : ${unitsToUsdt(oracleUsdt).toFixed(2)}  gas ${weiToBot(oracleBot).toFixed(4)} BOT`);
+  console.log(`Creator USDC : ${unitsToUsdc(creatorUsdc).toFixed(2)}  gas ${weiToEth(creatorEth).toFixed(4)} ETH`);
+  console.log(`Oracle  USDC : ${unitsToUsdc(oracleUsdc).toFixed(2)}  gas ${weiToEth(oracleEth).toFixed(4)} ETH`);
   void STATE;
 }
 

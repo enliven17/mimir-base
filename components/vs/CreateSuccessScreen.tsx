@@ -17,7 +17,7 @@ import PageTransition, { AnimatedItem } from "@/components/PageTransition";
 import { GlassCard, Button } from "@/components/ui";
 import { sealStamp } from "@/lib/animations/rituals";
 import { getShareUrl } from "@/lib/constants";
-import { getExplorerTxUrl, BOTCHAIN_EXPLORER_URL } from "@/lib/botchain";
+import { getExplorerTxUrl, BASE_EXPLORER_URL } from "@/lib/base";
 
 export default function CreateSuccessScreen({
   createdId,
@@ -208,7 +208,7 @@ export default function CreateSuccessScreen({
                   ) : (
                     <p>
                       <a
-                        href={BOTCHAIN_EXPLORER_URL}
+                        href={BASE_EXPLORER_URL}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-medium text-pv-emerald underline-offset-2 transition-colors hover:underline"

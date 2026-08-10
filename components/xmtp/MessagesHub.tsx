@@ -431,7 +431,7 @@ export default function MessagesHub() {
                                       {peer && pot > 0 ? " · " : ""}
                                       {pot > 0 ? (
                                         <span className="text-pv-gold/85">
-                                          {pot} USDT
+                                          {pot} USDC
                                         </span>
                                       ) : null}
                                     </div>

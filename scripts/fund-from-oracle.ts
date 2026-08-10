@@ -7,26 +7,26 @@
 import { formatEther, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  createBotchainPublicClient,
-  createBotchainWalletClientWithKey,
-  weiToBot,
+  createBasePublicClient,
+  createBaseWalletClientWithKey,
+  weiToEth,
   getExplorerTxUrl,
-  botchainTestnet,
-} from "../lib/botchain";
+  baseSepolia,
+} from "../lib/base";
 import {
   COUNCIL_PERSONAS,
   personaPrivateKeyEnv,
 } from "../agents/council/personas";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
 
 function cleanEnv(name: string): string {
   const raw = process.env[name] ?? "";
   return raw.split(/\s+#/)[0].trim();
 }
 
-const GAS_BOT = parseEther(process.env.FUND_GAS_BOT ?? "0.5");
-const USDT_CREATOR = usdtToUnits(Number(process.env.FUND_AMOUNT_USDT ?? "50"));
-const USDT_COUNCIL = usdtToUnits(Number(process.env.FUND_COUNCIL_AMOUNT_USDT ?? "30"));
+const GAS_ETH = parseEther(process.env.FUND_GAS_ETH ?? "0.5");
+const USDC_CREATOR = usdcToUnits(Number(process.env.FUND_AMOUNT_USDC ?? "50"));
+const USDC_COUNCIL = usdcToUnits(Number(process.env.FUND_COUNCIL_AMOUNT_USDC ?? "30"));
 
 async function main() {
   const funderKey = cleanEnv("ORACLE_PRIVATE_KEY");
@@ -44,85 +44,85 @@ async function main() {
     if (c) process.env[name] = c;
   }
 
-  const publicClient = createBotchainPublicClient();
+  const publicClient = createBasePublicClient();
   const funder = privateKeyToAccount(funderKey as `0x${string}`);
-  const wallet = createBotchainWalletClientWithKey(funderKey);
+  const wallet = createBaseWalletClientWithKey(funderKey);
 
-  const targets: Array<{ label: string; address: `0x${string}`; gas: bigint; usdt: bigint }> = [];
+  const targets: Array<{ label: string; address: `0x${string}`; gas: bigint; usdc: bigint }> = [];
 
-  const add = (label: string, keyEnv: string, usdt: bigint) => {
+  const add = (label: string, keyEnv: string, usdc: bigint) => {
     const key = process.env[keyEnv]?.trim() ?? "";
     if (!/^0x[0-9a-fA-F]{64}$/.test(key)) {
       console.warn(`  · skip ${label} — ${keyEnv} not set`);
       return;
     }
     const address = privateKeyToAccount(key as `0x${string}`).address;
-    // Don't send gas/USDT to funder itself
+    // Don't send gas/USDC to funder itself
     if (address.toLowerCase() === funder.address.toLowerCase()) {
       console.log(`  · ${label.padEnd(24)} is funder — skip self-transfer`);
       return;
     }
-    targets.push({ label, address, gas: GAS_BOT, usdt });
+    targets.push({ label, address, gas: GAS_ETH, usdc });
   };
 
-  add("market-creator", "CREATOR_PRIVATE_KEY", USDT_CREATOR);
+  add("market-creator", "CREATOR_PRIVATE_KEY", USDC_CREATOR);
   for (const persona of COUNCIL_PERSONAS) {
-    add(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDT_COUNCIL);
+    add(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDC_COUNCIL);
   }
 
-  const funderBot = await publicClient.getBalance({ address: funder.address });
-  const funderUsdt = (await publicClient.readContract({
-    address: USDT_ADDRESS,
+  const funderEth = await publicClient.getBalance({ address: funder.address });
+  const funderUsdc = (await publicClient.readContract({
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [funder.address],
   })) as bigint;
 
   console.log(`Funder (oracle): ${funder.address}`);
-  console.log(`  BOT  : ${weiToBot(funderBot).toFixed(4)}`);
-  console.log(`  USDT : ${unitsToUsdt(funderUsdt).toFixed(2)}`);
+  console.log(`  ETH  : ${weiToEth(funderEth).toFixed(4)}`);
+  console.log(`  USDC : ${unitsToUsdc(funderUsdc).toFixed(2)}`);
   console.log(`Targets: ${targets.length}`);
-  console.log(`Per target gas: ${formatEther(GAS_BOT)} BOT`);
-  console.log(`Creator USDT: ${unitsToUsdt(USDT_CREATOR)}`);
-  console.log(`Council USDT: ${unitsToUsdt(USDT_COUNCIL)}\n`);
+  console.log(`Per target gas: ${formatEther(GAS_ETH)} ETH`);
+  console.log(`Creator USDC: ${unitsToUsdc(USDC_CREATOR)}`);
+  console.log(`Council USDC: ${unitsToUsdc(USDC_COUNCIL)}\n`);
 
   for (const t of targets) {
     // Gas
-    const botBal = await publicClient.getBalance({ address: t.address });
-    if (botBal < t.gas) {
+    const ethBal = await publicClient.getBalance({ address: t.address });
+    if (ethBal < t.gas) {
       const hash = await wallet.sendTransaction({
         account: funder,
         to: t.address,
         value: t.gas,
-        chain: botchainTestnet,
+        chain: baseSepolia,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`  ✓ ${t.label.padEnd(24)} +${formatEther(t.gas)} BOT  ${getExplorerTxUrl(hash)}`);
+      console.log(`  ✓ ${t.label.padEnd(24)} +${formatEther(t.gas)} ETH  ${getExplorerTxUrl(hash)}`);
     } else {
-      console.log(`  · ${t.label.padEnd(24)} gas ok (${weiToBot(botBal).toFixed(4)} BOT)`);
+      console.log(`  · ${t.label.padEnd(24)} gas ok (${weiToEth(ethBal).toFixed(4)} ETH)`);
     }
 
-    // USDT
-    const usdtBal = (await publicClient.readContract({
-      address: USDT_ADDRESS,
+    // USDC
+    const usdcBal = (await publicClient.readContract({
+      address: USDC_ADDRESS,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [t.address],
     })) as bigint;
-    if (usdtBal < t.usdt) {
-      const need = t.usdt - usdtBal;
+    if (usdcBal < t.usdc) {
+      const need = t.usdc - usdcBal;
       const hash = await wallet.writeContract({
         account: funder,
-        address: USDT_ADDRESS,
+        address: USDC_ADDRESS,
         abi: ERC20_ABI,
         functionName: "transfer",
         args: [t.address, need],
-        chain: botchainTestnet,
+        chain: baseSepolia,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`  ✓ ${t.label.padEnd(24)} +${unitsToUsdt(need).toFixed(2)} USDT  ${getExplorerTxUrl(hash)}`);
+      console.log(`  ✓ ${t.label.padEnd(24)} +${unitsToUsdc(need).toFixed(2)} USDC  ${getExplorerTxUrl(hash)}`);
     } else {
-      console.log(`  · ${t.label.padEnd(24)} USDT ok (${unitsToUsdt(usdtBal).toFixed(2)})`);
+      console.log(`  · ${t.label.padEnd(24)} USDC ok (${unitsToUsdc(usdcBal).toFixed(2)})`);
     }
   }
 

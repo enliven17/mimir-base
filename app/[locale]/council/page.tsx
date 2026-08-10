@@ -1,15 +1,15 @@
 import Link from "next/link";
 import {
-  createBotchainPublicClient,
+  createBasePublicClient,
   getContractAddress,
   getDeployBlock,
   getExplorerAddressUrl,
   getExplorerTxUrl,
   isContractConfigured,
-  weiToBot,
+  weiToEth,
   paginatedGetLogs,
-} from "@/lib/botchain";
-import { unitsToUsdt } from "@/lib/usdt";
+} from "@/lib/base";
+import { unitsToUsdc } from "@/lib/usdc";
 import {
   getActiveCouncilPersonas,
 } from "@/lib/council-resolver";
@@ -25,12 +25,12 @@ export const revalidate = 30;
 interface PersonaStats {
   persona:         PersonaSpec;
   address:         string;
-  balanceBot:     number;
+  balanceEth:     number;
   stakesPlaced:    number;
-  totalStakedBot: number;
+  totalStakedUsdc: number;
   recentBets:      Array<{
     claimId:      number;
-    stakeBot:    number;
+    stakeUsdc:    number;
     txHash:       string;
     blockNumber:  number;
   }>;
@@ -38,7 +38,7 @@ interface PersonaStats {
 
 async function fetchCouncilStats(): Promise<PersonaStats[]> {
   if (!isContractConfigured()) return [];
-  const client    = createBotchainPublicClient();
+  const client    = createBasePublicClient();
   const address   = getContractAddress();
   const fromBlock = getDeployBlock();
   const personas  = getActiveCouncilPersonas();
@@ -84,7 +84,7 @@ async function fetchCouncilStats(): Promise<PersonaStats[]> {
         balance = 0n;
       }
 
-      const totalStakedWei = logs.reduce<bigint>(
+      const totalStakedUnits = logs.reduce<bigint>(
         (acc, log: any) => acc + BigInt(log.args.stake ?? 0),
         0n,
       );
@@ -95,12 +95,12 @@ async function fetchCouncilStats(): Promise<PersonaStats[]> {
       return {
         persona,
         address: addr,
-        balanceBot:     weiToBot(balance), // gas wallet (native BOT)
+        balanceEth:     weiToEth(balance), // gas wallet (native ETH)
         stakesPlaced:    logs.length,
-        totalStakedBot: unitsToUsdt(totalStakedWei), // USDT stakes
+        totalStakedUsdc: unitsToUsdc(totalStakedUnits), // USDC stakes
         recentBets:      sortedLogs.slice(0, 3).map((log: any) => ({
           claimId:     Number(log.args.id ?? 0),
-          stakeBot:   unitsToUsdt(BigInt(log.args.stake ?? 0)),
+          stakeUsdc:   unitsToUsdc(BigInt(log.args.stake ?? 0)),
           txHash:      log.transactionHash,
           blockNumber: Number(log.blockNumber ?? 0),
         })),
@@ -119,7 +119,7 @@ const ARCHETYPE_LABEL: Record<PersonaSpec["archetype"], string> = {
 };
 
 function PersonaCard({ stats }: { stats: PersonaStats }) {
-  const { persona, address, balanceBot, stakesPlaced, totalStakedBot, recentBets } = stats;
+  const { persona, address, balanceEth, stakesPlaced, totalStakedUsdc, recentBets } = stats;
   const active = stakesPlaced > 0;
 
   return (
@@ -165,7 +165,7 @@ function PersonaCard({ stats }: { stats: PersonaStats }) {
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-pv-muted">balance</dt>
           <dd className="mt-0.5 font-display text-sm font-bold tabular-nums text-pv-text">
-            {balanceBot.toFixed(2)}
+            {balanceEth.toFixed(2)}
           </dd>
         </div>
         <div>
@@ -177,7 +177,7 @@ function PersonaCard({ stats }: { stats: PersonaStats }) {
         <div>
           <dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-pv-muted">at risk</dt>
           <dd className="mt-0.5 font-display text-sm font-bold tabular-nums text-pv-text">
-            {totalStakedBot.toFixed(2)}
+            {totalStakedUsdc.toFixed(2)}
           </dd>
         </div>
       </dl>
@@ -189,7 +189,7 @@ function PersonaCard({ stats }: { stats: PersonaStats }) {
               <Link href={`/vs/${b.claimId}`} className="text-pv-emerald hover:underline">
                 claim #{b.claimId}
               </Link>
-              <span className="tabular-nums text-pv-text/85">{b.stakeBot.toFixed(2)} USDT</span>
+              <span className="tabular-nums text-pv-text/85">{b.stakeUsdc.toFixed(2)} USDC</span>
               <a
                 href={getExplorerTxUrl(b.txHash)}
                 target="_blank"
@@ -225,8 +225,8 @@ export default async function CouncilPage() {
   const stats = await fetchCouncilStats();
 
   const totalStakes       = stats.reduce((acc, s) => acc + s.stakesPlaced, 0);
-  const totalStakedBot   = stats.reduce((acc, s) => acc + s.totalStakedBot, 0);
-  const totalBankrollBot = stats.reduce((acc, s) => acc + s.balanceBot, 0);
+  const totalStakedUsdc   = stats.reduce((acc, s) => acc + s.totalStakedUsdc, 0);
+  const totalBankrollBot = stats.reduce((acc, s) => acc + s.balanceEth, 0);
 
   return (
     <div className="pb-10">
@@ -237,7 +237,7 @@ export default async function CouncilPage() {
           Each persona reads the same claims and the same evidence but reaches different
           verdicts based on character — optimists tilt up, doomers tilt down, contrarians
           chase imbalance, specialists only touch their domain. Every stake below is a real
-          on-chain USDT stake signed by that persona&apos;s local worker key.
+          on-chain USDC stake signed by that persona&apos;s local worker key.
         </p>
         {stats.length > 0 && (
           <div className="flex flex-wrap items-center justify-center gap-2 pt-2 font-mono text-[11px] uppercase tracking-[0.16em]">
@@ -248,10 +248,10 @@ export default async function CouncilPage() {
               {totalStakes} stakes
             </span>
             <span className="rounded-md border border-pv-border/40 bg-pv-surface2/40 px-2 py-1 text-pv-muted">
-              <span className="tabular-nums text-pv-text">{totalStakedBot.toFixed(2)}</span> USDT at risk
+              <span className="tabular-nums text-pv-text">{totalStakedUsdc.toFixed(2)}</span> USDC at risk
             </span>
             <span className="rounded-md border border-pv-border/40 bg-pv-surface2/40 px-2 py-1 text-pv-muted">
-              bankroll <span className="tabular-nums text-pv-text">{totalBankrollBot.toFixed(2)}</span> BOT gas
+              bankroll <span className="tabular-nums text-pv-text">{totalBankrollBot.toFixed(2)}</span> ETH gas
             </span>
           </div>
         )}

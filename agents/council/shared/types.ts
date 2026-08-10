@@ -38,7 +38,7 @@ export interface ClaimOnChain {
 export interface PersonaDecision {
   shouldStake:   boolean;
   /** BOT amount staked. Only meaningful when shouldStake is true. */
-  stakeBot:     number;
+  stakeUsdc:     number;
   /** Human-readable reason — surfaced in the activity log and /council. */
   rationale:     string;
   /** Optional LLM confidence (0-100) for callers that want to display it. */
@@ -75,7 +75,7 @@ export interface EvidenceCacheEntry {
 export interface PersonaStakeReceipt {
   persona:   PersonaSpec;
   claimId:   number;
-  stakeBot: number;
+  stakeUsdc: number;
   txHash:    string;
   rationale: string;
 }

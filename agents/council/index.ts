@@ -36,11 +36,12 @@ applyWorkerGeminiKey("COUNCIL_GEMINI_API_KEY");
 
 import { requireAnyLLMKey, applyWorkerGeminiKey } from "../../lib/agent-bootstrap";
 import {
-  createBotchainPublicClient,
-  botchainTestnet,
+  createBasePublicClient,
+  baseSepolia,
   getContractAddress,
-  weiToBot,
-} from "../../lib/botchain";
+  weiToEth,
+} from "../../lib/base";
+import { unitsToUsdc } from "../../lib/usdc";
 import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
 import { fetchDecodedClaim } from "../../lib/claim-codec";
 import { activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint } from "../../lib/llm";
@@ -69,9 +70,9 @@ const PEER_READS_ENABLED   = process.env.COUNCIL_PEER_READS === "1";
 const PEER_READS_BASE_URL  = process.env.MIMIR_BASE_URL ?? "http://localhost:3000";
 const PEER_READS_PER_PERSONA = Number(process.env.COUNCIL_PEER_READS_PER_PERSONA ?? 2);
 const PEER_READ_DELAY_MS   = Number(process.env.COUNCIL_PEER_READ_DELAY_MS ?? 15000);
-const PEER_READ_CAP_BOT   = Number(process.env.COUNCIL_PEER_READ_CAP_BOT ?? "0.003");
+const PEER_READ_CAP_USDC   = Number(process.env.COUNCIL_PEER_READ_CAP_USDC ?? "0.003");
 const CONTRACT_ADDRESS     = getContractAddress();
-const publicClient         = createBotchainPublicClient();
+const publicClient         = createBasePublicClient();
 
 // ── Env guard ─────────────────────────────────────────────────────────────────
 requireAnyLLMKey();
@@ -201,7 +202,7 @@ async function poll(): Promise<void> {
             claimId: claim.id,
             baseUrl: PEER_READS_BASE_URL,
             readsPerPersona: PEER_READS_PER_PERSONA,
-            capBot: PEER_READ_CAP_BOT,
+            capUsdc: PEER_READ_CAP_USDC,
             delayMs: PEER_READ_DELAY_MS,
           });
           if (reads.length > 0) {
@@ -209,13 +210,13 @@ async function poll(): Promise<void> {
               (read) => `${read.sellerName}: ${read.reasoning}`,
             );
             peerReasoning.set(`${claim.id}:${persona.slug}`, formattedReads);
-            const paidBot = reads.reduce(
-              (sum, read) => sum + weiToBot(BigInt(read.pricePaidWei ?? "0")),
+            const paidUsdc = reads.reduce(
+              (sum, read) => sum + unitsToUsdc(BigInt(read.pricePaidUnits ?? "0")),
               0,
             );
             console.log(
               `[council:${persona.slug}] bought ${reads.length} peer read(s) for claim #${claim.id} ` +
-              `(${paidBot.toFixed(6)} BOT)`,
+              `(${paidUsdc.toFixed(6)} USDC)`,
             );
           }
         }
@@ -245,7 +246,7 @@ async function main(): Promise<void> {
   console.log("═══════════════════════════════════════════════");
   console.log("  Mimir Council — 10 AI personas as economic actors");
   console.log(`  Contract       : ${CONTRACT_ADDRESS}`);
-  console.log(`  Network        : BOT Chain Testnet (${botchainTestnet.id})`);
+  console.log(`  Network        : Base Sepolia (${baseSepolia.id})`);
   console.log(`  LLM            : ${activeLLMProvider()} / ${activeLLMModel()} · key=${activeLLMKeyFingerprint()}`);
   console.log(`  Active personas: ${ACTIVE_PERSONAS.length} / ${COUNCIL_PERSONAS.length}`);
   console.log(`  Max claims/cycle: ${MAX_CLAIMS_PER_CYCLE}`);
@@ -259,7 +260,7 @@ async function main(): Promise<void> {
     const addr = process.env[personaAddressEnv(p)] as `0x${string}`;
     const bal  = await publicClient.getBalance({ address: addr }).catch(() => 0n);
     console.log(
-      `  ${p.emoji} ${p.displayName.padEnd(22)} ${addr.slice(0, 6)}…${addr.slice(-4)} · ${weiToBot(bal).toFixed(2)} BOT`,
+      `  ${p.emoji} ${p.displayName.padEnd(22)} ${addr.slice(0, 6)}…${addr.slice(-4)} · ${weiToEth(bal).toFixed(4)} ETH`,
     );
   }
   console.log("═══════════════════════════════════════════════\n");

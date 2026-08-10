@@ -1,7 +1,7 @@
 /**
  * Council-as-jury for settlement.
  *
- * During settlement the oracle BUYS each eligible persona's verdict via a BOT
+ * During settlement the oracle BUYS each eligible persona's verdict via a USDC
  * payment (into the persona's own wallet through the paid /api/council/vote
  * endpoint), then tallies the votes into the on-chain verdict.
  * This is what binds the 10 personas to settlement: every juror is paid, and
@@ -23,8 +23,8 @@
 
 import { COUNCIL_PERSONAS, type PersonaSpec } from "../council/personas";
 import { fetchWithBudget, type PayingWallet } from "../../lib/paid-client";
-import { transferBot, type AgentWallet } from "../../lib/agent-wallets";
-import { botToWei } from "../../lib/botchain";
+import { transferUsdc, type AgentWallet } from "../../lib/agent-wallets";
+import { usdcToUnits } from "../../lib/usdc";
 import { isVerdict, type Verdict } from "../../lib/verdict";
 
 export type { Verdict };
@@ -34,7 +34,7 @@ export interface CouncilVote {
   displayName: string;
   verdict: Verdict;
   confidence: number;
-  pricePaidWei: string | null; // wei (18dp BOT), null if free/unsettled
+  pricePaidUnits: string | null; // wei (18dp USDC), null if free/unsettled
   /** Persona wallet that received the vote fee (bonus transfer target). */
   walletAddress?: string;
   /** q_t = P(CHALLENGERS_WIN) implied by this report (self-resolving mode). */
@@ -42,7 +42,7 @@ export interface CouncilVote {
   /** Cross-entropy score vs the terminal reference report (self-resolving mode). */
   score?: number;
   /** Bonus paid out for a positive score (self-resolving mode). */
-  bonusBot?: number;
+  bonusUsdc?: number;
 }
 
 export interface CouncilVerdict {
@@ -51,7 +51,7 @@ export interface CouncilVerdict {
   explanation: string;
   tally: { creator: number; challengers: number; draw: number; unresolvable: number; decisive: number };
   votes: CouncilVote[];
-  totalPaidWei: bigint;
+  totalPaidUnits: bigint;
   /** Sequential q_t reports, prior first implicit at Q_PRIOR (self-resolving mode). */
   qHistory?: number[];
   /** Human-readable juror reports, in voting order — fed to the terminal
@@ -75,7 +75,7 @@ export const Q_PRIOR = 0.5;
 const Q_MIN = 0.02;
 const Q_MAX = 0.98;
 /** Bonus shares below this are dust — skipped rather than transferred. */
-export const BONUS_DUST_BOT = 0.0005;
+export const BONUS_DUST_USDC = 0.0005;
 
 function clampQ(q: number): number {
   // Round to 4dp so float artifacts (0.5 − 80/200 = 0.09999…8) don't leak
@@ -123,21 +123,21 @@ export function scoreCouncilVotes(votes: CouncilVote[], referenceQ: number): Cou
 }
 
 /**
- * Splits `poolBot` proportionally across positive scores; non-positive
+ * Splits `poolUsdc` proportionally across positive scores; non-positive
  * scores and dust-sized shares get nothing. May under-distribute (dust is
  * kept, never redistributed) and never exceeds the pool.
  */
-export function allocateBonus(scores: number[], poolBot: number): number[] {
+export function allocateBonus(scores: number[], poolUsdc: number): number[] {
   const positives = scores.map((s) => (s > 0 ? s : 0));
   const total = positives.reduce((a, b) => a + b, 0);
-  if (total <= 0 || poolBot <= 0) return scores.map(() => 0);
+  if (total <= 0 || poolUsdc <= 0) return scores.map(() => 0);
   // Integer micro-BOT with a float-noise epsilon: floors guarantee the sum
   // never exceeds the pool.
-  const poolMicro = Math.round(poolBot * 1e6);
+  const poolMicro = Math.round(poolUsdc * 1e6);
   return positives.map((s) => {
     const shareMicro = Math.floor((poolMicro * s) / total + 1e-6);
     const share = shareMicro / 1e6;
-    return share >= BONUS_DUST_BOT ? share : 0;
+    return share >= BONUS_DUST_USDC ? share : 0;
   });
 }
 
@@ -174,12 +174,12 @@ export async function gatherCouncilVerdict(args: {
   baseUrl: string;
   payer: PayingWallet;
   votePriceBot?: number;
-  capBot?: number;
+  capUsdc?: number;
   quorum?: number;
   /** Enables the sequential self-resolving mechanism (see module header). */
   selfResolving?: SelfResolvingConfig;
 }): Promise<CouncilVerdict | null> {
-  const capWei = botToWei(args.capBot ?? 0.005);
+  const capUnits = usdcToUnits(args.capUsdc ?? 0.005);
   const quorum = args.quorum ?? 3;
   const sr = args.selfResolving;
   // Random order prevents the same persona from always reporting first
@@ -193,7 +193,7 @@ export async function gatherCouncilVerdict(args: {
   const history: string[] = [];
   let qPrev = Q_PRIOR;
   let decisiveSoFar = 0;
-  let totalPaidWei = 0n;
+  let totalPaidUnits = 0n;
 
   // Sequential: keeps within LLM free-tier RPM and RPC rate limits —
   // and in self-resolving mode, sequencing is the mechanism itself.
@@ -203,22 +203,22 @@ export async function gatherCouncilVerdict(args: {
       url += `&history=${encodeURIComponent(JSON.stringify(history.slice(-8)))}`;
     }
     try {
-      const r = await fetchWithBudget(url, args.payer, capWei);
+      const r = await fetchWithBudget(url, args.payer, capUnits);
       if (!r.response.ok) continue;
       const body = (await r.response.json()) as VoteResponse;
       const verdict = body.verdict;
       if (!isVerdict(verdict)) {
         continue;
       }
-      const priceWei = r.payment?.priceWei ?? null;
-      if (priceWei != null) totalPaidWei += priceWei;
+      const priceUnits = r.payment?.priceUnits ?? null;
+      if (priceUnits != null) totalPaidUnits += priceUnits;
       const confidence = Math.max(0, Math.min(100, Math.round(body.confidence ?? 0)));
       const vote: CouncilVote = {
         slug: p.slug,
         displayName: p.displayName,
         verdict,
         confidence,
-        pricePaidWei: priceWei != null ? priceWei.toString() : null,
+        pricePaidUnits: priceUnits != null ? priceUnits.toString() : null,
         walletAddress: typeof body.paidTo === "string" ? body.paidTo : undefined,
       };
       if (sr) {
@@ -291,50 +291,50 @@ export async function gatherCouncilVerdict(args: {
     explanation,
     tally,
     votes,
-    totalPaidWei,
+    totalPaidUnits,
     ...(sr ? { qHistory, reports: history } : {}),
   };
 }
 
 export interface BonusReceipt {
   slug: string;
-  bonusBot: number;
+  bonusUsdc: number;
   txHash: string | null; // null when the transfer failed (logged, non-fatal)
 }
 
 /**
- * Pays the cross-entropy bonuses to positive-scoring jurors via native BOT
+ * Pays the cross-entropy bonuses to positive-scoring jurors via native USDC
  * transfers from the oracle wallet. Every transfer is individually best-effort:
  * a failed payout is logged and skipped, never thrown — settlement must not
  * depend on payout success. Call AFTER the claim is settled on-chain.
  */
 export async function payCouncilBonuses(
   votes: CouncilVote[],
-  poolBot: number,
+  poolUsdc: number,
   payerWallet: AgentWallet,
 ): Promise<BonusReceipt[]> {
-  const bonuses = allocateBonus(votes.map((v) => v.score ?? 0), poolBot);
+  const bonuses = allocateBonus(votes.map((v) => v.score ?? 0), poolUsdc);
   const receipts: BonusReceipt[] = [];
   for (let i = 0; i < votes.length; i++) {
     const vote = votes[i];
     const bonus = bonuses[i];
     if (bonus <= 0) continue;
-    vote.bonusBot = bonus;
+    vote.bonusUsdc = bonus;
     if (!vote.walletAddress?.startsWith("0x")) {
-      console.warn(`[council] no wallet address for ${vote.slug} — bonus ${bonus} BOT skipped`);
-      receipts.push({ slug: vote.slug, bonusBot: bonus, txHash: null });
+      console.warn(`[council] no wallet address for ${vote.slug} — bonus ${bonus} USDC skipped`);
+      receipts.push({ slug: vote.slug, bonusUsdc: bonus, txHash: null });
       continue;
     }
     try {
-      const txHash = await transferBot({
+      const txHash = await transferUsdc({
         wallet: payerWallet,
         to: vote.walletAddress as `0x${string}`,
-        amountBot: bonus.toFixed(6),
+        amountUsdc: bonus.toFixed(6),
       });
-      receipts.push({ slug: vote.slug, bonusBot: bonus, txHash });
+      receipts.push({ slug: vote.slug, bonusUsdc: bonus, txHash });
     } catch (err) {
       console.warn(`[council] bonus transfer to ${vote.slug} failed:`, err);
-      receipts.push({ slug: vote.slug, bonusBot: bonus, txHash: null });
+      receipts.push({ slug: vote.slug, bonusUsdc: bonus, txHash: null });
     }
   }
   return receipts;

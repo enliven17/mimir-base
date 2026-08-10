@@ -28,10 +28,10 @@ import {
   type ClaimChallenger,
   type VSData,
 } from "@/lib/contract";
-import { getExplorerTxUrl, createBotchainPublicClient } from "@/lib/botchain";
+import { getExplorerTxUrl, createBasePublicClient } from "@/lib/base";
 import { getPendingVS } from "@/lib/pending-vs";
 import { openPeepsAvatar } from "@/lib/avatars";
-import { formatBot } from "@/lib/money";
+import { formatUsdc } from "@/lib/money";
 import { acquireTxLock } from "@/lib/tx-lock";
 import {
   MIN_STAKE,
@@ -658,13 +658,13 @@ function VsChallengersCard({
                           className="flex min-h-7 min-w-[4.5rem] items-center justify-center rounded-md border border-white/[0.1] bg-pv-bg/55 px-2 py-1 font-mono text-[9px] font-bold tabular-nums leading-none text-pv-fuch sm:min-h-8 sm:min-w-[5rem] sm:text-[10px]"
                           title={t("challengerStake")}
                         >
-                          {formatBot(challenger.stake)}
+                          {formatUsdc(challenger.stake)}
                         </div>
                         <div
                           className="flex min-h-7 min-w-[4.5rem] items-center justify-center rounded-md border border-pv-emerald/[0.18] bg-pv-emerald/[0.08] px-2 py-1 font-mono text-[9px] font-bold tabular-nums leading-none text-pv-emerald sm:min-h-8 sm:min-w-[5rem] sm:text-[10px]"
                           title={t("potentialPayout")}
                         >
-                          {formatBot(challenger.potential_payout)}
+                          {formatUsdc(challenger.potential_payout)}
                         </div>
                       </div>
                     </div>
@@ -857,7 +857,7 @@ export default function VSDetailPage() {
 
     async function watchResolveTransaction() {
       // BOT Chain has sub-second finality — just wait for the EVM receipt.
-      const client = createBotchainPublicClient();
+      const client = createBasePublicClient();
       try {
         const receipt = await client.waitForTransactionReceipt({ hash: resolveTxHash });
         if (cancelled) return;
@@ -1086,8 +1086,8 @@ export default function VSDetailPage() {
     !hasWinner
       ? null
       : resolvedPayout === null
-        ? formatBot(pool)
-        : `${provenResultTone === "lost" ? "-" : "+"}${formatBot(resolvedPayout)}`;
+        ? formatUsdc(pool)
+        : `${provenResultTone === "lost" ? "-" : "+"}${formatUsdc(resolvedPayout)}`;
   const marketType = display.market_type ?? "binary";
   const oddsMode = display.odds_mode ?? "pool";
   const challengeStakeValue = Number(challengeStake);
@@ -1531,7 +1531,7 @@ export default function VSDetailPage() {
                       {t("pool")}
                     </p>
                     <div className="mt-auto min-w-0 pt-2 font-mono text-base font-bold tabular-nums leading-tight text-pv-gold sm:text-lg lg:text-xl">
-                      {formatBot(pool)}
+                      {formatUsdc(pool)}
                     </div>
                   </div>
                   <div className="flex min-h-[5.75rem] min-w-0 flex-col bg-pv-bg/55 px-4 py-3.5 sm:min-h-[6rem] sm:px-4 sm:py-4">
@@ -1539,7 +1539,7 @@ export default function VSDetailPage() {
                       {t("creatorStake")}
                     </p>
                     <div className="mt-auto min-w-0 pt-2 font-mono text-base font-bold tabular-nums leading-tight text-pv-cyan sm:text-lg lg:text-xl">
-                      {formatBot(display.creator_stake ?? display.stake_amount)}
+                      {formatUsdc(display.creator_stake ?? display.stake_amount)}
                     </div>
                   </div>
                   <div className="flex min-h-[5.75rem] min-w-0 flex-col bg-pv-bg/55 px-4 py-3.5 sm:min-h-[6rem] sm:px-4 sm:py-4">
@@ -1792,7 +1792,7 @@ export default function VSDetailPage() {
                               {t("ifChallengersWin")}
                             </div>
                             <div className="mt-1.5 font-mono text-sm font-bold tabular-nums text-pv-emerald sm:text-base">
-                              {formatBot(challengePayoutPreview)}
+                              {formatUsdc(challengePayoutPreview)}
                             </div>
                           </div>
                           <div className="min-w-0 bg-pv-bg/70 px-3.5 py-3">
@@ -1800,7 +1800,7 @@ export default function VSDetailPage() {
                               {t("netProfit")}
                             </div>
                             <div className="mt-1.5 font-mono text-sm font-bold tabular-nums text-pv-fuch sm:text-base">
-                              +{formatBot(challengeProfitPreview)}
+                              +{formatUsdc(challengeProfitPreview)}
                             </div>
                           </div>
                           <div className="min-w-0 bg-pv-bg/70 px-3.5 py-3">
@@ -1808,16 +1808,16 @@ export default function VSDetailPage() {
                               {t("ifCreatorWins")}
                             </div>
                             <div className="mt-1.5 font-mono text-sm font-bold tabular-nums text-pv-cyan sm:text-base">
-                              {formatBot(poolPreview?.creatorPayout ?? creatorPayoutPreview)}
+                              {formatUsdc(poolPreview?.creatorPayout ?? creatorPayoutPreview)}
                             </div>
                           </div>
                         </div>
                         {poolPreview ? (
                           <p className="px-3.5 py-3 text-xs leading-relaxed text-pv-muted">
                             {t("poolPayoutFormula", {
-                              stake: formatBot(challengeStakeValue),
-                              creatorStake: formatBot(creatorStake),
-                              challengerStake: formatBot(poolPreview.totalChallengerStake),
+                              stake: formatUsdc(challengeStakeValue),
+                              creatorStake: formatUsdc(creatorStake),
+                              challengerStake: formatUsdc(poolPreview.totalChallengerStake),
                             })}
                           </p>
                         ) : null}
@@ -2212,7 +2212,7 @@ export default function VSDetailPage() {
                                       {entry.question}
                                     </div>
                                     <div className="text-xs text-pv-muted mt-1">
-                                      {t("pool")}: {formatBot(getVSTotalPot(entry))}
+                                      {t("pool")}: {formatUsdc(getVSTotalPot(entry))}
                                     </div>
                                   </div>
                                 );

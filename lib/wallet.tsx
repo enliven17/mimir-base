@@ -24,7 +24,7 @@ import {
   useDisconnect,
   useSwitchChain,
 } from "wagmi";
-import { botchainTestnet } from "./botchain";
+import { baseSepolia } from "./base";
 
 interface WalletCtx {
   address: string | null;
@@ -90,7 +90,7 @@ function ConnectorPickerModal({
           </button>
         </div>
         <p className="mb-4 text-xs text-pv-muted">
-          BOT Chain Testnet (968). Pick a wallet to continue.
+          Base Sepolia (84532). Pick a wallet to continue.
         </p>
         <div className="space-y-2">
           {connectors.length === 0 ? (
@@ -129,20 +129,20 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const { switchChain } = useSwitchChain();
   const [pickerOpen, setPickerOpen] = useState(false);
 
-  const isCorrectNetwork = !chain || chain.id === botchainTestnet.id;
+  const isCorrectNetwork = !chain || chain.id === baseSepolia.id;
 
-  // Auto-switch the wallet to BOT Chain Testnet on connect.
+  // Auto-switch the wallet to Base Sepolia on connect.
   const autoSwitchAttempted = useRef(false);
   useEffect(() => {
     if (!isConnected || !chain) {
       autoSwitchAttempted.current = false;
       return;
     }
-    if (chain.id === botchainTestnet.id) return;
+    if (chain.id === baseSepolia.id) return;
     if (autoSwitchAttempted.current) return;
     autoSwitchAttempted.current = true;
     try {
-      switchChain({ chainId: botchainTestnet.id });
+      switchChain({ chainId: baseSepolia.id });
     } catch {
       /* user rejected */
     }
@@ -159,7 +159,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   }, [reset]);
 
   const switchNetwork = async () => {
-    switchChain({ chainId: botchainTestnet.id });
+    switchChain({ chainId: baseSepolia.id });
   };
 
   const connectorList = useMemo(

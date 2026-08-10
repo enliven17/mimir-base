@@ -13,7 +13,7 @@ interface IERC20 {
 /**
  * Mimir — AI-settled prediction market on BOT Chain
  *
- * Stakes are held in testnet USDT (ERC-20, 6 decimals). Users/agents must
+ * Stakes are held in testnet USDC (ERC-20, 6 decimals). Users/agents must
  * approve this contract before createClaim / challengeClaim / createRematch.
  * Gas is still paid in native BOT.
  *
@@ -38,7 +38,7 @@ contract Mimir {
 
     // ── Limits ────────────────────────────────────────────────────────────────
     uint256 public constant MAX_CHALLENGERS        = 100;
-    uint256 public constant MIN_STAKE              = 2 * 10**6; // 2 USDT (6 decimals)
+    uint256 public constant MIN_STAKE              = 2 * 10**6; // 2 USDC (6 decimals)
     uint256 public constant DEFAULT_PAYOUT_BPS     = 20_000;    // 2x
 
     // Anti-sniping: no new challenges accepted in the final N seconds before
@@ -95,7 +95,7 @@ contract Mimir {
 
     address public owner;
     address public oracle; // off-chain AI oracle agent
-    IERC20  public immutable usdt;
+    IERC20  public immutable usdc;
 
     // ── Events ────────────────────────────────────────────────────────────────
     event ClaimCreated(uint256 indexed id, address indexed creator, string category);
@@ -118,11 +118,11 @@ contract Mimir {
     }
 
     // ── Constructor ───────────────────────────────────────────────────────────
-    constructor(address _oracle, address _usdt) {
-        require(_usdt != address(0), "Mimir: zero USDT");
+    constructor(address _oracle, address _usdc) {
+        require(_usdc != address(0), "Mimir: zero USDC");
         owner  = msg.sender;
         oracle = _oracle;
-        usdt   = IERC20(_usdt);
+        usdc   = IERC20(_usdc);
         emit OracleChanged(address(0), _oracle);
     }
 
@@ -143,15 +143,15 @@ contract Mimir {
 
     function _pullStake(uint256 amount) internal {
         require(amount > 0, "Mimir: zero stake");
-        bool ok = usdt.transferFrom(msg.sender, address(this), amount);
-        require(ok, "Mimir: USDT pull failed");
+        bool ok = usdc.transferFrom(msg.sender, address(this), amount);
+        require(ok, "Mimir: USDC pull failed");
     }
 
     function _transfer(address to, uint256 amount) internal {
         if (amount == 0) return;
         // Prefer push; if the token returns false, park for pull-withdrawal so
         // one bad recipient cannot freeze the whole settlement.
-        bool ok = usdt.transfer(to, amount);
+        bool ok = usdc.transfer(to, amount);
         if (!ok) {
             pendingWithdrawals[to] += amount;
             emit WithdrawalPending(to, amount);
@@ -163,7 +163,7 @@ contract Mimir {
         uint256 amount = pendingWithdrawals[msg.sender];
         require(amount > 0, "Mimir: nothing to withdraw");
         pendingWithdrawals[msg.sender] = 0; // effects before interaction
-        bool ok = usdt.transfer(msg.sender, amount);
+        bool ok = usdc.transfer(msg.sender, amount);
         require(ok, "Mimir: withdraw failed");
         emit Withdrawal(msg.sender, amount);
     }
@@ -495,7 +495,7 @@ contract Mimir {
         uint256 resolved,
         uint256 balance
     ) {
-        return (claimCount, totalResolved, usdt.balanceOf(address(this)));
+        return (claimCount, totalResolved, usdc.balanceOf(address(this)));
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
@@ -505,6 +505,6 @@ contract Mimir {
 
     // Fallback: reject accidental native BOT sends
     receive() external payable {
-        revert("Mimir: stakes are USDT - approve + createClaim/challengeClaim");
+        revert("Mimir: stakes are USDC - approve + createClaim/challengeClaim");
     }
 }

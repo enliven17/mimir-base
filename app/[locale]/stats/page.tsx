@@ -1,16 +1,16 @@
 import Link from "next/link";
 import { cachedFor } from "@/lib/server/ttl-cache";
 import {
-  createBotchainPublicClient,
+  createBasePublicClient,
   getContractAddress,
   getDeployBlock,
   isContractConfigured,
   paginatedGetLogs,
-  weiToBot,
+  weiToEth,
   getExplorerAddressUrl,
   getExplorerTxUrl,
-} from "@/lib/botchain";
-import { unitsToUsdt } from "@/lib/usdt";
+} from "@/lib/base";
+import { unitsToUsdc } from "@/lib/usdc";
 import { MIMIR_ABI, STATE } from "@/lib/mimir-abi";
 import { ZERO_ADDRESS } from "@/lib/constants";
 import { getPersonaForAddress } from "@/lib/council-resolver";
@@ -46,7 +46,7 @@ interface ClaimRow {
   confidence:           number;
 }
 
-// Concurrency cap for the per-claim getClaim fan-out. Public BOT Chain RPCs can
+// Concurrency cap for the per-claim getClaim fan-out. Public ETH Chain RPCs can
 // throttle (HTTP 429) when slammed with `Promise.all` over 100+ IDs. Workers keep
 // the burst small while still finishing a large page quickly. Reads go through
 // viem's batch transport (RPC_BATCH_SIZE), so this is in-flight reads, not raw POSTs.
@@ -56,7 +56,7 @@ const fetchClaims = cachedFor(fetchClaimsUncached, 30_000);
 
 async function fetchClaimsUncached(): Promise<ClaimRow[]> {
   if (!isContractConfigured()) return [];
-  const client  = createBotchainPublicClient();
+  const client  = createBasePublicClient();
   const address = getContractAddress();
 
   try {
@@ -136,7 +136,7 @@ const fetchStakers = cachedFor(fetchStakersUncached, 30_000);
 
 async function fetchStakersUncached(oracleAddr?: string, creatorAddr?: string): Promise<StakerRow[]> {
   if (!isContractConfigured()) return [];
-  const client  = createBotchainPublicClient();
+  const client  = createBasePublicClient();
   const address = getContractAddress();
   const fromBlock = getDeployBlock();
   try {
@@ -233,7 +233,7 @@ const fetchSettlements = cachedFor(fetchSettlementsUncached, 30_000);
 
 async function fetchSettlementsUncached(): Promise<Settlement[]> {
   if (!isContractConfigured()) return [];
-  const client  = createBotchainPublicClient();
+  const client  = createBasePublicClient();
   const address = getContractAddress();
   try {
     const logs = await paginatedGetLogs(client, {
@@ -269,7 +269,7 @@ const fetchOracleAndCreator = cachedFor(fetchOracleAndCreatorUncached, 30_000);
 
 async function fetchOracleAndCreatorUncached() {
   if (!isContractConfigured()) return null;
-  const client = createBotchainPublicClient();
+  const client = createBasePublicClient();
   const address = getContractAddress();
   try {
     const oracle = (await client.readContract({
@@ -366,12 +366,12 @@ export default async function StatsPage() {
   const totalResolved  = resolvedClaims.length;
   const openClaims     = claims.filter((c) => c.state === 0 || c.state === 1).length;
 
-  // Total wagered = creator stakes + challenger stakes across all claims, in USDT.
-  const totalWageredWei = claims.reduce(
+  // Total wagered = creator stakes + challenger stakes across all claims, in USDC.
+  const totalWageredUnits = claims.reduce(
     (acc, c) => acc + c.creatorStake + c.totalChallengerStake,
     0n,
   );
-  const totalWageredBot = unitsToUsdt(totalWageredWei);
+  const totalWageredBot = unitsToUsdc(totalWageredUnits);
 
   // Confidence tiers from resolved on-chain claim state. The settlement
   // timeline below is intentionally capped; aggregate stats must not be.
@@ -395,13 +395,13 @@ export default async function StatsPage() {
       <div className="mx-auto max-w-[1100px] px-4 pt-6 sm:px-6 lg:px-8">
       <header className="mb-8">
         <p className="text-center text-sm text-pv-muted">
-          Every number on this page is read directly from the Mimir contract on BOT Chain Testnet.
+          Every number on this page is read directly from the Mimir contract on ETH Chain Testnet.
         </p>
       </header>
 
       {/* Headline KPIs */}
       <section className="mb-10 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-        <Kpi tone="accent" label="Total wagered" value={`${totalWageredBot.toFixed(2)} USDT`} sub="creator + challenger stakes" />
+        <Kpi tone="accent" label="Total wagered" value={`${totalWageredBot.toFixed(2)} USDC`} sub="creator + challenger stakes" />
         <Kpi label="Unique stakers" value={stakers.length} sub={`${humanStakers.length} human · ${councilStakers.length} council · ${stakers.length - humanStakers.length - councilStakers.length} other agent`} />
         <Kpi label="Claims resolved" value={totalResolved} sub={`${openClaims} open · ${totalClaims} total`} />
         <Kpi label="Oracle accuracy" value={`${accuracyPct}%`} sub="settlements at ≥ 80% confidence" />
@@ -425,14 +425,14 @@ export default async function StatsPage() {
         <div className="rounded-2xl border border-pv-border/30 bg-pv-surface/70 p-5 sm:p-6">
           <h2 className="mb-1 font-display text-base font-bold tracking-tight text-pv-text">Agent vault</h2>
           <p className="mb-5 text-xs text-pv-muted">
-            Local EOA wallets that the oracle and market-creator sign with on BOT Chain.
+            Local EOA wallets that the oracle and market-creator sign with on ETH Chain.
           </p>
           {agentInfo ? (
             <div className="space-y-4 text-sm">
               <div>
                 <div className="mb-1 flex items-baseline justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-pv-emerald">Oracle</span>
-                  <span className="font-mono tabular-nums text-pv-text">{weiToBot(agentInfo.oracleBalance).toFixed(4)} BOT</span>
+                  <span className="font-mono tabular-nums text-pv-text">{weiToEth(agentInfo.oracleBalance).toFixed(4)} ETH</span>
                 </div>
                 <a className="block break-all font-mono text-[10px] text-pv-muted hover:text-pv-emerald" href={getExplorerAddressUrl(agentInfo.oracle)} target="_blank" rel="noreferrer">
                   {agentInfo.oracle}
@@ -441,7 +441,7 @@ export default async function StatsPage() {
               <div>
                 <div className="mb-1 flex items-baseline justify-between">
                   <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-pv-emerald">Market-creator (owner)</span>
-                  <span className="font-mono tabular-nums text-pv-text">{weiToBot(agentInfo.ownerBalance).toFixed(4)} BOT</span>
+                  <span className="font-mono tabular-nums text-pv-text">{weiToEth(agentInfo.ownerBalance).toFixed(4)} ETH</span>
                 </div>
                 <a className="block break-all font-mono text-[10px] text-pv-muted hover:text-pv-emerald" href={getExplorerAddressUrl(agentInfo.owner)} target="_blank" rel="noreferrer">
                   {agentInfo.owner}
@@ -592,10 +592,10 @@ export default async function StatsPage() {
 
       {/* Resource links */}
       <section className="rounded-2xl border border-pv-border/30 bg-pv-surface/70 p-6">
-        <h3 className="mb-4 font-display text-lg font-bold tracking-tight text-pv-text">Get testnet BOT</h3>
+        <h3 className="mb-4 font-display text-lg font-bold tracking-tight text-pv-text">Get testnet ETH</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           {[
-            { label: "BOT Faucet",      href: "https://faucet.botchain.ai/basic",  desc: "Testnet BOT on BOT Chain (10 tBOT / day)" },
+            { label: "BOT Faucet",      href: "https://faucet.botchain.ai/basic",  desc: "Testnet ETH on ETH Chain (10 tBOT / day)" },
             { label: "BOT Explorer",    href: "https://scan.bohr.life",            desc: "Inspect contract activity" },
             { label: "BOT Chain Docs",  href: "https://dev-docs.botchain.ai",      desc: "Network, RPC and developer guides" },
           ].map(({ label, href, desc }) => {

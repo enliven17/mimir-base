@@ -35,7 +35,7 @@ sequenceDiagram
     participant DB as Neon ledger
 
     Agent->>API: request paid resource
-    API-->>Agent: HTTP 402 + { payTo, amountWei, chainId }
+    API-->>Agent: HTTP 402 + { payTo, amountUnits, chainId }
     Agent->>Chain: native BOT transfer to payTo
     Chain-->>Agent: tx hash
     Agent->>API: retry with X-Payment-Tx: <hash>
@@ -242,7 +242,7 @@ sequenceDiagram
 ```
 
 - **Sequential, visible history.** Jurors vote in shuffled order and each sees the prior reports (`"The Optimist: 90% challengers — …"`), so information aggregates like a real market instead of ten blind parallel opinions.
-- **Cross-entropy scoring.** Each report maps to `q = P(challengers win)` and is scored against the oracle's terminal, history-informed assessment: `S = qT·ln(qt/qprev) + (1−qT)·ln((1−qt)/(1−qprev))`. Parroting the prior scores **exactly zero**; informative updates toward the reference split the `COUNCIL_BONUS_BOT` pool, paid after settlement as native BOT transfers into juror wallets. The flat ~0.001 BOT HTTP 402 vote fee remains the participation floor.
+- **Cross-entropy scoring.** Each report maps to `q = P(challengers win)` and is scored against the oracle's terminal, history-informed assessment: `S = qT·ln(qt/qprev) + (1−qT)·ln((1−qt)/(1−qprev))`. Parroting the prior scores **exactly zero**; informative updates toward the reference split the `COUNCIL_BONUS_USDC` pool, paid after settlement as native BOT transfers into juror wallets. The flat ~0.001 BOT HTTP 402 vote fee remains the participation floor.
 - **Random termination.** Once `COUNCIL_QUORUM` decisive reports exist, every further vote happens only with probability `1 − COUNCIL_ALPHA` — the terminal position stays unpredictable and LLM spend per settlement is bounded.
 - **Verifiable.** The q-chain, reference belief, and per-juror scores are embedded in the committed `evidenceHash` payload, so the whole scored market can be audited against the on-chain hash.
 
@@ -347,7 +347,7 @@ See [`docs/COUNCIL.md`](docs/COUNCIL.md) for the full architecture, rate-limit s
 
 | Piece                          | Where it lives                                                                | What it actually does in Mimir                                                                                       |
 | ------------------------------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **BOT** as native token        | `contracts/Mimir.sol`, `lib/botchain.ts`                                      | Stakes use `msg.value` — no ERC-20 approval flow, no allowance dance, ~$0.06 per call                                |
+| **BOT** as native token        | `contracts/Mimir.sol`, `lib/base.ts`                                      | Stakes use `msg.value` — no ERC-20 approval flow, no allowance dance, ~$0.06 per call                                |
 | **Local agent wallets**        | `lib/agent-wallets.ts`, all agent entry points                                | Oracle, market-creator, and council personas each hold a private key in the worker env. Writes go through `agentContractWrite(...)` (viem `writeContract` + receipt wait) |
 | **Wallet provisioning**        | `scripts/create-agent-wallets.ts`, `scripts/fund-agents.ts`                   | One command generates all twelve keys (+ the public address block for the web server); another distributes BOT from a master wallet |
 | **Native transfers**           | `transferBot(...)` in `lib/agent-wallets.ts`                                  | Oracle's cross-entropy jury bonuses and agent funding are plain BOT transfers with receipt verification              |
@@ -363,8 +363,8 @@ sequenceDiagram
     participant Helper as lib/agent-wallets.ts
     participant Chain as BOT Chain RPC
 
-    Agent->>Helper: agentContractWrite({ wallet, abi, functionName, args, amountBot })
-    Helper->>Chain: writeContract (signed locally, msg.value = amountBot)
+    Agent->>Helper: agentContractWrite({ wallet, abi, functionName, args, amountUsdc })
+    Helper->>Chain: writeContract (signed locally, msg.value = amountUsdc)
     Chain-->>Helper: tx hash
     Helper->>Chain: waitForTransactionReceipt
     Chain-->>Helper: receipt (status = success)
@@ -385,8 +385,8 @@ sequenceDiagram
     participant Chain as BOT Chain
 
     Buyer->>API: GET /api/premium/price?symbol=bitcoin
-    API-->>Buyer: 402 { payTo, amountWei, chainId: 968 }
-    Buyer->>Chain: sendTransaction(to=payTo, value=amountWei)
+    API-->>Buyer: 402 { payTo, amountUnits, chainId: 968 }
+    Buyer->>Chain: sendTransaction(to=payTo, value=amountUnits)
     Chain-->>Buyer: tx hash
     Buyer->>API: retry + X-Payment-Tx: hash
     API->>Chain: getTransaction + getTransactionReceipt
@@ -619,7 +619,7 @@ flowchart LR
    - `NEXT_PUBLIC_CONTRACT_ADDRESS`
    - `SELLER_ADDRESS`, `PASS_SECRET`, `COUNCIL_<SLUG>_ADDRESS` ×10 (public addresses only — never keys)
    - `DATABASE_URL` (Neon pooler URL, optional)
-   - `NEXT_PUBLIC_BOTCHAIN_RPC` (optional override)
+   - `NEXT_PUBLIC_BASE_RPC_URL` (optional override)
 3. Push to `main`. Build takes ~60s. `vercel.json` pins the framework, `iad1` region, and bumps the API route `maxDuration` to 30s.
 
 ### Railway — agent workers
@@ -651,7 +651,7 @@ Every env var lives in `.env.example`. Quick reference:
 | --------------------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_CONTRACT_ADDRESS`    | frontend + agents        | Set after `npm run deploy:contract`                                                |
 | `NEXT_PUBLIC_DEPLOY_BLOCK`        | frontend + agents        | Block the contract was deployed at; log scans start here (default 0)               |
-| `NEXT_PUBLIC_BOTCHAIN_RPC` / `BOTCHAIN_RPC` | frontend / server reads | Optional override; defaults to `https://rpc.bohr.life`                  |
+| `NEXT_PUBLIC_BASE_RPC_URL` / `BASE_RPC_URL` | frontend / server reads | Optional override; defaults to `https://rpc.bohr.life`                  |
 | `ORACLE_PRIVATE_KEY`              | oracle (worker)          | The oracle's local key — its address is the contract's `oracle` role               |
 | `CREATOR_PRIVATE_KEY`             | market-creator (worker)  | The market-creator's local key                                                     |
 | `SELLER_ADDRESS`                  | web server               | Default recipient for paid-endpoint payments (usually the oracle address)          |
@@ -682,13 +682,13 @@ Every env var lives in `.env.example`. Quick reference:
 | `COUNCIL_PEER_READS`              | council (worker)         | `1` lets personas buy other personas' reasoning over HTTP 402 before deciding          |
 | `COUNCIL_PEER_READS_PER_PERSONA`  | council (worker)         | Peer reads bought before each persona decision; default `2`                         |
 | `COUNCIL_PEER_READ_DELAY_MS`      | council (worker)         | Delay between peer-read nanopayments; default `15000`                               |
-| `COUNCIL_PEER_READ_CAP_BOT`      | council (worker)         | Max accepted HTTP 402 quote per peer read; default `0.003` BOT                         |
+| `COUNCIL_PEER_READ_CAP_USDC`      | council (worker)         | Max accepted HTTP 402 quote per peer read; default `0.003` BOT                         |
 | `COUNCIL_SETTLEMENT`              | oracle                   | `1` settles by council tally instead of the solo oracle verdict                     |
 | `COUNCIL_QUORUM`                  | oracle                   | Min decisive juror votes before the council verdict is used; default `3`            |
-| `COUNCIL_VOTE_CAP_BOT`           | oracle                   | Max accepted HTTP 402 quote per settlement vote; default `0.005`                        |
+| `COUNCIL_VOTE_CAP_USDC`           | oracle                   | Max accepted HTTP 402 quote per settlement vote; default `0.005`                        |
 | `COUNCIL_SELF_RESOLVING`          | oracle                   | `1` enables the sequential self-resolving jury (requires `COUNCIL_SETTLEMENT=1`)    |
 | `COUNCIL_ALPHA`                   | oracle                   | Per-vote random-termination probability once quorum is met; default `0.25`          |
-| `COUNCIL_BONUS_BOT`              | oracle                   | Cross-entropy bonus pool split by positive-scoring jurors; default `0.01`           |
+| `COUNCIL_BONUS_USDC`              | oracle                   | Cross-entropy bonus pool split by positive-scoring jurors; default `0.01`           |
 
 ---
 

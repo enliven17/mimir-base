@@ -54,7 +54,7 @@ export const MIMIR_ABI = [
     type: "constructor",
     inputs: [
       { name: "_oracle", type: "address" },
-      { name: "_usdt",   type: "address" },
+      { name: "_usdc",   type: "address" },
     ],
     stateMutability: "nonpayable",
   },
@@ -275,7 +275,7 @@ export const MIMIR_ABI = [
   },
   {
     type: "function",
-    name: "usdt",
+    name: "usdc",
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "address" }],

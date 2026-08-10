@@ -31,26 +31,25 @@ import { formatEther } from "viem";
 import { requireEnv, requireAnyLLMKey, applyWorkerGeminiKey } from "../../lib/agent-bootstrap";
 import { callLLM, activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint, pickGeminiModel, extractJson } from "../../lib/llm";
 import {
-  createBotchainPublicClient,
-  botchainTestnet,
+  createBasePublicClient,
+  baseSepolia,
   getContractAddress,
   getExplorerTxUrl,
-  botToWei,
-  weiToBot,
-} from "../../lib/botchain";
+  weiToEth,
+} from "../../lib/base";
 import {
   agentContractWrite,
   getCreatorWallet,
 } from "../../lib/agent-wallets";
 import { payingWalletFor } from "../../lib/paid-client";
 import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../lib/usdc";
 import { gatherCouncilPreflight } from "./council-preflight";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CONTRACT_ADDRESS    = getContractAddress();
-const CREATOR_STAKE_USDT = Number(
-  process.env.CREATOR_STAKE_USDT ?? process.env.CREATOR_STAKE_BOT ?? "2"
+const CREATOR_STAKE_USDC = Number(
+  process.env.CREATOR_STAKE_USDC ?? process.env.CREATOR_STAKE_BOT ?? "2"
 );
 const MAX_CLAIMS_PER_RUN  = Number(process.env.MAX_CLAIMS_PER_RUN ?? "5");
 const MAX_ACTIVE_CLAIMS   = Number(process.env.MAX_ACTIVE_CLAIMS ?? "30");
@@ -64,7 +63,7 @@ const PREFLIGHT_ENABLED =
   process.env.MARKET_CREATOR_PREFLIGHT === "1" || Boolean(process.env.MIMIR_BASE_URL?.trim());
 const PREFLIGHT_BASE_URL = process.env.MIMIR_BASE_URL ?? "http://localhost:3000";
 const PREFLIGHT_MIN_SCORE = Number(process.env.MARKET_CREATOR_PREFLIGHT_MIN_SCORE ?? "60");
-const PREFLIGHT_CAP_BOT = Number(process.env.MARKET_CREATOR_PREFLIGHT_CAP_BOT ?? "0.005");
+const PREFLIGHT_CAP_BOT = Number(process.env.MARKET_CREATOR_PREFLIGHT_CAP_USDC ?? "0.005");
 const PREFLIGHT_PERSONAS = process.env.MARKET_CREATOR_PREFLIGHT_PERSONAS;
 const PREFLIGHT_DELAY_MS = Number(process.env.MARKET_CREATOR_PREFLIGHT_DELAY_MS ?? "30000");
 
@@ -72,7 +71,7 @@ requireEnv(["CREATOR_PRIVATE_KEY"]);
 requireAnyLLMKey();
 
 // ── Clients ───────────────────────────────────────────────────────────────────
-const publicClient   = createBotchainPublicClient();
+const publicClient   = createBasePublicClient();
 const CREATOR        = getCreatorWallet();
 const CREATOR_ADDR   = CREATOR.address;
 const CREATOR_PAYER  = payingWalletFor(CREATOR);
@@ -276,7 +275,7 @@ async function applyCouncilPreflight(candidates: ClaimCandidate[]): Promise<Clai
       baseUrl: PREFLIGHT_BASE_URL,
       payer: CREATOR_PAYER,
       personaCsv: PREFLIGHT_PERSONAS,
-      capBot: PREFLIGHT_CAP_BOT,
+      capUsdc: PREFLIGHT_CAP_BOT,
       delayMs: PREFLIGHT_DELAY_MS,
     }).catch((err) => {
       console.warn(
@@ -294,11 +293,11 @@ async function applyCouncilPreflight(candidates: ClaimCandidate[]): Promise<Clai
       continue;
     }
 
-    const paidBot = weiToBot(result.totalPaidWei);
+    const paidUsdc = unitsToUsdc(result.totalPaidUnits);
     const avg = Math.round(result.averageScore);
     console.log(
       `[market-creator] Council preflight ${avg}/100 ` +
-      `(open=${result.openVotes}, revise=${result.reviseVotes}, skip=${result.skipVotes}, paid=${paidBot.toFixed(6)} BOT) ` +
+      `(open=${result.openVotes}, revise=${result.reviseVotes}, skip=${result.skipVotes}, paid=${paidUsdc.toFixed(6)} USDC) ` +
       `for "${candidate.question.slice(0, 70)}..."`,
     );
 
@@ -638,18 +637,18 @@ async function createClaim(candidate: ClaimCandidate): Promise<string | null> {
   // Floor the WHOLE expression: sports candidates get kickoff-pinned
   // fractional deadlineHours, and BigInt() throws on non-integers.
   const deadline = BigInt(Math.floor(Date.now() / 1000 + candidate.deadlineHours * 3600));
-  const stake    = usdtToUnits(CREATOR_STAKE_USDT);
+  const stake    = usdcToUnits(CREATOR_STAKE_USDC);
 
-  // Check USDT balance (stakes). Gas is separate native BOT.
-  const usdtBal = (await publicClient.readContract({
-    address: USDT_ADDRESS,
+  // Check USDC balance (stakes). Gas is separate native BOT.
+  const usdcBal = (await publicClient.readContract({
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [CREATOR_ADDR],
   })) as bigint;
-  if (usdtBal < stake * 2n) {
+  if (usdcBal < stake * 2n) {
     console.warn(
-      `[market-creator] Insufficient USDT (${unitsToUsdt(usdtBal).toFixed(2)}) for ${candidate.question.slice(0, 40)}`
+      `[market-creator] Insufficient USDC (${unitsToUsdc(usdcBal).toFixed(2)}) for ${candidate.question.slice(0, 40)}`
     );
     return null;
   }
@@ -678,7 +677,7 @@ async function createClaim(candidate: ClaimCandidate): Promise<string | null> {
         false,                       // isPrivate
         "",                          // inviteKey
       ],
-      amountUsdt: String(CREATOR_STAKE_USDT),
+      amountUsdc: String(CREATOR_STAKE_USDC),
     });
     return txHash;
   } catch (err) {
@@ -774,7 +773,7 @@ async function run(): Promise<void> {
 
   console.log(`\n[market-creator] ── Run at ${new Date().toISOString()}`);
   console.log(`[market-creator] Creator : ${CREATOR_ADDR}`);
-  console.log(`[market-creator] Balance : ${weiToBot(balance).toFixed(4)} BOT`);
+  console.log(`[market-creator] Balance : ${weiToEth(balance).toFixed(4)} ETH`);
 
   // Single-pass sweep: cancels creator's stale expired-OPEN claims AND counts
   // joinable inventory (state ∈ {OPEN,ACTIVE} && deadline > now) on the same
@@ -863,10 +862,10 @@ async function main(): Promise<void> {
   console.log("═══════════════════════════════════════════════");
   console.log("  Mimir Market Creator Agent (local private key signer)");
   console.log(`  Creator    : ${CREATOR_ADDR}`);
-  console.log(`  Balance    : ${weiToBot(balance).toFixed(4)} BOT`);
-  console.log(`  Network    : BOT Chain Testnet (${botchainTestnet.id})`);
+  console.log(`  Balance    : ${weiToEth(balance).toFixed(4)} ETH`);
+  console.log(`  Network    : Base Sepolia (${baseSepolia.id})`);
   console.log(`  LLM        : ${activeLLMProvider()} / ${activeLLMModel()} · key=${activeLLMKeyFingerprint()}`);
-  console.log(`  Stake/mkt  : ${CREATOR_STAKE_USDT} USDT`);
+  console.log(`  Stake/mkt  : ${CREATOR_STAKE_USDC} USDC`);
   console.log(`  Max/run    : ${MAX_CLAIMS_PER_RUN} claims`);
   console.log(`  Active cap : ${MAX_ACTIVE_CLAIMS} unresolved (skip run above this)`);
   console.log(`  Preflight  : ${PREFLIGHT_ENABLED ? `on via ${PREFLIGHT_BASE_URL}` : "off"}`);

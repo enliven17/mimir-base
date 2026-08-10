@@ -14,11 +14,11 @@
 import { useEffect, useState } from "react";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { shortenAddress } from "@/lib/constants";
-import { getExplorerTxUrl } from "@/lib/botchain";
+import { getExplorerTxUrl } from "@/lib/base";
 
 interface PaymentEvent {
   resource: string;
-  amountBot: number;
+  amountUsdc: number;
   payer: string | null;
   seller: string | null;
   txHash: string | null;
@@ -28,8 +28,8 @@ interface PaymentEvent {
 interface RevenueSummary {
   totalCalls: number;
   baselineCalls: number;
-  totalBot: number;
-  baselineBot: number;
+  totalUsdc: number;
+  baselineUsdc: number;
   uniquePayers: number;
   uniqueSellers: number;
   byResource: Array<{ resource: string; calls: number; bot: number }>;
@@ -108,15 +108,15 @@ export default function RevenuePage() {
         <>
           <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Stat label="Paid calls" value={String(data.totalCalls)} />
-            <Stat label="BOT earned" value={`${data.totalBot.toFixed(6)} BOT`} accent />
+            <Stat label="BOT earned" value={`${data.totalUsdc.toFixed(6)} BOT`} accent />
             <Stat
               label="Paying agents"
               value={`${data.uniquePayers} → ${data.uniqueSellers} sellers`}
             />
           </section>
-          {(data.baselineCalls > 0 || data.baselineBot > 0) && (
+          {(data.baselineCalls > 0 || data.baselineUsdc > 0) && (
             <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-pv-muted">
-              includes {data.baselineCalls} calls / {data.baselineBot.toFixed(6)} BOT carried over
+              includes {data.baselineCalls} calls / {data.baselineUsdc.toFixed(6)} BOT carried over
               from an earlier deployment
             </p>
           )}
@@ -188,7 +188,7 @@ function PaymentCard({ event }: { event: PaymentEvent }) {
           </code>
         </div>
         <span className="shrink-0 font-mono text-sm font-semibold text-pv-text">
-          {event.amountBot.toFixed(6)} BOT
+          {event.amountUsdc.toFixed(6)} BOT
         </span>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-1 font-mono text-xs text-pv-muted">

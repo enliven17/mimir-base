@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, ExternalLink, ShieldCheck } from "lucide-react";
 import type { VSData } from "@/lib/contract";
-import { BOTCHAIN_EXPLORER_URL, getContractAddress, getExplorerAddressUrl } from "@/lib/botchain";
+import { BASE_EXPLORER_URL, getContractAddress, getExplorerAddressUrl } from "@/lib/base";
 
 interface EvidenceInspectorProps {
   vs: VSData;
@@ -150,7 +150,7 @@ export function EvidenceInspector({ vs }: EvidenceInspectorProps) {
                   View Mimir contract on BOTScan ↗
                 </a>
                 {" "}
-                <span className="text-pv-muted/70">({BOTCHAIN_EXPLORER_URL})</span>
+                <span className="text-pv-muted/70">({BASE_EXPLORER_URL})</span>
               </li>
             </ol>
           </div>

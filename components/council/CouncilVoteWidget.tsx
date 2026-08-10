@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { getExplorerTxUrl } from "@/lib/botchain";
+import { getExplorerTxUrl } from "@/lib/base";
 import { openPeepsAvatar } from "@/lib/avatars";
 
 interface PersonaVote {
@@ -27,7 +27,7 @@ interface PersonaVote {
     chip:   string;
   };
   staked:      boolean;
-  stakeBot:   number;
+  stakeUsdc:   number;
   txHash:      string | null;
   blockNumber: number | null;
 }
@@ -36,7 +36,7 @@ interface CouncilResponse {
   claimId:     number;
   total:       number;
   stakedCount: number;
-  totalBot:   number;
+  totalUsdc:   number;
   votes:       PersonaVote[];
 }
 
@@ -98,7 +98,7 @@ export default function CouncilVoteWidget({ claimId }: { claimId: number }) {
           </p>
         </div>
         <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-pv-muted">
-          {data.stakedCount} of {data.total} staked · {data.totalBot.toFixed(2)} USDT
+          {data.stakedCount} of {data.total} staked · {data.totalUsdc.toFixed(2)} USDC
         </div>
       </div>
 
@@ -128,7 +128,7 @@ export default function CouncilVoteWidget({ claimId }: { claimId: number }) {
             {v.staked && v.txHash ? (
               <div className="flex shrink-0 items-center gap-1.5">
                 <span className="font-mono text-[10px] tabular-nums text-pv-emerald">
-                  ✓ {v.stakeBot.toFixed(2)} USDT
+                  ✓ {v.stakeUsdc.toFixed(2)} USDC
                 </span>
                 <a
                   href={getExplorerTxUrl(v.txHash)}

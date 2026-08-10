@@ -104,14 +104,14 @@ function ArchitectureDiagram() {
 function EndToEndFlowDiagram() {
   const nodes = [
     { x: 40, y: 70, w: 150, h: 86, title: "Question", note: "source + rule" },
-    { x: 235, y: 70, w: 150, h: 86, title: "Create", note: "creator stakes USDT" },
+    { x: 235, y: 70, w: 150, h: 86, title: "Create", note: "creator stakes USDC" },
     { x: 430, y: 70, w: 150, h: 86, title: "Challenge", note: "counter-stake joins" },
     { x: 625, y: 70, w: 150, h: 86, title: "Deadline", note: "market locks" },
     { x: 820, y: 70, w: 150, h: 86, title: "Evidence", note: "fetch + hash" },
     { x: 235, y: 220, w: 150, h: 86, title: "LLM read", note: "verdict + confidence" },
     { x: 430, y: 220, w: 150, h: 86, title: "Council", note: "optional paid votes" },
     { x: 625, y: 220, w: 150, h: 86, title: "Resolve", note: "contract writes result" },
-    { x: 820, y: 220, w: 150, h: 86, title: "Payout", note: "USDT to winners" },
+    { x: 820, y: 220, w: 150, h: 86, title: "Payout", note: "USDC to winners" },
   ];
 
   return (
@@ -183,7 +183,7 @@ function StateMachineDiagram() {
 
 function LifecycleDiagram() {
   const steps = [
-    { tag: "01", title: "Create",   note: "Stake side A in USDT" },
+    { tag: "01", title: "Create",   note: "Stake side A in USDC" },
     { tag: "02", title: "Challenge",note: "Side B stakes the other side" },
     { tag: "03", title: "Wait",     note: "Deadline passes" },
     { tag: "04", title: "Read",     note: "Oracle fetches evidence" },
@@ -595,8 +595,8 @@ export default function DocsPage() {
       <header>
         <p className="mx-auto max-w-2xl text-center text-base leading-relaxed text-pv-text/75 sm:text-lg">
           Mimir is an AI-settled claim market on BOT Chain — an EVM L1 where native
-          BOT pays gas and agent micropayments, while market stakes settle in USDT.
-          Two parties stake USDT on opposite sides of a verifiable question; when the
+          BOT pays gas and agent micropayments, while market stakes settle in USDC.
+          Two parties stake USDC on opposite sides of a verifiable question; when the
           deadline passes, an off-chain AI oracle reads the agreed-upon evidence
           source, returns a verdict, and the smart contract pays out the winning side
           atomically. No committees, no manual disputes.
@@ -1010,7 +1010,7 @@ export default function DocsPage() {
             Browse the <Link href="/explorer" className="text-pv-emerald underline">explorer</Link>{" "}
             for open markets, or open your own with{" "}
             <Link href="/vs/create" className="text-pv-emerald underline">/vs/create</Link>.
-            Stake at least 2 USDT (approve USDT first).
+            Stake at least 2 USDC (approve USDC first).
           </li>
           <li>
             <strong className="text-pv-text">Wait.</strong>{" "}
@@ -1053,7 +1053,7 @@ export default function DocsPage() {
           </Card>
           <Card title="Mainnet?">
             Mimir runs on BOT Chain Testnet (chain 968) as of writing. The codebase
-            is chain-config driven (see <code className="rounded bg-pv-surface2 px-1 text-xs">lib/botchain.ts</code>) —
+            is chain-config driven (see <code className="rounded bg-pv-surface2 px-1 text-xs">lib/base.ts</code>) —
             a mainnet (chain 677) redeploy is mostly a chain definition swap plus a
             logs-capable RPC endpoint.
           </Card>

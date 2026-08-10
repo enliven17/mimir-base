@@ -4,31 +4,31 @@
  *   FUNDER_PRIVATE_KEY=0x... npx tsx --env-file=.env.local scripts/fund-agents.ts
  *
  * Sends:
- *   - native BOT for gas (FUND_GAS_BOT, default 1)
- *   - USDT for stakes (FUND_AMOUNT_USDT / FUND_COUNCIL_AMOUNT_USDT, defaults 20 / 10)
+ *   - native ETH for gas (FUND_GAS_ETH, default 1)
+ *   - USDC for stakes (FUND_AMOUNT_USDC / FUND_COUNCIL_AMOUNT_USDC, defaults 20 / 10)
  *
- * The funder must hold both tBOT (faucet) and test USDT on BOT Chain Testnet.
- * USDT: 0x75edC9335175Fc0552D51D48439F229c10420fe3
+ * The funder must hold both tBOT (faucet) and test USDC on ETH Chain Testnet.
+ * USDC: 0x75edC9335175Fc0552D51D48439F229c10420fe3
  */
 
 import { formatEther, parseEther } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import {
-  createBotchainPublicClient,
-  createBotchainWalletClientWithKey,
-  weiToBot,
+  createBasePublicClient,
+  createBaseWalletClientWithKey,
+  weiToEth,
   getExplorerTxUrl,
-  botchainTestnet,
-} from "../lib/botchain";
+  baseSepolia,
+} from "../lib/base";
 import {
   COUNCIL_PERSONAS,
   personaPrivateKeyEnv,
 } from "../agents/council/personas";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
 
-const GAS_BOT = parseEther(process.env.FUND_GAS_BOT ?? "1");
-const USDT_CORE = usdtToUnits(Number(process.env.FUND_AMOUNT_USDT ?? "20"));
-const USDT_COUNCIL = usdtToUnits(Number(process.env.FUND_COUNCIL_AMOUNT_USDT ?? "10"));
+const GAS_ETH = parseEther(process.env.FUND_GAS_ETH ?? "1");
+const USDC_CORE = usdcToUnits(Number(process.env.FUND_AMOUNT_USDC ?? "20"));
+const USDC_COUNCIL = usdcToUnits(Number(process.env.FUND_COUNCIL_AMOUNT_USDC ?? "10"));
 
 async function main(): Promise<void> {
   const funderKey = process.env.FUNDER_PRIVATE_KEY ?? process.env.DEPLOYER_PRIVATE_KEY;
@@ -37,18 +37,18 @@ async function main(): Promise<void> {
     process.exit(1);
   }
 
-  const publicClient = createBotchainPublicClient();
+  const publicClient = createBasePublicClient();
   const funder = privateKeyToAccount(funderKey as `0x${string}`);
-  const wallet = createBotchainWalletClientWithKey(funderKey);
+  const wallet = createBaseWalletClientWithKey(funderKey);
 
   const targets: Array<{
     label: string;
     address: `0x${string}`;
     gas: bigint;
-    usdt: bigint;
+    usdc: bigint;
   }> = [];
 
-  const addTarget = (label: string, keyEnv: string, usdt: bigint) => {
+  const addTarget = (label: string, keyEnv: string, usdc: bigint) => {
     const key = process.env[keyEnv]?.trim();
     if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) {
       console.warn(`  · skip ${label} — ${keyEnv} not set`);
@@ -57,69 +57,69 @@ async function main(): Promise<void> {
     targets.push({
       label,
       address: privateKeyToAccount(key as `0x${string}`).address,
-      gas: GAS_BOT,
-      usdt,
+      gas: GAS_ETH,
+      usdc,
     });
   };
 
-  addTarget("oracle", "ORACLE_PRIVATE_KEY", USDT_CORE);
-  addTarget("market-creator", "CREATOR_PRIVATE_KEY", USDT_CORE);
+  addTarget("oracle", "ORACLE_PRIVATE_KEY", USDC_CORE);
+  addTarget("market-creator", "CREATOR_PRIVATE_KEY", USDC_CORE);
   for (const persona of COUNCIL_PERSONAS) {
-    addTarget(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDT_COUNCIL);
+    addTarget(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDC_COUNCIL);
   }
 
-  const funderBot = await publicClient.getBalance({ address: funder.address });
-  const funderUsdt = (await publicClient.readContract({
-    address: USDT_ADDRESS,
+  const funderEth = await publicClient.getBalance({ address: funder.address });
+  const funderUsdc = (await publicClient.readContract({
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [funder.address],
   })) as bigint;
 
   console.log(`Funder     : ${funder.address}`);
-  console.log(`  BOT gas  : ${weiToBot(funderBot).toFixed(4)} BOT`);
-  console.log(`  USDT     : ${unitsToUsdt(funderUsdt).toFixed(2)} USDT  (${USDT_ADDRESS})`);
+  console.log(`  ETH gas  : ${weiToEth(funderEth).toFixed(4)} ETH`);
+  console.log(`  USDC     : ${unitsToUsdc(funderUsdc).toFixed(2)} USDC  (${USDC_ADDRESS})`);
   console.log(`Targets    : ${targets.length} wallets`);
-  console.log(`Per core   : ${formatEther(GAS_BOT)} BOT gas + ${unitsToUsdt(USDT_CORE)} USDT`);
-  console.log(`Per council: ${formatEther(GAS_BOT)} BOT gas + ${unitsToUsdt(USDT_COUNCIL)} USDT\n`);
+  console.log(`Per core   : ${formatEther(GAS_ETH)} ETH gas + ${unitsToUsdc(USDC_CORE)} USDC`);
+  console.log(`Per council: ${formatEther(GAS_ETH)} ETH gas + ${unitsToUsdc(USDC_COUNCIL)} USDC\n`);
 
   for (const t of targets) {
-    // Gas (native BOT)
-    const botBal = await publicClient.getBalance({ address: t.address });
-    if (botBal < t.gas) {
+    // Gas (native ETH)
+    const ethBal = await publicClient.getBalance({ address: t.address });
+    if (ethBal < t.gas) {
       const hash = await wallet.sendTransaction({
         account: funder,
         to: t.address,
         value: t.gas,
-        chain: botchainTestnet,
+        chain: baseSepolia,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`  ✓ ${t.label.padEnd(24)} +${formatEther(t.gas)} BOT gas — ${getExplorerTxUrl(hash)}`);
+      console.log(`  ✓ ${t.label.padEnd(24)} +${formatEther(t.gas)} ETH gas — ${getExplorerTxUrl(hash)}`);
     } else {
-      console.log(`  · ${t.label.padEnd(24)} gas ok (${weiToBot(botBal).toFixed(4)} BOT)`);
+      console.log(`  · ${t.label.padEnd(24)} gas ok (${weiToEth(ethBal).toFixed(4)} ETH)`);
     }
 
-    // Stake token (USDT)
-    const usdtBal = (await publicClient.readContract({
-      address: USDT_ADDRESS,
+    // Stake token (USDC)
+    const usdcBal = (await publicClient.readContract({
+      address: USDC_ADDRESS,
       abi: ERC20_ABI,
       functionName: "balanceOf",
       args: [t.address],
     })) as bigint;
-    if (usdtBal < t.usdt) {
-      const need = t.usdt - usdtBal;
+    if (usdcBal < t.usdc) {
+      const need = t.usdc - usdcBal;
       const hash = await wallet.writeContract({
         account: funder,
-        address: USDT_ADDRESS,
+        address: USDC_ADDRESS,
         abi: ERC20_ABI,
         functionName: "transfer",
         args: [t.address, need],
-        chain: botchainTestnet,
+        chain: baseSepolia,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`  ✓ ${t.label.padEnd(24)} +${unitsToUsdt(need).toFixed(2)} USDT — ${getExplorerTxUrl(hash)}`);
+      console.log(`  ✓ ${t.label.padEnd(24)} +${unitsToUsdc(need).toFixed(2)} USDC — ${getExplorerTxUrl(hash)}`);
     } else {
-      console.log(`  · ${t.label.padEnd(24)} USDT ok (${unitsToUsdt(usdtBal).toFixed(2)} USDT)`);
+      console.log(`  · ${t.label.padEnd(24)} USDC ok (${unitsToUsdc(usdcBal).toFixed(2)} USDC)`);
     }
   }
 

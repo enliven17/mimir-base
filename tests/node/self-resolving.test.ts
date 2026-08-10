@@ -3,7 +3,7 @@ import test from "node:test";
 
 import {
   Q_PRIOR,
-  BONUS_DUST_BOT,
+  BONUS_DUST_USDC,
   verdictToProbability,
   crossEntropyScore,
   scoreCouncilVotes,
@@ -69,7 +69,7 @@ function makeVote(overrides: Partial<CouncilVote>): CouncilVote {
     displayName: "The Optimist",
     verdict: "CHALLENGERS_WIN",
     confidence: 80,
-    pricePaidWei: null,
+    pricePaidUnits: null,
     ...overrides,
   };
 }
@@ -109,6 +109,6 @@ test("dust shares are skipped, all-negative rounds pay nothing", () => {
   const bonuses = allocateBonus([99, 1], 0.01);
   assert.ok(bonuses[0] > 0);
   assert.equal(bonuses[1], 0);
-  assert.ok((0.01 * 1) / 100 < BONUS_DUST_BOT);
+  assert.ok((0.01 * 1) / 100 < BONUS_DUST_USDC);
   assert.deepEqual(allocateBonus([-1, -2, 0], 0.01), [0, 0, 0]);
 });

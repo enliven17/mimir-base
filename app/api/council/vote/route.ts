@@ -16,7 +16,7 @@
 import { requireBotPayment, json } from "@/lib/paid-server";
 import { COUNCIL_PERSONAS } from "@/agents/council/personas";
 import { getCouncilAddress } from "@/lib/agent-wallets";
-import { createBotchainPublicClient, getContractAddress } from "@/lib/botchain";
+import { createBasePublicClient, getContractAddress } from "@/lib/base";
 import { fetchDecodedClaim } from "@/lib/claim-codec";
 import { evaluateClaimAsPersona } from "@/agents/council/shared/persona-llm";
 import { fetchEvidence } from "@/lib/server/evidence-fetcher";
@@ -75,7 +75,7 @@ export async function GET(req: Request): Promise<Response> {
   // Read the claim from chain.
   let claim: ClaimOnChain;
   try {
-    const decoded = await fetchDecodedClaim(createBotchainPublicClient(), getContractAddress(), claimId);
+    const decoded = await fetchDecodedClaim(createBasePublicClient(), getContractAddress(), claimId);
     if (!decoded) {
       return json({ error: `claim ${claimId} not found` }, { status: 404, headers: gate.responseHeaders });
     }

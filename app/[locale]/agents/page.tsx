@@ -1,15 +1,15 @@
 import Link from "next/link";
 import {
-  createBotchainPublicClient,
+  createBasePublicClient,
   getContractAddress,
   getDeployBlock,
   isContractConfigured,
   paginatedGetLogs,
-  weiToBot,
+  weiToEth,
   getExplorerAddressUrl,
   getExplorerTxUrl,
-} from "@/lib/botchain";
-import { unitsToUsdt } from "@/lib/usdt";
+} from "@/lib/base";
+import { unitsToUsdc } from "@/lib/usdc";
 import { MIMIR_ABI } from "@/lib/mimir-abi";
 import {
   classifyActor,
@@ -42,7 +42,7 @@ type EventRow =
       kind:        "challenged";
       claimId:     number;
       actor:       string;
-      stakeWei:    bigint;
+      stakeUnits:    bigint;
       txHash:      string;
       blockNumber: number;
     }
@@ -60,7 +60,7 @@ const fetchEvents = cachedFor(fetchEventsUncached, 20_000);
 
 async function fetchEventsUncached() {
   if (!isContractConfigured()) return [] as EventRow[];
-  const client  = createBotchainPublicClient();
+  const client  = createBasePublicClient();
   const address = getContractAddress();
   const fromBlock = getDeployBlock();
   try {
@@ -118,7 +118,7 @@ async function fetchEventsUncached() {
         kind:        "challenged" as const,
         claimId:     Number(log.args.id ?? 0),
         actor:       String(log.args.challenger ?? "").toLowerCase(),
-        stakeWei:    BigInt(log.args.stake ?? 0),
+        stakeUnits:    BigInt(log.args.stake ?? 0),
         txHash:      log.transactionHash,
         blockNumber: Number(log.blockNumber ?? 0),
       })),
@@ -145,7 +145,7 @@ const fetchAgentAddresses = cachedFor(fetchAgentAddressesUncached, 20_000);
 
 async function fetchAgentAddressesUncached() {
   if (!isContractConfigured()) return null;
-  const client  = createBotchainPublicClient();
+  const client  = createBasePublicClient();
   const address = getContractAddress();
   try {
     const [oracle, owner, oracleBal, ownerBal] = await Promise.all([
@@ -315,7 +315,7 @@ export default async function AgentsPage({
       <header className="mb-8 space-y-1.5">
         <p className="mx-auto max-w-2xl text-center text-sm text-pv-muted">
           Every row is a real on-chain transaction. Agents sign with local worker keys
-          on BOT Chain; humans through their own wallets. Cached for 20 seconds.
+          on ETH Chain; humans through their own wallets. Cached for 20 seconds.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-[11px] font-mono uppercase tracking-[0.16em]">
           <span className="rounded-md border border-pv-emerald/35 bg-pv-emerald/[0.06] px-2 py-1 text-pv-emerald">
@@ -352,12 +352,12 @@ export default async function AgentsPage({
               </a>
             </div>
             <p className="mt-1 text-sm text-pv-text/85">
-              Reads expired claims, fetches evidence, asks an LLM, and settles. With auto-challenger on, also stakes BOT on mispriced open claims using Kelly.
+              Reads expired claims, fetches evidence, asks an LLM, and settles. With auto-challenger on, also stakes ETH on mispriced open claims using Kelly.
             </p>
             <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-emerald/80">Balance</div>
-                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToBot(agentInfo.oracleBal).toFixed(2)} <span className="text-xs text-pv-muted">BOT</span></div>
+                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToEth(agentInfo.oracleBal).toFixed(2)} <span className="text-xs text-pv-muted">BOT</span></div>
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-emerald/80">Settled</div>
@@ -389,7 +389,7 @@ export default async function AgentsPage({
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-text/60">Balance</div>
-                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToBot(agentInfo.ownerBal).toFixed(2)} <span className="text-xs text-pv-muted">BOT</span></div>
+                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToEth(agentInfo.ownerBal).toFixed(2)} <span className="text-xs text-pv-muted">BOT</span></div>
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-text/60">Markets opened</div>
@@ -482,7 +482,7 @@ export default async function AgentsPage({
                     <>
                       <ActorTag addr={e.actor} oracle={agentInfo?.oracle} creator={agentInfo?.owner} />
                       <span className="text-[13px] font-bold text-pv-text">staked the contrarian side</span>
-                      <span className="text-[11px] font-mono text-pv-text/85">{unitsToUsdt(e.stakeWei).toFixed(2)} USDT</span>
+                      <span className="text-[11px] font-mono text-pv-text/85">{unitsToUsdc(e.stakeUnits).toFixed(2)} USDC</span>
                     </>
                   )}
                   {e.kind === "resolved" && (() => {

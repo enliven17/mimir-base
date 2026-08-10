@@ -73,7 +73,7 @@ mimir-botchain/
 ```
 NEXT_PUBLIC_CONTRACT_ADDRESS        # Deployed Mimir.sol on BOT Chain
 NEXT_PUBLIC_DEPLOY_BLOCK            # Deploy block for log scans
-NEXT_PUBLIC_BOTCHAIN_RPC            # RPC override (default https://rpc.bohr.life)
+NEXT_PUBLIC_BASE_RPC_URL            # RPC override (default https://rpc.bohr.life)
 NEXT_PUBLIC_DEMO_MODE               # "1" to enable demo relay
 NEXT_PUBLIC_WC_PROJECT_ID           # WalletConnect Cloud project id
 NEXT_PUBLIC_FEATURE_XMTP            # Enable XMTP UI
@@ -82,7 +82,7 @@ NEXT_PUBLIC_XMTP_ENV                # local | dev | production
 
 **Server / workers only:**
 ```
-BOTCHAIN_RPC                        # Server-side RPC override
+BASE_RPC_URL                        # Server-side RPC override
 ORACLE_PRIVATE_KEY                  # Oracle agent
 CREATOR_PRIVATE_KEY                 # Market-creator agent
 COUNCIL_<SLUG>_PRIVATE_KEY          # Each council persona (workers)
@@ -145,10 +145,10 @@ withdraw()                                              // pull-payment fallback
 
 ---
 
-## BOT Chain Config (`lib/botchain.ts`)
+## BOT Chain Config (`lib/base.ts`)
 
 ```typescript
-export const botchainTestnet = {
+export const baseSepolia = {
   id: 968,
   name: "BOT Chain Testnet",
   nativeCurrency: { name: "BOT", symbol: "BOT", decimals: 18 },
@@ -158,7 +158,7 @@ export const botchainTestnet = {
 
 export function botToWei(bot: number): bigint
 export function weiToBot(wei: bigint): number
-export function ensureBotChain(ethereum)  // MetaMask chain switch / add
+export function ensureBaseSepolia(ethereum)  // MetaMask chain switch / add
 ```
 
 ---

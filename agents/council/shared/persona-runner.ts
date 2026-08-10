@@ -10,12 +10,12 @@
  *   4. Submits challengeClaim through the persona's own wallet.
  */
 
-import { getExplorerTxUrl } from "../../../lib/botchain";
+import { getExplorerTxUrl } from "../../../lib/base";
 import { agentContractWrite, getCouncilWallet } from "../../../lib/agent-wallets";
 import { MIMIR_ABI } from "../../../lib/mimir-abi";
 import { kellyFraction } from "../../../lib/kelly";
 import { createThrottle } from "../../../lib/agent-bootstrap";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../../../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../../lib/usdc";
 import {
   type PersonaSpec,
   personaPrivateKeyEnv,
@@ -34,7 +34,7 @@ import type {
 } from "./types";
 
 const DEFAULT_MIN_CONFIDENCE = 75;
-const DEFAULT_STAKE_USDT     = 2;
+const DEFAULT_STAKE_USDC     = 2;
 
 /**
  * Gemini free tier is 15 req/min. We chain LLM calls serially inside a
@@ -72,7 +72,7 @@ export async function evaluatePersonaForClaim(
   if (!categoryMatches(persona, claim)) {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   `${persona.displayName} only watches ${persona.categoryFilter?.join(" / ")} markets — this one is out of scope.`,
       skipReason:  "category-filter",
     };
@@ -88,7 +88,7 @@ export async function evaluatePersonaForClaim(
     }
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   `${persona.displayName} has no rule evaluator wired.`,
       skipReason:  "abstain-low-confidence",
     };
@@ -99,7 +99,7 @@ export async function evaluatePersonaForClaim(
   if (evidence.fetcher === "none") {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   `${persona.displayName}: no usable evidence at the resolution URL — abstaining.`,
       skipReason:  "no-evidence",
     };
@@ -117,7 +117,7 @@ export async function evaluatePersonaForClaim(
   } catch (err) {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   `${persona.displayName}: LLM call failed (${err instanceof Error ? err.message : "unknown"}).`,
       skipReason:  "llm-failed",
     };
@@ -128,7 +128,7 @@ export async function evaluatePersonaForClaim(
   if (verdict.verdict === "CREATOR_WINS") {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   `${persona.displayName} agrees with the creator (${verdict.confidence}%): ${verdict.explanation}`,
       confidence:  verdict.confidence,
       skipReason:  "abstain-agrees-with-creator",
@@ -139,7 +139,7 @@ export async function evaluatePersonaForClaim(
   if (verdict.verdict !== "CHALLENGERS_WIN" || verdict.confidence < minConf) {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   `${persona.displayName} won't stake: verdict ${verdict.verdict} at ${verdict.confidence}% (threshold ${minConf}%). ${verdict.explanation}`,
       confidence:  verdict.confidence,
       skipReason:  "abstain-low-confidence",
@@ -152,7 +152,7 @@ export async function evaluatePersonaForClaim(
   // wallet balance is read. Here we surface the base stake from the spec.
   return {
     shouldStake: true,
-    stakeBot:   persona.stakeBot ?? DEFAULT_STAKE_USDT,
+    stakeUsdc:   persona.stakeUsdc ?? DEFAULT_STAKE_USDC,
     rationale:   `${persona.displayName} stakes: ${verdict.explanation}`,
     confidence:  verdict.confidence,
     verdict,
@@ -197,18 +197,18 @@ export async function runPersonaForClaim(
   }
   if (alreadyIn) return null;
 
-  // USDT bankroll — keep a 2x stake buffer so we never drain stakes dry.
-  const usdtBal = (await ctx.publicClient.readContract({
-    address: USDT_ADDRESS,
+  // USDC bankroll — keep a 2x stake buffer so we never drain stakes dry.
+  const usdcBal = (await ctx.publicClient.readContract({
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [address as `0x${string}`],
   })) as bigint;
-  const baseStakeUsdt = persona.stakeBot ?? DEFAULT_STAKE_USDT;
-  const minRequired = usdtToUnits(baseStakeUsdt * 2);
-  if (usdtBal < minRequired) {
+  const baseStakeUsdc = persona.stakeUsdc ?? DEFAULT_STAKE_USDC;
+  const minRequired = usdcToUnits(baseStakeUsdc * 2);
+  if (usdcBal < minRequired) {
     console.log(
-      `[council:${persona.slug}] insufficient USDT (${unitsToUsdt(usdtBal).toFixed(2)}), skipping`,
+      `[council:${persona.slug}] insufficient USDC (${unitsToUsdc(usdcBal).toFixed(2)}), skipping`,
     );
     return null;
   }
@@ -221,37 +221,37 @@ export async function runPersonaForClaim(
 
   // For LLM personas, apply Kelly sizing on top of the base stake.
   // Rule personas don't have a confidence score — they use the base stake as-is.
-  let stakeUsdt = decision.stakeBot;
+  let stakeUsdc = decision.stakeUsdc;
   if (decision.confidence && decision.confidence >= (persona.minConfidence ?? DEFAULT_MIN_CONFIDENCE)) {
     const kelly = kellyFraction(decision.confidence, KELLY_CAP);
-    const bankroll = unitsToUsdt(usdtBal);
+    const bankroll = unitsToUsdc(usdcBal);
     const kellyStake = Math.max(
-      baseStakeUsdt,
+      baseStakeUsdc,
       Math.min(bankroll * kelly, bankroll * 0.10),
     );
-    stakeUsdt = Math.round(kellyStake * 100) / 100;
+    stakeUsdc = Math.round(kellyStake * 100) / 100;
   }
 
-  // Submit (approve + challengeClaim — USDT ERC-20).
-  const stakeUnits = usdtToUnits(stakeUsdt);
+  // Submit (approve + challengeClaim — USDC ERC-20).
+  const stakeUnits = usdcToUnits(stakeUsdc);
   const txHash = await agentContractWrite({
     wallet,
     contractAddress: ctx.contractAddress,
     abi: MIMIR_ABI,
     functionName: "challengeClaim",
     args: [BigInt(claim.id), stakeUnits, ""],
-    amountUsdt: String(stakeUsdt),
+    amountUsdc: String(stakeUsdc),
   });
 
   console.log(
-    `[council:${persona.slug}] ✓ Staked ${stakeUsdt} USDT on claim #${claim.id} — ${getExplorerTxUrl(txHash)}`,
+    `[council:${persona.slug}] ✓ Staked ${stakeUsdc} USDC on claim #${claim.id} — ${getExplorerTxUrl(txHash)}`,
   );
   console.log(`[council:${persona.slug}]   ${decision.rationale.slice(0, 160)}`);
 
   return {
     persona,
     claimId:   claim.id,
-    stakeBot:  stakeUsdt, // field name kept; value is USDT display units
+    stakeUsdc:  stakeUsdc, // field name kept; value is USDC display units
     txHash,
     rationale: decision.rationale,
   };

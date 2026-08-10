@@ -8,7 +8,7 @@
 
 import { fetchWithBudget, payingWalletFor, type PayingWallet } from "../../../lib/paid-client";
 import { getCouncilWallet } from "../../../lib/agent-wallets";
-import { botToWei } from "../../../lib/botchain";
+import { usdcToUnits } from "../../../lib/usdc";
 import {
   type PersonaSpec,
   personaPrivateKeyEnv,
@@ -18,7 +18,7 @@ export interface PeerReasoningRead {
   sellerSlug: string;
   sellerName: string;
   reasoning: string;
-  pricePaidWei: string | null;
+  pricePaidUnits: string | null;
 }
 
 interface ReasoningResponse {
@@ -59,7 +59,7 @@ export async function buyPeerReasoning(args: {
   claimId: number;
   baseUrl: string;
   readsPerPersona: number;
-  capBot: number;
+  capUsdc: number;
   delayMs: number;
 }): Promise<PeerReasoningRead[]> {
   if (args.readsPerPersona <= 0) return [];
@@ -67,7 +67,7 @@ export async function buyPeerReasoning(args: {
   const payer = payingWalletForPersona(args.buyer);
   if (!payer) return [];
 
-  const capWei = botToWei(args.capBot);
+  const capUnits = usdcToUnits(args.capUsdc);
   const sellers = selectPeerSellers(
     args.buyer,
     args.activePersonas,
@@ -83,7 +83,7 @@ export async function buyPeerReasoning(args: {
       `&persona=${encodeURIComponent(seller.slug)}`;
 
     try {
-      const result = await fetchWithBudget(url, payer, capWei, {
+      const result = await fetchWithBudget(url, payer, capUnits, {
         method: "GET",
         headers: { accept: "application/json" },
       });
@@ -97,7 +97,7 @@ export async function buyPeerReasoning(args: {
         sellerSlug: body.persona?.slug ?? seller.slug,
         sellerName: body.persona?.name ?? seller.displayName,
         reasoning: reasoning.slice(0, 360),
-        pricePaidWei: result.payment?.priceWei?.toString() ?? null,
+        pricePaidUnits: result.payment?.priceUnits?.toString() ?? null,
       });
     } catch (err) {
       console.warn(

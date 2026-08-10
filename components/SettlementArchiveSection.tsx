@@ -7,7 +7,7 @@ import { PlusCircle } from "lucide-react";
 import { getVSChallengerCount, getVSTotalPot, type VSData } from "@/lib/contract";
 import { Button } from "@/components/ui";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
-import { formatBotBare } from "@/lib/money";
+import { formatUsdcBare } from "@/lib/money";
 
 type FeedRow =
   | {
@@ -80,7 +80,7 @@ export default function SettlementArchiveSection({
             className="font-display text-3xl font-medium tabular-nums tracking-tighter text-pv-text sm:text-4xl"
             style={{ textShadow: "0 0 24px rgba(51,79,169, 0.22)" }}
           >
-            {loading ? "—" : `${totalPool.toFixed(2)} USDT`}
+            {loading ? "—" : `${totalPool.toFixed(2)} USDC`}
           </span>
         </div>
         <div className="bg-pv-bg px-5 py-7 text-center sm:py-9">
@@ -157,8 +157,8 @@ export default function SettlementArchiveSection({
                         {t("archiveColPool")}
                       </span>
                       <span className="font-display text-lg font-medium tabular-nums text-pv-text sm:text-xl">
-                        {formatBotBare(getVSTotalPot(row.vs))}
-                        <span className="ml-0.5 text-sm font-normal text-pv-muted">USDT</span>
+                        {formatUsdcBare(getVSTotalPot(row.vs))}
+                        <span className="ml-0.5 text-sm font-normal text-pv-muted">USDC</span>
                       </span>
                     </div>
                     <div className="text-center min-w-[4.5rem]">

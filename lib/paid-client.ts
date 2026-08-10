@@ -4,7 +4,7 @@
  *
  * Flow when a resource answers 402:
  *   1. Parse the payment requirement from the response body
- *      ({ payment: { payTo, amountWei, ... } }).
+ *      ({ payment: { payTo, amountUnits, ... } }).
  *   2. Send a native BOT transfer to `payTo` from the agent's own wallet.
  *   3. Retry the request with `X-Payment-Tx: <txHash>` — the server verifies
  *      the transfer on-chain and serves the content.
@@ -15,7 +15,7 @@
  *      decide against a budget cap, only THEN pay.
  */
 
-import { createBotchainPublicClient, botchainTestnet } from "./botchain";
+import { createBasePublicClient, baseSepolia } from "./base";
 import type { AgentWallet } from "./agent-wallets";
 
 export interface PayingWallet {
@@ -36,7 +36,7 @@ export function payingWalletFor(wallet: AgentWallet): PayingWallet {
         value: valueWei,
         chain: null,
       });
-      await createBotchainPublicClient().waitForTransactionReceipt({ hash });
+      await createBasePublicClient().waitForTransactionReceipt({ hash });
       return hash;
     },
   };
@@ -48,7 +48,7 @@ export interface PaymentRequirement {
   chainId?: number;
   currency?: string;
   amount?: string;
-  amountWei?: string;
+  amountUnits?: string;
   payTo?: `0x${string}`;
   resource?: string;
   description?: string;
@@ -58,17 +58,17 @@ export interface PaidFetchResult {
   response: Response;
   /** Null when the resource was free (no 402). */
   payment: {
-    priceWei: bigint;
+    priceUnits: bigint;
     txHash: `0x${string}`;
   } | null;
 }
 
 export class PaymentBudgetExceeded extends Error {
   constructor(
-    readonly priceWei: bigint,
-    readonly capWei: bigint,
+    readonly priceUnits: bigint,
+    readonly capUnits: bigint,
   ) {
-    super(`payment price ${priceWei} wei exceeds budget cap ${capWei}`);
+    super(`payment price ${priceUnits} wei exceeds budget cap ${capUnits}`);
     this.name = "PaymentBudgetExceeded";
   }
 }
@@ -78,7 +78,7 @@ function parseRequirement(body: unknown): PaymentRequirement | null {
   const payment = (body as { payment?: unknown }).payment;
   if (!payment || typeof payment !== "object") return null;
   const p = payment as PaymentRequirement;
-  if (!p.payTo || !p.amountWei) return null;
+  if (!p.payTo || !p.amountUnits) return null;
   return p;
 }
 
@@ -87,15 +87,15 @@ async function payAndRetry(
   wallet: PayingWallet,
   requirement: PaymentRequirement,
   init?: RequestInit,
-): Promise<{ response: Response; txHash: `0x${string}`; priceWei: bigint }> {
-  const priceWei = BigInt(requirement.amountWei!);
-  const txHash = await wallet.sendPayment(requirement.payTo!, priceWei);
+): Promise<{ response: Response; txHash: `0x${string}`; priceUnits: bigint }> {
+  const priceUnits = BigInt(requirement.amountUnits!);
+  const txHash = await wallet.sendPayment(requirement.payTo!, priceUnits);
 
   const headers = new Headers(init?.headers);
   headers.set("x-payment-tx", txHash);
   headers.set("x-payment-from", wallet.address);
   const response = await fetch(url, { ...init, headers });
-  return { response, txHash, priceWei };
+  return { response, txHash, priceUnits };
 }
 
 /**
@@ -116,7 +116,7 @@ export function createPayingFetch(wallet: PayingWallet): typeof globalThis.fetch
       requirement = null;
     }
     if (!requirement) return probe;
-    if (requirement.chainId && requirement.chainId !== botchainTestnet.id) {
+    if (requirement.chainId && requirement.chainId !== baseSepolia.id) {
       throw new Error(`402 payment targets unsupported chain ${requirement.chainId}`);
     }
 
@@ -130,7 +130,7 @@ export function createPayingFetch(wallet: PayingWallet): typeof globalThis.fetch
  *
  * @param url     resource to fetch
  * @param wallet  paying agent wallet
- * @param maxWei  hard budget cap in wei. Throws PaymentBudgetExceeded when the
+ * @param maxUnits  hard budget cap in wei. Throws PaymentBudgetExceeded when the
  *                quoted price is higher — the agent walks away rather than
  *                overpay.
  * @param init    passthrough fetch init
@@ -138,7 +138,7 @@ export function createPayingFetch(wallet: PayingWallet): typeof globalThis.fetch
 export async function fetchWithBudget(
   url: string,
   wallet: PayingWallet,
-  maxWei: bigint,
+  maxUnits: bigint,
   init?: RequestInit,
 ): Promise<PaidFetchResult> {
   // 1. Probe — unauthenticated request, see if payment is even required.
@@ -157,20 +157,20 @@ export async function fetchWithBudget(
   if (!requirement) {
     throw new Error("402 with no parseable payment requirement");
   }
-  if (requirement.chainId && requirement.chainId !== botchainTestnet.id) {
+  if (requirement.chainId && requirement.chainId !== baseSepolia.id) {
     throw new Error(`402 payment targets unsupported chain ${requirement.chainId}`);
   }
-  const priceWei = BigInt(requirement.amountWei!);
+  const priceUnits = BigInt(requirement.amountUnits!);
 
   // 3. Agentic budget decision — this is the "agent decides" moment.
-  if (priceWei > maxWei) {
-    throw new PaymentBudgetExceeded(priceWei, maxWei);
+  if (priceUnits > maxUnits) {
+    throw new PaymentBudgetExceeded(priceUnits, maxUnits);
   }
 
   // 4. Pay + retry with the on-chain proof.
   const paid = await payAndRetry(url, wallet, requirement, init);
   return {
     response: paid.response,
-    payment: { priceWei: paid.priceWei, txHash: paid.txHash },
+    payment: { priceUnits: paid.priceUnits, txHash: paid.txHash },
   };
 }

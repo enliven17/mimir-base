@@ -6,7 +6,7 @@ import { useTranslations } from "next-intl";
 import { Link, usePathname } from "@/i18n/navigation";
 import { useWallet } from "@/lib/wallet";
 import { shortenAddress } from "@/lib/constants";
-import { getExplorerAddressUrl } from "@/lib/botchain";
+import { getExplorerAddressUrl } from "@/lib/base";
 import { Copy, ExternalLink, LogOut, Menu, X } from "lucide-react";
 import { isXmtpFeatureEnabled } from "@/lib/xmtp/config";
 

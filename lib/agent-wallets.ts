@@ -18,12 +18,12 @@
 import { maxUint256, parseEther, type WalletClient } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import {
-  createBotchainWalletClientWithKey,
-  createBotchainPublicClient,
+  createBaseWalletClientWithKey,
+  createBasePublicClient,
   getContractAddress,
-  botchainTestnet,
-} from "./botchain";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits } from "./usdt";
+  baseSepolia,
+} from "./base";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits } from "./usdc";
 
 export interface AgentWallet {
   account: PrivateKeyAccount;
@@ -46,7 +46,7 @@ export function loadAgentWallet(envVar: string): AgentWallet {
   const account = privateKeyToAccount(key);
   return {
     account,
-    client: createBotchainWalletClientWithKey(key),
+    client: createBaseWalletClientWithKey(key),
     address: account.address,
   };
 }
@@ -90,23 +90,21 @@ export interface AgentWriteArgs {
   functionName: string;
   args?: readonly unknown[];
   /**
-   * Decimal USDT stake that must be approved for the Mimir contract before the
-   * write (createClaim / challengeClaim / createRematch). NOT native BOT.
+   * Decimal USDC stake that must be approved for the Mimir contract before the
+   * write (createClaim / challengeClaim / createRematch). NOT native ETH.
    */
-  amountUsdt?: string;
-  /** @deprecated use amountUsdt */
-  amountBot?: string;
+  amountUsdc?: string;
 }
 
-async function ensureAgentUsdtAllowance(
+async function ensureAgentUsdcAllowance(
   wallet: AgentWallet,
   spender: `0x${string}`,
   amountUnits: bigint
 ): Promise<void> {
   if (amountUnits <= 0n) return;
-  const client = createBotchainPublicClient();
+  const client = createBasePublicClient();
   const current = (await client.readContract({
-    address: USDT_ADDRESS,
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "allowance",
     args: [wallet.address, spender],
@@ -115,28 +113,27 @@ async function ensureAgentUsdtAllowance(
 
   const hash = await wallet.client.writeContract({
     account: wallet.account,
-    address: USDT_ADDRESS,
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "approve",
     args: [spender, maxUint256],
-    chain: botchainTestnet,
+    chain: baseSepolia,
   });
   const receipt = await client.waitForTransactionReceipt({ hash });
   if (receipt.status === "reverted") {
-    throw new Error(`USDT approve reverted (tx ${hash})`);
+    throw new Error(`USDC approve reverted (tx ${hash})`);
   }
 }
 
 /**
  * Submit a contract write from an agent wallet and wait for the receipt.
- * When amountUsdt is set, ensures USDT allowance to the Mimir contract first.
+ * When amountUsdc is set, ensures USDC allowance to the Mimir contract first.
  * Returns the tx hash; throws when the transaction reverts.
  */
 export async function agentContractWrite(args: AgentWriteArgs): Promise<`0x${string}`> {
-  const stakeDec = args.amountUsdt ?? args.amountBot;
-  if (stakeDec) {
-    const units = usdtToUnits(Number(stakeDec));
-    await ensureAgentUsdtAllowance(args.wallet, args.contractAddress, units);
+  if (args.amountUsdc) {
+    const units = usdcToUnits(Number(args.amountUsdc));
+    await ensureAgentUsdcAllowance(args.wallet, args.contractAddress, units);
   }
 
   const hash = await args.wallet.client.writeContract({
@@ -147,54 +144,54 @@ export async function agentContractWrite(args: AgentWriteArgs): Promise<`0x${str
     args: (args.args ?? []) as never,
     chain: null,
   });
-  const receipt = await createBotchainPublicClient().waitForTransactionReceipt({ hash });
+  const receipt = await createBasePublicClient().waitForTransactionReceipt({ hash });
   if (receipt.status === "reverted") {
     throw new Error(`${args.functionName} reverted on-chain (tx ${hash})`);
   }
   return hash;
 }
 
-/** Transfer ERC-20 USDT from an agent wallet. */
-export async function transferUsdt(args: {
+/** Transfer ERC-20 USDC from an agent wallet. */
+export async function transferUsdc(args: {
   wallet: AgentWallet;
   to: `0x${string}`;
-  /** Decimal USDT amount, e.g. "5". */
-  amountUsdt: string;
+  /** Decimal USDC amount, e.g. "5". */
+  amountUsdc: string;
 }): Promise<`0x${string}`> {
   const hash = await args.wallet.client.writeContract({
     account: args.wallet.account,
-    address: USDT_ADDRESS,
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "transfer",
-    args: [args.to, usdtToUnits(Number(args.amountUsdt))],
-    chain: botchainTestnet,
+    args: [args.to, usdcToUnits(Number(args.amountUsdc))],
+    chain: baseSepolia,
   });
-  const receipt = await createBotchainPublicClient().waitForTransactionReceipt({ hash });
+  const receipt = await createBasePublicClient().waitForTransactionReceipt({ hash });
   if (receipt.status === "reverted") {
-    throw new Error(`USDT transfer reverted on-chain (tx ${hash})`);
+    throw new Error(`USDC transfer reverted on-chain (tx ${hash})`);
   }
   return hash;
 }
 
 /**
- * Transfer native BOT from an agent wallet to an arbitrary destination.
- * Returns the tx hash once confirmed.
+ * Transfer native ETH from an agent wallet — gas top-ups only. Agent bonuses and
+ * every other value transfer go through transferUsdc.
  */
-export async function transferBot(args: {
+export async function transferEth(args: {
   wallet: AgentWallet;
   to: `0x${string}`;
-  /** Decimal BOT amount, e.g. "0.01". */
-  amountBot: string;
+  /** Decimal ETH amount, e.g. "0.001". */
+  amountEth: string;
 }): Promise<`0x${string}`> {
   const hash = await args.wallet.client.sendTransaction({
     account: args.wallet.account,
     to: args.to,
-    value: parseEther(args.amountBot),
-    chain: null,
+    value: parseEther(args.amountEth),
+    chain: baseSepolia,
   });
-  const receipt = await createBotchainPublicClient().waitForTransactionReceipt({ hash });
+  const receipt = await createBasePublicClient().waitForTransactionReceipt({ hash });
   if (receipt.status === "reverted") {
-    throw new Error(`BOT transfer reverted on-chain (tx ${hash})`);
+    throw new Error(`ETH transfer reverted on-chain (tx ${hash})`);
   }
   return hash;
 }

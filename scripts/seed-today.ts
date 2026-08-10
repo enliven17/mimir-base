@@ -10,17 +10,17 @@
  */
 
 import {
-  createBotchainPublicClient,
+  createBasePublicClient,
   getContractAddress,
   getExplorerTxUrl,
-  weiToBot,
-} from "../lib/botchain";
+  weiToEth,
+} from "../lib/base";
 import { MIMIR_ABI } from "../lib/mimir-abi";
 import { agentContractWrite, getCreatorWallet } from "../lib/agent-wallets";
-import { ERC20_ABI, USDT_ADDRESS, usdtToUnits, unitsToUsdt } from "../lib/usdt";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
 
 const DRY_RUN = process.env.DRY_RUN === "1";
-const STAKE_USDT = 2;
+const STAKE_USDC = 2;
 const CONTRACT = getContractAddress();
 
 interface Seed {
@@ -186,8 +186,8 @@ const MIN_LEAD_MS = 10 * 60 * 1000;
 
 async function main() {
   const creator = getCreatorWallet();
-  const pub = createBotchainPublicClient();
-  const stake = usdtToUnits(STAKE_USDT);
+  const pub = createBasePublicClient();
+  const stake = usdcToUnits(STAKE_USDC);
   const now = Date.now();
 
   const live = SEEDS.filter((s) => new Date(s.deadlineIso).getTime() - now > MIN_LEAD_MS);
@@ -196,12 +196,12 @@ async function main() {
   console.log(`Seeding ${live.length} claims on ${CONTRACT}${skipped ? ` (${skipped} skipped — deadline too close/past)` : ""}`);
   console.log(`Creator: ${creator.address} · now ${new Date(now).toISOString()}`);
   const gas = await pub.getBalance({ address: creator.address });
-  const usdt = (await pub.readContract({
-    address: USDT_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [creator.address],
+  const usdc = (await pub.readContract({
+    address: USDC_ADDRESS, abi: ERC20_ABI, functionName: "balanceOf", args: [creator.address],
   })) as bigint;
-  console.log(`Gas: ${weiToBot(gas).toFixed(2)} BOT · USDT: ${unitsToUsdt(usdt).toFixed(2)} · need ~${live.length * STAKE_USDT} USDT\n`);
-  if (!DRY_RUN && usdt < stake * BigInt(live.length)) {
-    throw new Error("Insufficient creator USDT — fund via faucet + scripts/fund-agents.ts");
+  console.log(`Gas: ${weiToEth(gas).toFixed(2)} ETH · USDC: ${unitsToUsdc(usdc).toFixed(2)} · need ~${live.length * STAKE_USDC} USDC\n`);
+  if (!DRY_RUN && usdc < stake * BigInt(live.length)) {
+    throw new Error("Insufficient creator USDC — fund via faucet + scripts/fund-agents.ts");
   }
 
   let created = 0;
@@ -219,7 +219,7 @@ async function main() {
           s.question, s.a, s.b, s.url, deadline, stake, s.category,
           BigInt(0), "binary", "pool", BigInt(0), "", s.rule, BigInt(100), false, "",
         ],
-        amountUsdt: String(STAKE_USDT),
+        amountUsdc: String(STAKE_USDC),
       });
       created++;
       console.log(`  ✓ ${getExplorerTxUrl(tx)}`);

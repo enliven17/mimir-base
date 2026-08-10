@@ -41,7 +41,7 @@ export type EvidenceFetcherKind = "coingecko-api" | "direct" | "jina" | "bot-pai
 /** What the agent paid to obtain a paywalled evidence source. */
 export interface EvidencePayment {
   /** Price in wei (18dp BOT). */
-  priceWei: string;
+  priceUnits: string;
   /** On-chain transfer hash proving the payment. */
   txHash: string;
 }

@@ -35,20 +35,19 @@ import { isVerdict, type Verdict } from "../../lib/verdict";
 import { INJECTION_GUARD, fenceUntrusted } from "../../lib/prompt-safety";
 import { callLLM, activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint, pickGeminiModel, extractJson } from "../../lib/llm";
 import {
-  createBotchainPublicClient,
-  botchainTestnet,
-  weiToBot,
-  botToWei,
+  createBasePublicClient,
+  baseSepolia,
+  weiToEth,
   getContractAddress,
   getExplorerTxUrl,
-} from "../../lib/botchain";
+} from "../../lib/base";
 import {
   agentContractWrite,
   getOracleWallet,
 } from "../../lib/agent-wallets";
 import { fetchWithBudget, payingWalletFor } from "../../lib/paid-client";
 import { MIMIR_ABI, WINNER_SIDE, STATE, BPS_DIVISOR } from "../../lib/mimir-abi";
-import { unitsToUsdt, usdtToUnits, ERC20_ABI, USDT_ADDRESS } from "../../lib/usdt";
+import { unitsToUsdc, usdcToUnits, ERC20_ABI, USDC_ADDRESS } from "../../lib/usdc";
 import { fetchDecodedClaim, type DecodedClaim } from "../../lib/claim-codec";
 import {
   fetchEvidence as fetchEvidenceShared,
@@ -70,8 +69,8 @@ const POLL_INTERVAL_MS      = Number(process.env.ORACLE_POLL_INTERVAL_MS ?? "600
 const MAX_CONTENT_CHARS     = 8_000;
 const CONTRACT_ADDRESS      = getContractAddress();
 const AUTO_CHALLENGE        = process.env.AUTO_CHALLENGE === "1";
-const CHALLENGE_STAKE_USDT = Number(
-  process.env.CHALLENGE_STAKE_USDT ?? process.env.CHALLENGE_STAKE_BOT ?? "2"
+const CHALLENGE_STAKE_USDC = Number(
+  process.env.CHALLENGE_STAKE_USDC ?? process.env.CHALLENGE_STAKE_BOT ?? "2"
 );
 const CHALLENGE_CONFIDENCE  = Number(process.env.CHALLENGE_CONFIDENCE ?? "80");
 const LLM_THROTTLE_MS       = Number(process.env.ORACLE_LLM_THROTTLE_MS ?? "8000");
@@ -81,8 +80,8 @@ const LLM_THROTTLE_MS       = Number(process.env.ORACLE_LLM_THROTTLE_MS ?? "8000
 // nanopayment — only up to a budget tied to what's actually at stake.
 const PAY_EVIDENCE        = process.env.PAY_EVIDENCE !== "0"; // on by default
 const EVIDENCE_POOL_BPS   = Number(process.env.EVIDENCE_POOL_BPS ?? "50");   // 0.5% of pot
-const EVIDENCE_MAX_BOT   = Number(process.env.EVIDENCE_MAX_BOT ?? "0.05"); // hard ceiling
-const EVIDENCE_MIN_BOT   = Number(process.env.EVIDENCE_MIN_BOT ?? "0.001");// floor (still pay tiny sources)
+const EVIDENCE_MAX_USDC   = Number(process.env.EVIDENCE_MAX_USDC ?? "0.05"); // hard ceiling
+const EVIDENCE_MIN_USDC   = Number(process.env.EVIDENCE_MIN_USDC ?? "0.001");// floor (still pay tiny sources)
 
 // Council-as-jury settlement. When on, the oracle buys each eligible persona's
 // verdict via HTTP 402 BOT payment (into the persona's wallet) and settles by
@@ -91,7 +90,7 @@ const EVIDENCE_MIN_BOT   = Number(process.env.EVIDENCE_MIN_BOT ?? "0.001");// fl
 const COUNCIL_SETTLEMENT  = process.env.COUNCIL_SETTLEMENT === "1";
 const COUNCIL_BASE_URL    = process.env.MIMIR_BASE_URL ?? "http://localhost:3000";
 const COUNCIL_QUORUM      = Number(process.env.COUNCIL_QUORUM ?? "3");
-const COUNCIL_VOTE_CAP    = Number(process.env.COUNCIL_VOTE_CAP_BOT ?? "0.005");
+const COUNCIL_VOTE_CAP    = Number(process.env.COUNCIL_VOTE_CAP_USDC ?? "0.005");
 
 // Self-resolving jury (arXiv:2306.04305): jurors vote sequentially in random
 // order seeing prior reports, the market stops with probability ALPHA per vote
@@ -99,7 +98,7 @@ const COUNCIL_VOTE_CAP    = Number(process.env.COUNCIL_VOTE_CAP_BOT ?? "0.005");
 // oracle's terminal, history-informed assessment) split a bonus pool.
 const COUNCIL_SELF_RESOLVING = COUNCIL_SETTLEMENT && process.env.COUNCIL_SELF_RESOLVING === "1";
 const COUNCIL_ALPHA          = Number(process.env.COUNCIL_ALPHA ?? "0.25");
-const COUNCIL_BONUS_BOT     = Number(process.env.COUNCIL_BONUS_BOT ?? "0.01");
+const COUNCIL_BONUS_USDC     = Number(process.env.COUNCIL_BONUS_USDC ?? "0.01");
 const SETTLEMENT_DELAY_MS = Number(process.env.ORACLE_SETTLEMENT_DELAY_MS ?? "900000");
 
 // Free-tier Gemini is 5 RPM on new accounts and the oracle has no other rate
@@ -123,7 +122,7 @@ requireEnv(["ORACLE_PRIVATE_KEY"]);
 requireAnyLLMKey();
 
 // ── Clients ───────────────────────────────────────────────────────────────────
-const publicClient  = createBotchainPublicClient();
+const publicClient  = createBasePublicClient();
 const ORACLE        = getOracleWallet();
 const ORACLE_ADDR   = ORACLE.address;
 const ORACLE_PAYER  = payingWalletFor(ORACLE);
@@ -169,13 +168,13 @@ interface EvidenceResult {
 /**
  * How much the oracle is willing to pay for evidence on THIS claim: a fraction
  * of the pot, clamped between a floor and a hard ceiling. The bigger the stakes,
- * the more it'll pay to read the truth — but never more than EVIDENCE_MAX_BOT.
+ * the more it'll pay to read the truth — but never more than EVIDENCE_MAX_USDC.
  * This is the agent's spending judgement, in code.
  */
-function evidenceBudgetBot(claim: ClaimOnChain): number {
-  const potBot = unitsToUsdt(claim.creatorStake + claim.totalChallengerStake);
-  const fraction = (potBot * EVIDENCE_POOL_BPS) / BPS_DIVISOR;
-  return Math.min(EVIDENCE_MAX_BOT, Math.max(EVIDENCE_MIN_BOT, fraction));
+function evidenceBudgetUsdc(claim: ClaimOnChain): number {
+  const potUsdc = unitsToUsdc(claim.creatorStake + claim.totalChallengerStake);
+  const fraction = (potUsdc * EVIDENCE_POOL_BPS) / BPS_DIVISOR;
+  return Math.min(EVIDENCE_MAX_USDC, Math.max(EVIDENCE_MIN_USDC, fraction));
 }
 
 async function fetchEvidence(claim: ClaimOnChain): Promise<EvidenceResult> {
@@ -186,16 +185,16 @@ async function fetchEvidence(claim: ClaimOnChain): Promise<EvidenceResult> {
 
   // Wire the budgeted paying fetch only when payment is enabled. Evidence-fetcher
   // calls it solely on a 402; free sources never trigger a payment.
-  const budgetBot = evidenceBudgetBot(claim);
-  const maxWei = botToWei(budgetBot);
+  const budgetUsdc = evidenceBudgetUsdc(claim);
+  const maxUnits = usdcToUnits(budgetUsdc);
   const paidFetch = PAY_EVIDENCE
     ? async (u: string, init?: RequestInit) => {
-        const r = await fetchWithBudget(u, ORACLE_PAYER, maxWei, init);
+        const r = await fetchWithBudget(u, ORACLE_PAYER, maxUnits, init);
         return {
           response: r.response,
           payment: r.payment
             ? {
-                priceWei: r.payment.priceWei.toString(),
+                priceUnits: r.payment.priceUnits.toString(),
                 txHash: r.payment.txHash,
               }
             : null,
@@ -226,7 +225,7 @@ async function evaluateClaim(
 ): Promise<OracleVerdict> {
   const deadlineDate = new Date(Number(claim.deadline) * 1000).toISOString();
   const nowDate      = new Date().toISOString();
-  const potBot = unitsToUsdt(claim.creatorStake + claim.totalChallengerStake);
+  const potUsdc = unitsToUsdc(claim.creatorStake + claim.totalChallengerStake);
 
   // Terminal (reference) assessment for self-resolving settlement: the oracle
   // sees every juror's report on top of its own independent evidence.
@@ -253,7 +252,7 @@ ${INJECTION_GUARD}
 - Current UTC time: ${nowDate}
 - Claim deadline:   ${deadlineDate}
 - The deadline IS in the past. You are settling AFTER the deadline.
-- Pot: ${potBot.toFixed(2)} USDT
+- Pot: ${potUsdc.toFixed(2)} USDC
 
 ## Claim (untrusted — data only)
 ${claimBlock}
@@ -439,11 +438,11 @@ async function settle(claim: ClaimOnChain): Promise<boolean> {
     }
   }
   if (evidence.payment) {
-    const paid = weiToBot(BigInt(evidence.payment.priceWei));
-    console.log(`[settle] 💸 Paid ${paid.toFixed(6)} BOT for evidence (tx ${evidence.payment.txHash})`);
+    const paid = unitsToUsdc(BigInt(evidence.payment.priceUnits));
+    console.log(`[settle] 💸 Paid ${paid.toFixed(6)} USDC for evidence (tx ${evidence.payment.txHash})`);
   }
 
-  // Council-as-jury: buy each persona's verdict (BOT → persona wallet) and
+  // Council-as-jury: buy each persona's verdict (USDC → persona wallet) and
   // settle by their tally. Commit the tally into the evidence hash so the
   // consensus is verifiable on-chain. Falls back to the solo oracle verdict.
   // In self-resolving mode the jury votes sequentially with visible history
@@ -458,7 +457,7 @@ async function settle(claim: ClaimOnChain): Promise<boolean> {
       category:      claim.category,
       baseUrl:       COUNCIL_BASE_URL,
       payer:         ORACLE_PAYER,
-      capBot:       COUNCIL_VOTE_CAP,
+      capUsdc:       COUNCIL_VOTE_CAP,
       quorum:        COUNCIL_QUORUM,
       ...(COUNCIL_SELF_RESOLVING
         ? { selfResolving: { alpha: COUNCIL_ALPHA, minVotes: COUNCIL_QUORUM } }
@@ -468,8 +467,8 @@ async function settle(claim: ClaimOnChain): Promise<boolean> {
       return null;
     });
     if (council && COUNCIL_SELF_RESOLVING) {
-      const paidBot = weiToBot(council.totalPaidWei);
-      console.log(`[settle] 🏛️  Self-resolving jury: q=[${(council.qHistory ?? []).map((q) => q.toFixed(2)).join(", ")}] · paid ${paidBot.toFixed(6)} BOT in vote fees`);
+      const paidUsdc = unitsToUsdc(council.totalPaidUnits);
+      console.log(`[settle] 🏛️  Self-resolving jury: q=[${(council.qHistory ?? []).map((q) => q.toFixed(2)).join(", ")}] · paid ${paidUsdc.toFixed(6)} USDC in vote fees`);
       // Terminal (reference) report: full juror history + independent evidence.
       const reference  = await evaluateClaim(claim, evidence.text, council.reports ?? []);
       const referenceQ = verdictToProbability(reference.verdict, reference.confidence, Q_PRIOR);
@@ -480,8 +479,8 @@ async function settle(claim: ClaimOnChain): Promise<boolean> {
       commit = `${evidence.text}\n[council]${JSON.stringify({ tally: council.tally, q: council.qHistory, refQ: Number(referenceQ.toFixed(4)), scores })}`;
       bonusVotes = council.votes;
     } else if (council) {
-      const paidBot = weiToBot(council.totalPaidWei);
-      console.log(`[settle] 🏛️  Council ${council.tally.creator}–${council.tally.challengers} (${council.tally.draw + council.tally.unresolvable} abstain) · paid ${paidBot.toFixed(6)} BOT to jurors`);
+      const paidUsdc = unitsToUsdc(council.totalPaidUnits);
+      console.log(`[settle] 🏛️  Council ${council.tally.creator}–${council.tally.challengers} (${council.tally.draw + council.tally.unresolvable} abstain) · paid ${paidUsdc.toFixed(6)} USDC to jurors`);
       rawVerdict = { verdict: council.verdict, confidence: council.confidence, explanation: council.explanation };
       commit = `${evidence.text}\n[council]${JSON.stringify(council.tally)}`;
     } else {
@@ -524,10 +523,10 @@ async function settle(claim: ClaimOnChain): Promise<boolean> {
   // Cross-entropy bonuses AFTER the on-chain settle: informative jurors split
   // the pool, parrots and dissenters-from-evidence get nothing. Best-effort —
   // a failed transfer never affects the already-final settlement.
-  if (bonusVotes && COUNCIL_BONUS_BOT > 0) {
-    const receipts = await payCouncilBonuses(bonusVotes, COUNCIL_BONUS_BOT, ORACLE);
+  if (bonusVotes && COUNCIL_BONUS_USDC > 0) {
+    const receipts = await payCouncilBonuses(bonusVotes, COUNCIL_BONUS_USDC, ORACLE);
     for (const r of receipts) {
-      console.log(`[settle] 🏆 Bonus ${r.bonusBot.toFixed(6)} BOT → ${r.slug}${r.txHash ? ` — ${getExplorerTxUrl(r.txHash)}` : " (transfer failed)"}`);
+      console.log(`[settle] 🏆 Bonus ${r.bonusUsdc.toFixed(6)} USDC → ${r.slug}${r.txHash ? ` — ${getExplorerTxUrl(r.txHash)}` : " (transfer failed)"}`);
     }
     if (receipts.length === 0) {
       console.log(`[settle] No positive-score jurors this round — bonus pool untouched.`);
@@ -562,17 +561,17 @@ async function challengeIfMispriced(claim: ClaimOnChain): Promise<void> {
     return;
   }
 
-  // Check oracle USDT balance (stakes) — gas is separate native BOT
-  const usdtBal = (await publicClient.readContract({
-    address: USDT_ADDRESS,
+  // Check oracle USDC balance (stakes) — gas is separate native BOT
+  const usdcBal = (await publicClient.readContract({
+    address: USDC_ADDRESS,
     abi: ERC20_ABI,
     functionName: "balanceOf",
     args: [ORACLE_ADDR],
   })) as bigint;
-  const stakeNeeded = usdtToUnits(CHALLENGE_STAKE_USDT);
-  if (usdtBal < stakeNeeded) {
+  const stakeNeeded = usdcToUnits(CHALLENGE_STAKE_USDC);
+  if (usdcBal < stakeNeeded) {
     console.log(
-      `[challenge] Insufficient USDT (${unitsToUsdt(usdtBal).toFixed(2)} USDT), skipping`
+      `[challenge] Insufficient USDC (${unitsToUsdc(usdcBal).toFixed(2)} USDC), skipping`
     );
     return;
   }
@@ -602,15 +601,15 @@ async function challengeIfMispriced(claim: ClaimOnChain): Promise<void> {
     return;
   }
 
-  // Kelly Criterion: size position based on confidence edge (USDT bankroll)
+  // Kelly Criterion: size position based on confidence edge (USDC bankroll)
   const kelly = kellyFraction(verdict.confidence, KELLY_CAP);
-  const bankroll = unitsToUsdt(usdtBal);
-  const kellyStake = Math.max(CHALLENGE_STAKE_USDT, Math.min(bankroll * kelly, bankroll * 0.1));
-  const stakeUsdt = Math.round(kellyStake * 100) / 100;
+  const bankroll = unitsToUsdc(usdcBal);
+  const kellyStake = Math.max(CHALLENGE_STAKE_USDC, Math.min(bankroll * kelly, bankroll * 0.1));
+  const stakeUsdc = Math.round(kellyStake * 100) / 100;
 
-  console.log(`[challenge] Kelly: ${(kelly * 100).toFixed(1)}% of USDT bankroll → ${stakeUsdt} USDT stake`);
-  console.log(`[challenge] Staking ${stakeUsdt} USDT on challenger side...`);
-  const stakeUnits = usdtToUnits(stakeUsdt);
+  console.log(`[challenge] Kelly: ${(kelly * 100).toFixed(1)}% of USDC bankroll → ${stakeUsdc} USDC stake`);
+  console.log(`[challenge] Staking ${stakeUsdc} USDC on challenger side...`);
+  const stakeUnits = usdcToUnits(stakeUsdc);
 
   const txHash = await agentContractWrite({
     wallet:          ORACLE,
@@ -618,11 +617,11 @@ async function challengeIfMispriced(claim: ClaimOnChain): Promise<void> {
     abi:             MIMIR_ABI,
     functionName:    "challengeClaim",
     args:            [BigInt(claim.id), stakeUnits, ""],
-    amountUsdt:      String(stakeUsdt),
+    amountUsdc:      String(stakeUsdc),
   });
 
   challengedClaimIds.add(claim.id);
-  console.log(`[challenge] ✓ Staked ${stakeUsdt} USDT — ${getExplorerTxUrl(txHash)}`);
+  console.log(`[challenge] ✓ Staked ${stakeUsdc} USDC — ${getExplorerTxUrl(txHash)}`);
   console.log(`[challenge] Oracle: "${verdict.explanation.slice(0, 120)}"`);
 }
 
@@ -704,13 +703,13 @@ async function main(): Promise<void> {
   console.log("  Mimir Oracle Agent (local private key signer)");
   console.log(`  Contract   : ${CONTRACT_ADDRESS}`);
   console.log(`  Oracle     : ${ORACLE_ADDR}`);
-  console.log(`  Balance    : ${weiToBot(balance).toFixed(4)} BOT`);
-  console.log(`  Network    : BOT Chain Testnet (${botchainTestnet.id})`);
+  console.log(`  Balance    : ${weiToEth(balance).toFixed(4)} ETH`);
+  console.log(`  Network    : Base Sepolia (${baseSepolia.id})`);
   console.log(`  LLM        : ${activeLLMProvider()} / ${activeLLMModel()} · key=${activeLLMKeyFingerprint()}`);
   console.log(`  Throttle   : ${LLM_THROTTLE_MS > 0 ? `${LLM_THROTTLE_MS}ms (${(60_000 / LLM_THROTTLE_MS).toFixed(1)} RPM cap)` : "OFF"}`);
   console.log(`  Settle gap : ${SETTLEMENT_DELAY_MS / 1000}s`);
   console.log(`  Poll every : ${POLL_INTERVAL_MS / 1000}s`);
-  console.log(`  Auto-challenge: ${AUTO_CHALLENGE ? `YES (≥${CHALLENGE_CONFIDENCE}% confidence, ${CHALLENGE_STAKE_USDT} USDT/claim)` : "OFF (set AUTO_CHALLENGE=1 to enable)"}`);
+  console.log(`  Auto-challenge: ${AUTO_CHALLENGE ? `YES (≥${CHALLENGE_CONFIDENCE}% confidence, ${CHALLENGE_STAKE_USDC} USDC/claim)` : "OFF (set AUTO_CHALLENGE=1 to enable)"}`);
   console.log("═══════════════════════════════════════════════\n");
 
   const safePoll = async () => {

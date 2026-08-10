@@ -37,9 +37,9 @@ const oracleKey = envMap.get("ORACLE_PRIVATE_KEY") ?? "";
 const oracleAddr =
   envMap.get("SELLER_ADDRESS") ||
   "0xFD54d1F9ce18484eA2b7977eAF4d5f24D17437F8";
-const usdt =
-  envMap.get("NEXT_PUBLIC_USDT_ADDRESS") ||
-  envMap.get("USDT_ADDRESS") ||
+const usdc =
+  envMap.get("NEXT_PUBLIC_USDC_ADDRESS") ||
+  envMap.get("USDC_ADDRESS") ||
   "0x75edC9335175Fc0552D51D48439F229c10420fe3";
 
 if (!/^0x[0-9a-fA-F]{64}$/.test(oracleKey)) {
@@ -53,13 +53,13 @@ const env = {
   DEPLOYER_PRIVATE_KEY: oracleKey,
   ORACLE_ADDRESS: oracleAddr,
   ORACLE_PRIVATE_KEY: oracleKey,
-  USDT_ADDRESS: usdt,
-  NEXT_PUBLIC_USDT_ADDRESS: usdt,
+  USDC_ADDRESS: usdc,
+  NEXT_PUBLIC_USDC_ADDRESS: usdc,
 };
 
 console.log("Deploying Mimir…");
 console.log(`  Oracle  : ${oracleAddr}`);
-console.log(`  USDT    : ${usdt}`);
+console.log(`  USDC    : ${usdc}`);
 
 const result = spawnSync(
   process.platform === "win32" ? "npx.cmd" : "npx",
@@ -92,7 +92,7 @@ if (!contract) {
 
 const updates: Record<string, string> = {
   NEXT_PUBLIC_CONTRACT_ADDRESS: contract,
-  NEXT_PUBLIC_USDT_ADDRESS: usdt,
+  NEXT_PUBLIC_USDC_ADDRESS: usdc,
   SELLER_ADDRESS: oracleAddr,
 };
 if (block) updates.NEXT_PUBLIC_DEPLOY_BLOCK = block;

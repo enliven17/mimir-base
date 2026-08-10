@@ -47,7 +47,7 @@ export interface PersonaSpec {
   /** Minimum LLM confidence to stake. Defaults to 75. Statistician is strict; Yapper is loose. */
   minConfidence?: number;
   /** BOT per stake. Defaults to 2. */
-  stakeBot?:     number;
+  stakeUsdc?:     number;
   /** Tailwind accent classes for cards/badges. */
   accent: {
     border:   string;
@@ -72,7 +72,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     archetype:   "llm-biased",
     promptBias:  "You are the Optimist on the Mimir Council. Lean toward affirmative outcomes when evidence is balanced. Prefer the side that represents progress, success, or positive change. Add a modest optimism premium of about +5% confidence on calls you find plausible. Never invent evidence.",
     minConfidence: 75,
-    stakeBot:   2,
+    stakeUsdc:   2,
     accent: {
       border: "border-amber-400/40",
       bg:     "bg-amber-400/[0.06]",
@@ -89,7 +89,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     archetype:   "llm-biased",
     promptBias:  "You are the Pessimist on the Mimir Council. Lean toward negative outcomes when evidence is balanced. Prefer the side that represents failure, regression, or unmet expectations. Doubt rosy headlines and add a modest pessimism premium of about +5% confidence on calls you find plausible. Never invent evidence.",
     minConfidence: 75,
-    stakeBot:   2,
+    stakeUsdc:   2,
     accent: {
       border: "border-slate-500/40",
       bg:     "bg-slate-500/[0.06]",
@@ -105,7 +105,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     longBio:       "Reads the current pool sizes and always stakes the smaller side. The Contrarian doesn't think; it just resists. When the crowd is wrong, it gets paid.",
     archetype:     "rule-based",
     ruleEvaluator: "contrarian",
-    stakeBot:     1.5,
+    stakeUsdc:     1.5,
     accent: {
       border: "border-fuchsia-400/40",
       bg:     "bg-fuchsia-400/[0.06]",
@@ -122,7 +122,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     archetype:     "llm-biased",
     promptBias:    "You are the Statistician on the Mimir Council. Demand rigorous, citable evidence before asserting a verdict. Only return high confidence (>= 90) when the evidence is overwhelming and unambiguous. When data is sparse or contested, return lower confidence — the runner will abstain. Cite base rates and historical priors when possible.",
     minConfidence: 90,
-    stakeBot:     3,
+    stakeUsdc:     3,
     accent: {
       border: "border-blue-500/40",
       bg:     "bg-blue-500/[0.06]",
@@ -138,7 +138,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     longBio:       "Reads the on-chain stake distribution and copies whichever side the single largest staker chose. The Whale-Watcher believes the rich know things the rest of us don't.",
     archetype:     "rule-based",
     ruleEvaluator: "whale-follow",
-    stakeBot:     2,
+    stakeUsdc:     2,
     accent: {
       border: "border-cyan-500/40",
       bg:     "bg-cyan-500/[0.06]",
@@ -156,7 +156,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     categoryFilter: ["crypto", "defi", "token"],
     promptBias:    "You are the Crypto Maximalist on the Mimir Council. You believe in continued crypto adoption. For claims framed as bullish (price up, adoption up, TVL up), lean toward the affirmative side. For claims framed as bearish, lean toward denial. Add about +5% confidence on calls aligned with your worldview. Never invent evidence.",
     minConfidence: 70,
-    stakeBot:     2,
+    stakeUsdc:     2,
     accent: {
       border: "border-orange-500/40",
       bg:     "bg-orange-500/[0.06]",
@@ -174,7 +174,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     categoryFilter: ["sports", "soccer", "nba", "nfl", "tennis", "f1"],
     promptBias:    "You are the Sports Pundit on the Mimir Council. Treat each claim like a pre-game analysis: weigh recent form, head-to-head record, and noted absences mentioned in the evidence. Be confident when the data is clear. Specific numbers (scores, win streaks) outweigh narrative descriptions.",
     minConfidence: 72,
-    stakeBot:     2,
+    stakeUsdc:     2,
     accent: {
       border: "border-emerald-500/40",
       bg:     "bg-emerald-500/[0.06]",
@@ -192,7 +192,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     categoryFilter: ["weather", "climate"],
     promptBias:    "You are the Weatherman on the Mimir Council. Read weather data with a meteorologist's eye. Specific numerical values (temperature, precipitation amounts, wind speed) outweigh narrative descriptions. When the claim hinges on a threshold, evaluate against the threshold directly.",
     minConfidence: 72,
-    stakeBot:     2,
+    stakeUsdc:     2,
     accent: {
       border: "border-sky-500/40",
       bg:     "bg-sky-500/[0.06]",
@@ -209,7 +209,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     archetype:     "llm-biased",
     promptBias:    "You are the Doomer on the Mimir Council. Worst-case outcomes are your base case. When evidence permits a pessimistic reading, take it. Markets crash, predictions fail, deadlines slip. Add about +7% confidence on calls aligned with disaster scenarios. Never invent evidence.",
     minConfidence: 75,
-    stakeBot:     2,
+    stakeUsdc:     2,
     accent: {
       border: "border-red-500/40",
       bg:     "bg-red-500/[0.06]",
@@ -226,7 +226,7 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
     archetype:     "micro",
     promptBias:    "You are the Yapper on the Mimir Council. You stake small but often. Make a verdict on almost every claim. Confidence of 60 or higher is enough for you — leave abstention to the cautious. Never invent evidence; if the evidence is empty, abstain.",
     minConfidence: 60,
-    stakeBot:     0.5,
+    stakeUsdc:     0.5,
     accent: {
       border: "border-pink-500/40",
       bg:     "bg-pink-500/[0.06]",

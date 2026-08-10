@@ -13,7 +13,7 @@ export default function Footer() {
               </span>
               <p className="mt-2 font-mono text-[13px] leading-relaxed text-pv-muted">
                 AI-settled claim markets on BOT Chain. Stand behind your claim —
-                Mimir settles stakes on-chain in USDT.
+                Mimir settles stakes on-chain in USDC.
               </p>
             </div>
             {/* X / social */}

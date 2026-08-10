@@ -1570,7 +1570,7 @@ export default function CreatePage() {
                         : "border border-white/[0.12] bg-pv-surface text-pv-muted hover:border-pv-emerald/35 hover:text-pv-emerald"
                     }`}
                   >
-                    {amount} USDT
+                    {amount} USDC
                   </motion.button>
                 ))}
                 <div

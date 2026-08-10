@@ -12,7 +12,7 @@ import { requireBotPayment, json } from "@/lib/paid-server";
 import { verifyPass } from "@/lib/paid-pass";
 import { COUNCIL_PERSONAS } from "@/agents/council/personas";
 import { getCouncilAddress } from "@/lib/agent-wallets";
-import { createBotchainPublicClient, getContractAddress } from "@/lib/botchain";
+import { createBasePublicClient, getContractAddress } from "@/lib/base";
 import { MIMIR_ABI } from "@/lib/mimir-abi";
 import { ZERO_ADDRESS } from "@/lib/constants";
 import { callLLM } from "@/lib/llm";
@@ -75,7 +75,7 @@ export async function GET(req: Request): Promise<Response> {
   let sideA = "";
   let sideB = "";
   try {
-    const base = (await createBotchainPublicClient().readContract({
+    const base = (await createBasePublicClient().readContract({
       address: getContractAddress(),
       abi: MIMIR_ABI,
       functionName: "getClaim",

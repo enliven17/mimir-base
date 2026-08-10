@@ -9,7 +9,7 @@
  * the creator side because personas can't join the creator pool.
  */
 
-import { weiToBot } from "../../../lib/botchain";
+import { unitsToUsdc } from "../../../lib/usdc";
 import { MIMIR_ABI } from "../../../lib/mimir-abi";
 import type { PublicClient } from "viem";
 import type { PersonaSpec } from "../personas";
@@ -28,7 +28,7 @@ export function evaluateContrarian(
   persona: PersonaSpec,
   claim: ClaimOnChain,
 ): PersonaDecision {
-  const stakeBot = persona.stakeBot ?? 2;
+  const stakeUsdc = persona.stakeUsdc ?? 2;
   const creator   = claim.creatorStake;
   const challenger = claim.totalChallengerStake;
 
@@ -37,7 +37,7 @@ export function evaluateContrarian(
   if (challenger === 0n) {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   "Contrarian abstains: no challenger pool yet to bet against.",
       skipReason:  "no-pool-imbalance",
     };
@@ -50,14 +50,14 @@ export function evaluateContrarian(
   if (creatorShare >= 60) {
     return {
       shouldStake: true,
-      stakeBot,
+      stakeUsdc,
       rationale: `Contrarian: creator holds ${creatorShare}% of the pool. The crowd is leaning hard one way — I take the other side.`,
     };
   }
 
   return {
     shouldStake: false,
-    stakeBot:   0,
+    stakeUsdc:   0,
     rationale: `Contrarian abstains: pool is balanced (creator ${creatorShare}%) — nothing to react against.`,
     skipReason:  "no-pool-imbalance",
   };
@@ -79,12 +79,12 @@ export async function evaluateWhaleWatcher(
   publicClient: PublicClient,
   contractAddress: `0x${string}`,
 ): Promise<PersonaDecision> {
-  const stakeBot = persona.stakeBot ?? 2;
+  const stakeUsdc = persona.stakeUsdc ?? 2;
 
   if (claim.totalChallengerStake === 0n) {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   "Whale-Watcher waits: no challenger has staked yet, no whale to follow.",
       skipReason:  "no-whale-yet",
     };
@@ -102,7 +102,7 @@ export async function evaluateWhaleWatcher(
   } catch {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   "Whale-Watcher: failed to read challenger list, abstaining this round.",
       skipReason:  "no-whale-yet",
     };
@@ -111,7 +111,7 @@ export async function evaluateWhaleWatcher(
   if (stakes.length === 0) {
     return {
       shouldStake: false,
-      stakeBot:   0,
+      stakeUsdc:   0,
       rationale:   "Whale-Watcher waits: challenger list is empty.",
       skipReason:  "no-whale-yet",
     };
@@ -122,15 +122,15 @@ export async function evaluateWhaleWatcher(
   if (biggestChallenger > claim.creatorStake) {
     return {
       shouldStake: true,
-      stakeBot,
-      rationale: `Whale-Watcher: largest individual stake is on the challenger side (${weiToBot(biggestChallenger).toFixed(2)} BOT vs creator's ${weiToBot(claim.creatorStake).toFixed(2)}). I follow the whale.`,
+      stakeUsdc,
+      rationale: `Whale-Watcher: largest individual stake is on the challenger side (${unitsToUsdc(biggestChallenger).toFixed(2)} USDC vs creator's ${unitsToUsdc(claim.creatorStake).toFixed(2)}). I follow the whale.`,
     };
   }
 
   return {
     shouldStake: false,
-    stakeBot:   0,
-    rationale: `Whale-Watcher abstains: the biggest single staker is the creator (${weiToBot(claim.creatorStake).toFixed(2)} BOT). I can't join the creator side, so I sit out.`,
+    stakeUsdc:   0,
+    rationale: `Whale-Watcher abstains: the biggest single staker is the creator (${unitsToUsdc(claim.creatorStake).toFixed(2)} USDC). I can't join the creator side, so I sit out.`,
     skipReason:  "abstain-agrees-with-creator",
   };
 }

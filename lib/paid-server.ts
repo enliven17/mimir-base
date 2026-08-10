@@ -16,7 +16,7 @@
 
 import "server-only";
 import { parseEther } from "viem";
-import { botchainTestnet, createBotchainPublicClient } from "./botchain";
+import { baseSepolia, createBasePublicClient } from "./base";
 import { recordPayment } from "./paid-revenue";
 import { hasPaymentTx } from "./db";
 
@@ -36,8 +36,8 @@ function sellerAddress(payTo?: string): `0x${string}` {
 }
 
 function paymentRequired(args: {
-  amountBot: string;
-  amountWei: bigint;
+  amountUsdc: string;
+  amountUnits: bigint;
   payTo: `0x${string}`;
   resource: string;
   reason?: string;
@@ -48,10 +48,10 @@ function paymentRequired(args: {
       ...(args.reason ? { reason: args.reason } : {}),
       payment: {
         scheme: "native-transfer",
-        chainId: botchainTestnet.id,
+        chainId: baseSepolia.id,
         currency: "BOT",
-        amount: args.amountBot,
-        amountWei: args.amountWei.toString(),
+        amount: args.amountUsdc,
+        amountUnits: args.amountUnits.toString(),
         payTo: args.payTo,
         resource: args.resource,
         description:
@@ -77,26 +77,26 @@ export type RequirePaymentResult =
  * the payer address and tx hash.
  *
  * @param req      the Next Request
- * @param amountBot decimal BOT price string, e.g. "0.001"
+ * @param amountUsdc decimal BOT price string, e.g. "0.001"
  */
 export async function requireBotPayment(
   req: Request,
-  amountBot: string,
+  amountUsdc: string,
   opts?: { payTo?: string },
 ): Promise<RequirePaymentResult> {
   const payTo = sellerAddress(opts?.payTo).toLowerCase() as `0x${string}`;
-  const amountWei = parseEther(amountBot);
+  const amountUnits = parseEther(amountUsdc);
   const resource = new URL(req.url).pathname;
 
   const txHash = req.headers.get("x-payment-tx")?.trim() as `0x${string}` | undefined;
   const fromHeader = req.headers.get("x-payment-from")?.trim().toLowerCase();
   if (!txHash || !/^0x[0-9a-fA-F]{64}$/.test(txHash)) {
-    return { paid: false, response: paymentRequired({ amountBot, amountWei, payTo, resource }) };
+    return { paid: false, response: paymentRequired({ amountUsdc, amountUnits, payTo, resource }) };
   }
 
   const fail = (reason: string): RequirePaymentResult => ({
     paid: false,
-    response: paymentRequired({ amountBot, amountWei, payTo, resource, reason }),
+    response: paymentRequired({ amountUsdc, amountUnits, payTo, resource, reason }),
   });
 
   // Replay guards — in-process first (cheap), then the durable ledger.
@@ -111,7 +111,7 @@ export async function requireBotPayment(
   let tx;
   let receipt;
   try {
-    const client = createBotchainPublicClient();
+    const client = createBasePublicClient();
     [tx, receipt] = await Promise.all([
       client.getTransaction({ hash: txHash }),
       client.getTransactionReceipt({ hash: txHash }),
@@ -122,13 +122,13 @@ export async function requireBotPayment(
 
   if (receipt.status !== "success") return fail("payment tx reverted");
   if (!tx.to || tx.to.toLowerCase() !== payTo) return fail(`payment must go to ${payTo}`);
-  if (tx.value < amountWei) return fail(`payment underpaid: expected ≥ ${amountBot} BOT`);
+  if (tx.value < amountUnits) return fail(`payment underpaid: expected ≥ ${amountUsdc} BOT`);
   const payer = tx.from.toLowerCase() as `0x${string}`;
   if (fromHeader && fromHeader !== payer) return fail("x-payment-from does not match tx sender");
 
   // Freshness — an ancient transfer must not unlock new reads forever.
   try {
-    const block = await createBotchainPublicClient().getBlock({ blockNumber: receipt.blockNumber });
+    const block = await createBasePublicClient().getBlock({ blockNumber: receipt.blockNumber });
     if (Date.now() - Number(block.timestamp) * 1000 > MAX_PAYMENT_AGE_MS) {
       return fail("payment tx is too old");
     }
@@ -147,7 +147,7 @@ export async function requireBotPayment(
   // fire-and-forget insert still in flight.
   await recordPayment({
     resource,
-    amountBot: Number(amountBot),
+    amountUsdc: Number(amountUsdc),
     payer,
     seller: payTo,
     txHash: txKey,

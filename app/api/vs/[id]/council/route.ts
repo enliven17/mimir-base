@@ -14,14 +14,13 @@
 
 import { NextResponse } from "next/server";
 import {
-  createBotchainPublicClient,
+  createBasePublicClient,
   getContractAddress,
   getDeployBlock,
   isContractConfigured,
-  weiToBot,
   paginatedGetLogs,
-} from "@/lib/botchain";
-import { unitsToUsdt } from "@/lib/usdt";
+} from "@/lib/base";
+import { unitsToUsdc } from "@/lib/usdc";
 import {
   COUNCIL_PERSONAS,
   personaAddressEnv,
@@ -37,7 +36,7 @@ interface PersonaVote {
   archetype:   PersonaSpec["archetype"];
   accent:      PersonaSpec["accent"];
   staked:      boolean;
-  stakeBot:   number;
+  stakeUsdc:   number;
   txHash:      string | null;
   blockNumber: number | null;
 }
@@ -46,7 +45,7 @@ interface CouncilResponse {
   claimId:    number;
   total:      number;
   stakedCount: number;
-  totalBot:  number;
+  totalUsdc:  number;
   votes:      PersonaVote[];
 }
 
@@ -65,12 +64,12 @@ export async function GET(
       claimId,
       total: 0,
       stakedCount: 0,
-      totalBot: 0,
+      totalUsdc: 0,
       votes: [],
     } satisfies CouncilResponse);
   }
 
-  const client    = createBotchainPublicClient();
+  const client    = createBasePublicClient();
   const address   = getContractAddress();
   const fromBlock = getDeployBlock();
 
@@ -122,20 +121,20 @@ export async function GET(
       archetype:   p.archetype,
       accent:      p.accent,
       staked:      !!hit,
-      stakeBot:   hit ? unitsToUsdt(hit.stake) : 0,
+      stakeUsdc:   hit ? unitsToUsdc(hit.stake) : 0,
       txHash:      hit?.txHash ?? null,
       blockNumber: hit?.blockNumber ?? null,
     };
   });
 
   const stakedCount = votes.filter((v) => v.staked).length;
-  const totalBot   = votes.reduce((acc, v) => acc + v.stakeBot, 0);
+  const totalUsdc   = votes.reduce((acc, v) => acc + v.stakeUsdc, 0);
 
   const body: CouncilResponse = {
     claimId,
     total:       votes.length,
     stakedCount,
-    totalBot,
+    totalUsdc,
     votes,
   };
   return NextResponse.json(body, {

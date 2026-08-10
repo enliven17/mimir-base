@@ -1,10 +1,10 @@
 /** Quick read of claim #1 state on BOT Chain. Run: npx tsx --env-file=.env.local scripts/check-claim.ts */
-import { createBotchainPublicClient, getContractAddress } from "../lib/botchain";
+import { createBasePublicClient, getContractAddress } from "../lib/base";
 import { MIMIR_ABI, STATE } from "../lib/mimir-abi";
 
 async function main(): Promise<void> {
   const id = Number(process.argv[2] ?? "1");
-  const client = createBotchainPublicClient();
+  const client = createBasePublicClient();
   const addr   = getContractAddress();
   const claim  = await client.readContract({
     address: addr, abi: MIMIR_ABI, functionName: "getClaim", args: [BigInt(id)],
