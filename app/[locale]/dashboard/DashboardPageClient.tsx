@@ -143,6 +143,9 @@ export default function DashboardPageClient() {
         needsChallengers: false,
         expiringSoon: false,
         participation: "all",
+        // The dashboard shows the user's own positions; underdog is a discovery
+        // filter for the explorer, not a lens on markets you are already in.
+        underdogOnly: false,
       }),
     [tabFiltered, categoryFilter, minStakeFilter, searchQuery]
   );

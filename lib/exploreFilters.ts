@@ -1,8 +1,9 @@
 import type { VSData } from "@/lib/contract";
 import { CATEGORIES } from "@/lib/constants";
 import { computeClaimQuality } from "@/lib/claimQuality";
+import { assessUnderdog, compareByUpside, isChallengerUnderdog } from "@/lib/underdog";
 
-export type ExploreSort = "newest" | "highest" | "expiring" | "strength";
+export type ExploreSort = "newest" | "highest" | "expiring" | "strength" | "upside";
 
 /** Valores válidos en `?sort=` y chips de orden en Explore / Dashboard. */
 export const EXPLORE_SORT_OPTIONS: ExploreSort[] = [
@@ -10,6 +11,8 @@ export const EXPLORE_SORT_OPTIONS: ExploreSort[] = [
   "highest",
   "expiring",
   "strength",
+  // Payout asymmetry, not a likelihood ranking — see lib/underdog.ts.
+  "upside",
 ];
 
 /** Wallet participation filter for the live arena. Applied in ExploreClient (needs address). */
@@ -23,6 +26,8 @@ export interface ExploreFilterState {
   needsChallengers: boolean;
   expiringSoon: boolean;
   participation: ParticipationFilter;
+  /** Only markets where the joinable side is the thin one. */
+  underdogOnly: boolean;
 }
 
 export const DEFAULT_EXPLORE_FILTERS: ExploreFilterState = {
@@ -33,6 +38,7 @@ export const DEFAULT_EXPLORE_FILTERS: ExploreFilterState = {
   needsChallengers: false,
   expiringSoon: false,
   participation: "all",
+  underdogOnly: false,
 };
 
 /** Valores permitidos para `minStake` (URL `?min=`) y chips del sidebar Explore */
@@ -73,7 +79,17 @@ export function parseExploreSearchParams(sp: URLSearchParams): ExploreFilterStat
   const participation: ParticipationFilter =
     mineRaw === "joined" || mineRaw === "available" ? mineRaw : "all";
 
-  return { cat, minStake, sort, search, needsChallengers, expiringSoon, participation };
+  const underdogOnly = sp.get("underdog") === "1";
+  return {
+    cat,
+    minStake,
+    sort,
+    search,
+    needsChallengers,
+    expiringSoon,
+    participation,
+    underdogOnly,
+  };
 }
 
 /** Serializa solo desviaciones respecto a defaults (URLs limpias). */
@@ -81,6 +97,7 @@ export function serializeExploreFilters(f: ExploreFilterState): string {
   const p = new URLSearchParams();
   if (f.cat !== "all") p.set("cat", f.cat);
   if (f.minStake !== 0) p.set("min", String(f.minStake));
+  if (f.underdogOnly) p.set("underdog", "1");
   if (f.sort !== "newest") p.set("sort", f.sort);
   if (f.needsChallengers) p.set("needs", "1");
   if (f.expiringSoon) p.set("soon", "1");
@@ -129,6 +146,11 @@ export function applyExploreFilters(
       (v) => v.deadline > nowTs && v.deadline - nowTs <= 24 * 60 * 60
     );
   }
+  if (f.underdogOnly) {
+    // Only markets whose JOINABLE side is thin: a market where the creator is the
+    // underdog is lopsided too, but a browsing user cannot take that side.
+    list = list.filter((v) => isChallengerUnderdog(assessUnderdog(v)));
+  }
   list = filterVsByTextQuery(list, f.search);
 
   const sorted = [...list];
@@ -136,6 +158,8 @@ export function applyExploreFilters(
     sorted.sort((a, b) => b.stake_amount - a.stake_amount);
   } else if (f.sort === "expiring") {
     sorted.sort((a, b) => a.deadline - b.deadline);
+  } else if (f.sort === "upside") {
+    sorted.sort((a, b) => compareByUpside(a, b));
   } else if (f.sort === "strength") {
     sorted.sort((a, b) => {
       const aScore = computeClaimQuality({

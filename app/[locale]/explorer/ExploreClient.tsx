@@ -362,7 +362,8 @@ export default function ExploreClient() {
     opportunities,
   ]);
 
-  const { cat, sort, search, minStake, needsChallengers, expiringSoon } = filters;
+  const { cat, sort, search, minStake, needsChallengers, expiringSoon, underdogOnly } =
+    filters;
 
   useEffect(() => {
     if (minStake === 0) {
@@ -381,6 +382,7 @@ export default function ExploreClient() {
     search.trim().length > 0 ||
     needsChallengers !== DEFAULT_EXPLORE_FILTERS.needsChallengers ||
     expiringSoon !== DEFAULT_EXPLORE_FILTERS.expiringSoon ||
+    underdogOnly !== DEFAULT_EXPLORE_FILTERS.underdogOnly ||
     filters.participation !== DEFAULT_EXPLORE_FILTERS.participation;
 
   /**
@@ -424,21 +426,23 @@ export default function ExploreClient() {
     }
     if (needsChallengers) return t("needsChallengers");
     if (expiringSoon) return t("expiringSoon");
+    if (underdogOnly) return t("underdogOnly");
     if (sort === "strength" && !needsChallengers && !expiringSoon) {
       return t("strength");
     }
     return t("quickFilterAll");
-  }, [expiringSoon, needsChallengers, sort, t]);
+  }, [expiringSoon, needsChallengers, sort, t, underdogOnly]);
 
   const quickFilterOptionSelected = (
-    choice: "all" | "needs" | "soon" | "strength"
+    choice: "all" | "needs" | "soon" | "strength" | "underdog"
   ) => {
     if (choice === "all") {
-      return !needsChallengers && !expiringSoon && sort !== "strength";
+      return !needsChallengers && !expiringSoon && !underdogOnly && sort !== "strength";
     }
-    if (choice === "needs") return needsChallengers && !expiringSoon;
-    if (choice === "soon") return expiringSoon && !needsChallengers;
-    return sort === "strength" && !needsChallengers && !expiringSoon;
+    if (choice === "needs") return needsChallengers && !expiringSoon && !underdogOnly;
+    if (choice === "soon") return expiringSoon && !needsChallengers && !underdogOnly;
+    if (choice === "underdog") return underdogOnly;
+    return sort === "strength" && !needsChallengers && !expiringSoon && !underdogOnly;
   };
 
   useEffect(() => {
@@ -907,6 +911,7 @@ export default function ExploreClient() {
                           updateFilters({
                             needsChallengers: false,
                             expiringSoon: false,
+                            underdogOnly: false,
                             sort: "newest",
                           });
                           setQuickFilterMenuOpen(false);
@@ -935,6 +940,7 @@ export default function ExploreClient() {
                           updateFilters({
                             needsChallengers: true,
                             expiringSoon: false,
+                            underdogOnly: false,
                           });
                           setQuickFilterMenuOpen(false);
                         }}
@@ -958,6 +964,7 @@ export default function ExploreClient() {
                           updateFilters({
                             expiringSoon: true,
                             needsChallengers: false,
+                            underdogOnly: false,
                             sort: "expiring",
                           });
                           setQuickFilterMenuOpen(false);
@@ -978,6 +985,7 @@ export default function ExploreClient() {
                           updateFilters({
                             needsChallengers: false,
                             expiringSoon: false,
+                            underdogOnly: false,
                             sort: "strength",
                           });
                           setQuickFilterMenuOpen(false);
@@ -989,6 +997,39 @@ export default function ExploreClient() {
                         }`}
                       >
                         {t("strength")}
+                      </button>
+                      {/* Underdog is Arena-Live only: it is derived from an
+                          on-chain pool, and an AI opportunity has no pool yet. */}
+                      <button
+                        type="button"
+                        role="option"
+                        aria-disabled={activeView === "ai"}
+                        disabled={activeView === "ai"}
+                        title={
+                          activeView === "ai"
+                            ? t("quickFilterNeedsArenaOnlyHint")
+                            : t("underdogOnlyHint")
+                        }
+                        aria-selected={quickFilterOptionSelected("underdog")}
+                        onClick={() => {
+                          if (activeView === "ai") return;
+                          updateFilters({
+                            needsChallengers: false,
+                            expiringSoon: false,
+                            underdogOnly: true,
+                            sort: "upside",
+                          });
+                          setQuickFilterMenuOpen(false);
+                        }}
+                        className={`flex w-full items-center px-4 py-2.5 text-left font-body text-sm transition-colors ${
+                          activeView === "ai" ? "cursor-not-allowed opacity-45" : ""
+                        } ${
+                          quickFilterOptionSelected("underdog")
+                            ? "bg-pv-emerald/[0.12] font-medium text-pv-emerald"
+                            : "text-pv-muted hover:bg-white/[0.05] hover:text-pv-text"
+                        }`}
+                      >
+                        {t("underdogOnly")}
                       </button>
                     </motion.div>
                   ) : null}
