@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   availableCreatorLiquidityUnits,
+  fixedOddsCapacityUnits,
   fixedOddsPayoutUnits,
   fixedOddsReservedLiabilityUnits,
   isLowUpside,
@@ -261,4 +262,54 @@ test("fractional USDC previews stay exact at 6 decimals", () => {
   // pool after join = 0.75 → share = floor(500000 * 1250000 / 750000) = 833333
   assert.equal(preview.totalReturn, 1.333333);
   assert.equal(preview.netProfit, 0.833333);
+});
+
+// ── Fixed-odds capacity (§6.3) ────────────────────────────────────────────────
+
+test("capacity is stake divided by the promised profit, not by the multiple", () => {
+  // At 2x total return the profit is 1x, so a 10 USDC creator can absorb 10 USDC.
+  assert.equal(
+    fixedOddsCapacityUnits({ creatorStakeUnits: U(10), challengerPayoutBps: 20_000 }),
+    U(10),
+  );
+  // At 3x the profit is 2x, so the same creator can absorb only 5.
+  assert.equal(
+    fixedOddsCapacityUnits({ creatorStakeUnits: U(10), challengerPayoutBps: 30_000 }),
+    U(5),
+  );
+  // At 1.25x the profit is 0.25x, so capacity is four times the stake.
+  assert.equal(
+    fixedOddsCapacityUnits({ creatorStakeUnits: U(10), challengerPayoutBps: 12_500 }),
+    U(40),
+  );
+});
+
+test("capacity and liability agree at the limit", () => {
+  // Filling a market to capacity must reserve exactly the creator's stake.
+  const creatorStake = U(10);
+  for (const bps of [12_500, 15_000, 20_000, 30_000]) {
+    const capacity = fixedOddsCapacityUnits({ creatorStakeUnits: creatorStake, challengerPayoutBps: bps });
+    const reserved = fixedOddsReservedLiabilityUnits({ stakeUnits: capacity, challengerPayoutBps: bps });
+    assert.ok(reserved <= creatorStake, `${bps} reserved ${reserved} > stake ${creatorStake}`);
+  }
+});
+
+test("a multiple at or below 1x has no capacity rather than infinite capacity", () => {
+  // validateMode rejects these anyway; dividing by zero would render a market that
+  // can absorb anything.
+  assert.equal(fixedOddsCapacityUnits({ creatorStakeUnits: U(10), challengerPayoutBps: 10_000 }), 0n);
+  assert.equal(fixedOddsCapacityUnits({ creatorStakeUnits: U(10), challengerPayoutBps: 0 }), 0n);
+});
+
+test("an unstaked creator can absorb nothing", () => {
+  assert.equal(fixedOddsCapacityUnits({ creatorStakeUnits: 0n, challengerPayoutBps: 20_000 }), 0n);
+});
+
+test("capacity rounds down so it never promises a unit the creator cannot cover", () => {
+  // 3 units at 1.5x: profit per unit is 0.5, so capacity is 6 exactly; at 1.3x the
+  // division is inexact and must floor.
+  assert.equal(fixedOddsCapacityUnits({ creatorStakeUnits: 3n, challengerPayoutBps: 15_000 }), 6n);
+  const inexact = fixedOddsCapacityUnits({ creatorStakeUnits: 10n, challengerPayoutBps: 13_000 });
+  const reserved = fixedOddsReservedLiabilityUnits({ stakeUnits: inexact, challengerPayoutBps: 13_000 });
+  assert.ok(reserved <= 10n);
 });

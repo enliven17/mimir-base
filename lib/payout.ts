@@ -83,6 +83,29 @@ export function fixedOddsPayoutUnits(args: {
 }
 
 /**
+ * How much challenger stake a fixed-odds market can absorb.
+ *
+ * Inverse of the liability calculation: the creator backs the challenger's PROFIT,
+ * so capacity is stake / (multiple - 1). At 2x a 10 USDC creator can take 10 USDC
+ * of challenges; at 3x only 5. Worth stating because raising the promised multiple
+ * silently shrinks the market.
+ *
+ * A multiple at or below 1x returns 0 rather than dividing by zero — such a market
+ * is rejected by validateMode anyway, and an infinite capacity would render as a
+ * market that can absorb anything.
+ */
+export function fixedOddsCapacityUnits(args: {
+  creatorStakeUnits: bigint;
+  challengerPayoutBps: number;
+}): bigint {
+  const bps = BigInt(Math.max(0, Math.trunc(args.challengerPayoutBps)));
+  if (bps <= BPS_DIVISOR_UNITS || args.creatorStakeUnits <= 0n) return 0n;
+  // Integer division floors, so capacity never promises a unit the creator cannot
+  // cover — the rounding always favours the escrow.
+  return (args.creatorStakeUnits * BPS_DIVISOR_UNITS) / (bps - BPS_DIVISOR_UNITS);
+}
+
+/**
  * Creator liability a fixed-odds challenge reserves — the challenger's PROFIT,
  * not the gross payout. Mirrors the contract's reservedCreatorLiability update.
  */

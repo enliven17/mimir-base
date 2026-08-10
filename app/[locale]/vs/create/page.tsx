@@ -23,7 +23,21 @@ import {
 } from "@/lib/contract";
 import { removePendingVS, savePendingVS, type PendingVS } from "@/lib/pending-vs";
 import { acquireTxLock } from "@/lib/tx-lock";
+import { fixedOddsCapacityUnits } from "@/lib/payout";
+import { unitsToUsdc, usdcToUnits } from "@/lib/usdc";
 import { rematchReadiness, type RematchReadiness } from "@/lib/series";
+
+/**
+ * Total-return presets for fixed odds (§6.3). Deliberately labelled "total
+ * return", not "profit": 2x total return is 1x profit, and a creator who reads it
+ * the other way underestimates their liability by the entire stake.
+ */
+const TOTAL_RETURN_PRESETS = [
+  { bps: 12_500, label: "1.25x" },
+  { bps: 15_000, label: "1.5x" },
+  { bps: 20_000, label: "2x" },
+  { bps: 30_000, label: "3x" },
+] as const;
 import {
   CATEGORIES,
   CATEGORY_GUIDANCE,
@@ -207,6 +221,8 @@ export default function CreatePage() {
   // Settlement mode is a real choice now. Duel is the default because it is the
   // shape the app has actually been creating (one slot), just unlabelled.
   const [settlementMode, setSettlementMode] = useState<SettlementMode>("duel");
+  // Total-return basis points for fixed odds. 20000 = 2x total return = 1x profit.
+  const [challengerPayoutBps, setChallengerPayoutBps] = useState(20_000);
   const [poolSlots, setPoolSlots] = useState(10);
   const [settlementRule, setSettlementRule] = useState("");
   const [, setMaxChallengers] = useState(1);
@@ -263,6 +279,19 @@ export default function CreatePage() {
   );
   const settlementMatchesRecommended =
     settlementRule.trim() === recommendedSettlementTemplate.trim();
+  // Capacity comes from lib/payout.ts so the number shown here is the same integer
+  // arithmetic the escrow uses, not a float re-derivation of it.
+  const fixedOddsCapacity = useMemo(
+    () =>
+      unitsToUsdc(
+        fixedOddsCapacityUnits({
+          creatorStakeUnits: usdcToUnits(stake),
+          challengerPayoutBps,
+        }),
+      ),
+    [challengerPayoutBps, stake],
+  );
+
   const ticketSettlementPreview =
     settlementRule.trim() || recommendedSettlementTemplate;
   /**
@@ -988,6 +1017,7 @@ export default function CreatePage() {
       settlementMode,
       maxChallengers: normalizedMaxChallengers,
       creatorStake: stake,
+      challengerPayoutBps: settlementMode === "fixed_odds" ? challengerPayoutBps : 0,
     });
     if (!modeCheck.ok) {
       toast.error(modeCheck.errors[0]);
@@ -1004,7 +1034,9 @@ export default function CreatePage() {
       category,
       market_type: normalizedMarketType,
       odds_mode: normalizedOddsMode,
-      challenger_payout_bps: 0,
+      // Zero for every mode but fixed odds: a non-zero bps on a pool market is
+      // rejected by validateMode, and the contract would price payouts off it.
+      challenger_payout_bps: settlementMode === "fixed_odds" ? challengerPayoutBps : 0,
       handicap_line: "",
       settlement_rule: settlementRule.trim(),
       max_challengers: normalizedMaxChallengers,
@@ -1956,6 +1988,51 @@ export default function CreatePage() {
                   <p className="text-[11px] leading-relaxed text-pv-muted">
                     {t(`settlementModes.${settlementMode}.detail`)}
                   </p>
+
+                  {/* Fixed odds: the creator promises a TOTAL RETURN multiple and
+                      backs the profit out of their own stake. Presets rather than a
+                      free number because every multiple has a capacity consequence
+                      the creator has to be able to see. */}
+                  {settlementMode === "fixed_odds" && (
+                    <div className="space-y-2 pt-1">
+                      <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-pv-muted">
+                        {t("totalReturnLabel")}
+                      </span>
+                      <div
+                        role="radiogroup"
+                        aria-label={t("totalReturnLabel") ?? "Total return"}
+                        className="flex flex-wrap gap-2"
+                      >
+                        {TOTAL_RETURN_PRESETS.map((preset) => {
+                          const active = challengerPayoutBps === preset.bps;
+                          return (
+                            <button
+                              key={preset.bps}
+                              type="button"
+                              role="radio"
+                              aria-checked={active}
+                              onClick={() => setChallengerPayoutBps(preset.bps)}
+                              className={`rounded-lg border px-3 py-2 font-mono text-xs font-bold tabular-nums transition ${
+                                active
+                                  ? "border-pv-emerald/60 bg-pv-emerald/[0.1] text-pv-text"
+                                  : "border-pv-border/40 bg-pv-surface2/40 text-pv-muted hover:border-pv-emerald/40"
+                              }`}
+                            >
+                              {preset.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {/* Always "total return", never "profit": 2x total return is 1x
+                          profit, and the two readings differ by the entire stake. */}
+                      <p className="text-[11px] leading-relaxed text-pv-muted">
+                        {t("totalReturnHint", {
+                          multiple: (challengerPayoutBps / 10_000).toFixed(2),
+                          capacity: fixedOddsCapacity.toFixed(2),
+                        })}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Slot count only exists for pool: duel is one by definition
                       and fixed odds is bounded by liquidity, not by a count. */}

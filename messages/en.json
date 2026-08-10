@@ -434,7 +434,9 @@
         "questionHint": "",
         "settlementTemplate": "Resolve this exactly as written using the linked source only. If the wording or source is ambiguous, mark it unresolvable."
       }
-    }
+    },
+    "totalReturnLabel": "Total return promised to challengers",
+    "totalReturnHint": "Challengers get {multiple}x their stake back on a win, funded from your stake. At this multiple your market can absorb about {capacity} USDC of challenges."
   },
   "explore": {
     "title": "THE ARENA",

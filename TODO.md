@@ -257,8 +257,8 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 6.3 Creator-Backed Fixed Odds — P0 UI hardening
 
-- [ ] Create ekranında `1.25x`, `1.5x`, `2x`, `3x` total return preset'leri ekle.
-- [ ] “2x profit” yerine daima “2x total return” yaz.
+- [x] Create ekranında `1.25x`, `1.5x`, `2x`, `3x` total return preset'leri ekle.
+- [x] “2x profit” yerine daima “2x total return” yaz.
 - [ ] `availableCreatorLiquidity = creatorStake - reservedCreatorLiability`
   değerini göster.
 - [ ] Stake girilirken liability'yi kontratla aynı rounding ile önizle ve fazla
