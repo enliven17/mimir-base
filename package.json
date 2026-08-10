@@ -11,6 +11,7 @@
     "dev:clean": "rm -rf .next && next dev",
     "clean": "rm -rf .next",
     "build": "next build",
+    "typecheck": "tsc --noEmit",
     "check:terms": "node scripts/check-forbidden-terms.mjs",
     "compile:contract": "node scripts/compile-contract.mjs",
     "start": "next start",
