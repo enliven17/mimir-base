@@ -310,11 +310,11 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 6.8 Squad vs Squad — P2, kontrat v2
 
-- [ ] V0 görsel prototip: creator'ı Side A captain, challengers'ı Side B olarak
+- [x] V0 görsel prototip: creator'ı Side A captain, challengers'ı Side B olarak
   sun; bunun gerçek two-sided deposit olmadığını açıkça belirt.
 - [ ] V1 kontrat tasarımı: her iki tarafa çoklu deposit, side shares, proportional
   payout, withdrawal/cancel, deadline ve dust accounting.
-- [ ] Creator'a ayrı ekonomik ayrıcalık vermek gerekiyorsa açıkça modelle; gizli
+- [x] Creator'a ayrı ekonomik ayrıcalık vermek gerekiyorsa açıkça modelle; gizli
   bir avantaj bırakma.
 - [ ] `Back YES / Back NO`, iki taraf participant count/pool ve stacked avatar UI.
 - [ ] İki taraf için fee, late liquidity ve payout invariant fuzz testleri.
