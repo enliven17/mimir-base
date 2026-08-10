@@ -1,0 +1,680 @@
+# Mimir Base Product Roadmap
+
+> Durum: uygulanabilir ürün ve mühendislik planı  
+> Ağ: Base Sepolia (`84532`, `eip155:84532`)  
+> Değer birimi: testnet USDC; ETH yalnızca gas  
+> Son güncelleme: 2026-08-10
+
+Bu dosya Base migration sonrası Mimir'in bir claim uygulamasından, insanların ve
+ajanların market açabildiği, araştırabildiği, pozisyon alabildiği ve gelir
+üretebildiği Base-native bir agent market platformuna dönüşüm planıdır.
+
+## 0. Değişmez ürün ve mimari kararlar
+
+- [ ] Kontrat state'ini tek finansal doğruluk kaynağı olarak koru; Neon yalnızca
+  yeniden üretilebilir read-index, analytics ve off-chain metadata tutsun.
+- [ ] Tüm stake, payout, fee, agent bütçesi ve x402 ödemelerini 6 decimal USDC
+  atomic integer olarak hesapla; UI dışında `number`/float kullanma.
+- [ ] Base Sepolia dışındaki eski ağ isimlerini, adreslerini ve koşullu network
+  dallarını geri getirme.
+- [ ] Kullanıcının veya dış ajanın private key'ini Mimir'e yükletme. Dış ajan
+  işlemleri kendi wallet'ında imzalasın; Mimir imzayı ve yetki sınırını doğrulasın.
+- [ ] Otomatik harcamayı yalnızca kullanıcının açıkça imzaladığı token, periyot,
+  tutar, market ve bitiş sınırları içinde çalıştır; her izin durdurulabilir ve
+  iptal edilebilir olsun.
+- [ ] Draw, unresolvable ve iptal refund'larından platform veya agent-owner fee
+  kesme.
+- [ ] “Underdog” etiketini kazanma olasılığı iddiası olarak değil, yalnızca payout
+  asimetrisi olarak göster.
+- [ ] USYC'yi Base üzerinde varmış veya herkese açıkmış gibi tasarlama. Güncel
+  Circle dokümanına göre USYC Base'de desteklenmiyor ve yatırımcı uygunluk
+  kısıtları var; agent baskets MVP'sinde idle bakiye USDC kalacak.
+
+## 1. Önce veri modelini düzelt: üç ayrı eksen
+
+Bugünkü `marketType` alanı konu/sonuç formatını, `oddsMode` ekonomik modeli
+anlatıyor. Yeni oyun modlarını bu alanlara rastgele string ekleyerek modelleme.
+
+### 1.1 Canonical sınıflandırma
+
+- [ ] `subjectType` tanımla: `binary`, `moneyline`, `spread`, `total`, `prop`,
+  `custom`.
+- [ ] `settlementMode` tanımla: `pool`, `duel`, `fixed_odds`; kontrat v2 sonrası
+  `squad_pool`.
+- [ ] `productModifiers[]` tanımla: `underdog_boost`, `streak`,
+  `rematch_ladder`, `conviction`.
+- [ ] Geçiş süresinde mevcut onchain `marketType` ve `oddsMode` alanlarını codec
+  katmanında canonical modele map et.
+- [ ] Bilinmeyen enum değerlerini sessizce `pool` yapma; read-index'te
+  `unsupported` olarak işaretle ve telemetry üret.
+- [ ] Market kuralları için version ekle: `rulesVersion`, `contractVersion`,
+  `contextSchemaVersion`.
+
+### 1.2 Market mode registry
+
+- [ ] Tek bir `lib/market-modes.ts` registry oluştur; create UI, detail UI,
+  market-creator ve testler aynı policy kaynağını kullansın.
+- [ ] Her mode için `maxChallengers`, stake eşleme kuralı, odds policy, CTA metni,
+  görünürlük, rematch desteği ve kontrat gereksinimini tanımla.
+- [ ] Registry'nin yanlış kombinasyonları reddetmesini test et; örneğin
+  `duel + maxChallengers > 1`, yetersiz teminatlı fixed odds veya parent olmadan
+  `rematch_ladder`.
+
+**Kabul kriteri:** Aynı market create formunda, read-index'te ve VS detayında
+aynı canonical mode olarak görünür; legacy marketler bozulmadan okunur.
+
+---
+
+## 01. Product analytics with PostHog — P0
+
+Amaç: Sonraki tüm ürün kararlarını ölçebilecek tam funnel ve güvenilir event
+şeması kurmak. Analiz kullanıcı fonlarını veya hassas reasoning içeriğini sızdırmamalı.
+
+### İşler
+
+- [ ] PostHog client/server entegrasyonunu environment flag ile ekle.
+- [ ] Wallet adresini raw PII olarak göndermek yerine kararlı, salt'lı actor ID
+  üret; agent ve human actor tipini ayrı property olarak taşı.
+- [ ] Consent, opt-out, DNT ve production/test ayrımını uygula.
+- [ ] Ortak event envelope tanımla: `event_version`, `chain_id`, `contract`,
+  `claim_id`, `subject_type`, `settlement_mode`, `modifiers`, `actor_type`,
+  `agent_id`, `source_surface`, `locale`, `tx_status`.
+- [ ] Şu funnel event'lerini instrument et:
+  - [ ] `market_viewed`
+  - [ ] `create_started`, `create_mode_selected`, `create_submitted`, `create_confirmed`
+  - [ ] `stake_previewed`, `stake_started`, `stake_confirmed`, `stake_failed`
+  - [ ] `payout_preview_seen`, `low_upside_warning_seen`
+  - [ ] `agent_viewed`, `agent_followed`, `agent_unfollowed`
+  - [ ] `reasoning_opened`, `reasoning_x402_purchased`
+  - [ ] `share_card_generated`, `share_card_clicked`
+  - [ ] `rematch_started`, `rematch_confirmed`
+  - [ ] `copy_permission_created`, `copy_executed`, `copy_skipped`, `copy_revoked`
+- [ ] Server event'leri için idempotency key kullan; retry çift sayım yapmasın.
+- [ ] PostHog'da create, stake, settlement-return, follow-to-copy ve share-to-market
+  funnel'larını oluştur.
+- [ ] Mode/category/cohort bazlı retention ve conversion dashboard'ları oluştur.
+- [ ] Test wallet'larını internal cohort ile ayır.
+
+### KPI ve kabul kriteri
+
+- [ ] Create → confirmed ve view → stake conversion güvenilir ölçülüyor.
+- [ ] Eventlerin %99'unda `event_version`, chain ve mode alanları dolu.
+- [ ] Event payload'larında private key, signature, invite key, raw prompt veya
+  kullanıcıya özel evidence bulunmadığı otomatik testle doğrulanıyor.
+
+Bağımlılık: yok. Diğer milestone'lar bundan sonra feature flag ve event planıyla çıkar.
+
+---
+
+## 02. Social share cards — P1
+
+- [ ] Her market için dinamik OG/share card üret: claim, iki taraf, toplam pot,
+  mode, deadline ve kaynak alan adı.
+- [ ] Settlement kartı üret: verdict, kazanan taraf, payout ve seri skoru.
+- [ ] Duel kartında iki actor/agent kimliğini ve “winner takes pot” dilini kullan.
+- [ ] Rematch kartında round ve Best-of-N skorunu göster.
+- [ ] Kart URL'sine yalnızca public market ID koy; private invite key'i görsele,
+  analytics'e veya cache key'e yazma.
+- [ ] X, Farcaster ve standart Open Graph boyutlarında render testi ekle.
+- [ ] Lokalizasyon, uzun claim kırpma, emoji ve missing avatar fallback'lerini test et.
+- [ ] Share click → market view attribution'ını PostHog'a bağla.
+
+**Kabul kriteri:** Her public aktif/settled market deterministik bir kart üretir;
+private market kartı yetkisiz kişiye claim detayını sızdırmaz.
+
+---
+
+## 03. Public agent reasoning feed — P1
+
+Mevcut council reasoning akışını okunabilir ve kaynak izli bir market timeline'ına
+dönüştür.
+
+- [ ] Append-only `agent_reasoning_events` tablosu tasarla:
+  `event_id`, `claim_id`, `agent_id`, `stage`, `position`, `confidence_bps`,
+  `summary`, `evidence_refs`, `model/provider`, `prompt_version`, `created_at`,
+  `visibility`, `payment_identifier`.
+- [ ] Raw hidden chain-of-thought yayınlama; kullanıcıya kısa gerekçe, iddia,
+  evidence ve belirsizlik yayınla.
+- [ ] Council preflight, pre-stake görüşü, peer response, vote ve settlement
+  reflection event tiplerini ayır.
+- [ ] Her evidence referansında URL/domain, capture time, content hash ve freshness
+  göster.
+- [ ] Aynı reasoning'in retry ile iki kez yazılmasını engelle.
+- [ ] `/vs/[id]` üzerinde kronolojik feed, agent/category filtresi ve “before/after
+  stake” ayrımı ekle.
+- [ ] Public özet ile x402 premium ayrıntısını ayır; ödeme sonrası erişimi mevcut
+  `payments_v2` idempotency modeliyle ilişkilendir.
+- [ ] Prompt injection, kişisel veri, güvenli olmayan URL ve telifli uzun alıntı
+  redaction katmanı ekle.
+- [ ] Reasoning silinirse audit kaydını tombstone olarak koru.
+
+**Kabul kriteri:** Kullanıcı her ajan kararında pozisyonu, zamanı, kullanılan
+kaynakları ve belirsizliği görebilir; gizli model reasoning'i veya credentials
+göremez.
+
+---
+
+## 04. Philosopher council track — P1
+
+- [ ] Persona registry'ye şu ilk-prensip arketiplerini ekle: Stoic, Skeptic,
+  Utilitarian, Deontologist, Pragmatist ve Bayesian Epistemologist.
+- [ ] Her persona için ayrı public wallet/agent identity, açıklanabilir decision
+  rubric, risk limiti ve kategori kapsamı tanımla.
+- [ ] “Felsefi stil” ile rastgele karşıtlık üretmeyi ayır; aynı evidence üzerinde
+  farklı normatif/epistemik çerçeveler kullan.
+- [ ] Persona prompt versiyonlarını ve evaluation fixture'larını version-control et.
+- [ ] Mevcut council ile philosopher track'i ayrı filtrele; kombine consensus'u
+  ayrıca hesapla.
+- [ ] Her persona için minimum calibration seti, bias testi ve tutarlılık testi ekle.
+- [ ] Wallet funding ve x402 bütçelerini persona bazında sınırla.
+- [ ] Sabit `COUNCIL_PERSONAS` dizisini ileride BYOA registry okuyabilecek adapter
+  arkasına al.
+
+**Kabul kriteri:** Her philosopher aynı markette kendine özgü, kaynaklı ve
+tekrarlanabilir bir rubric ile oy verir; kimliği ve wallet'ı UI'da doğrulanabilir.
+
+---
+
+## 05. Fee system — P0, kontrat değişikliği
+
+### 5.1 Ekonomik kararlar
+
+- [ ] İki ayrı fee hattını tanımla:
+  - [ ] `platformFeeBps`: yalnızca resolved markette dağıtılabilir kazanç/pot
+    üzerinden protokol geliri.
+  - [ ] `agentOwnerFeeBps`: yalnızca agent-attributed create/copy/service
+    aktivitelerinde ilgili agent sahibine gelir.
+- [ ] Deposit anında fee alma; başarısız, draw, unresolvable ve refund akışlarını
+  kesintisiz iade et.
+- [ ] Agent fee'nin stake principal, brüt payout veya net profit tabanlarından
+  hangisine uygulanacağını ADR ile sabitle. Öneri: copy için net realized profit;
+  x402 için settled service revenue.
+- [ ] Fee stacking üst sınırı ve rounding/dust policy belirle.
+- [ ] Creator, agent owner ve platform aynı adres olduğunda double-counting'i
+  engelle.
+
+### 5.2 Kontrat ve muhasebe
+
+- [ ] Yeni kontrat sürümünde immutable/capped fee policy veya timelock'lı yönetim
+  tasarla; admin'in anlık sınırsız fee değiştirmesine izin verme.
+- [ ] Claim'e create anındaki fee snapshot'ını yaz; sonradan fee değişimi açık
+  marketleri etkilemesin.
+- [ ] Agent attribution için güvenilir `agentId → ownerFeeRecipient` snapshot'ı al.
+- [ ] Push payout yerine gerektiğinde pull-based `claimFees/claimPayout` modelini
+  değerlendir; reentrancy ve başarısız recipient riskini azalt.
+- [ ] Eventler: `FeePolicyUpdated`, `FeeAccrued`, `FeeClaimed`, `AgentAttributed`.
+- [ ] `payments_v2` x402 revenue ile market fee ledger'ını aynı toplamda birleştir,
+  fakat kaynak türlerini ayrı tut.
+- [ ] `/revenue` sayfasında gross volume, payouts, platform fees, agent-owner fees,
+  x402 revenue ve unclaimed balance göster.
+
+### 5.3 Testler
+
+- [ ] Pool, Duel, Fixed Odds, creator-win, challenger-win, draw, cancel ve dust
+  için invariant/property testleri.
+- [ ] `sum(principal + payout + fees + dust) == escrow inflow` invariant'ı.
+- [ ] Fee-on-transfer/rebasing token desteklenmediğini açıkça doğrula; yalnızca
+  configured USDC kabul et.
+- [ ] Slither/fuzz/reentrancy ve malicious fee-recipient testleri.
+
+**Kabul kriteri:** Her atomic USDC bir kez ve açıklanabilir şekilde principal,
+payout, platform fee, owner fee veya dust olarak muhasebeleşir.
+
+---
+
+## 06. Game modes — P0/P1
+
+### 6.1 Pool Market — canlı primitive, P0 anlaşılabilirlik
+
+- [ ] Explorer kartında creator pool, challenger pool, total pot ve side imbalance
+  göster.
+- [ ] Stake öncesi `total return`, `returned principal`, `net profit` alanlarını
+  ayrı göster.
+- [ ] Challenger payout preview formülünü kontratla aynı atomic integer helper'da
+  tut: `stake + stake / challengerPoolAfterJoin * creatorStake`.
+- [ ] Kalabalık tarafa katılımda düşük-upside uyarısı göster.
+- [ ] Doküman ve VS sayfasına “Kârın Mimir'den değil kaybeden taraftan gelir”
+  açıklamasını ekle.
+- [ ] 10 USDC creator / 10 × 10 USDC challenger örneğini golden test yap: NO
+  kazanırsa challenger başına 11 USDC; YES kazanırsa creator 110 USDC.
+
+### 6.2 Duel / 1v1 Fixed Challenge — P0 ilk yeni mode
+
+- [ ] Create ekranına `Duel` ve `Pool Market` selector ekle.
+- [ ] Duel policy: `maxChallengers = 1`, challenger stake = creator stake,
+  winner takes two-person pot, draw/unresolvable = full refund.
+- [ ] Eşit stake'i yalnızca UI'da değil kontratta veya mode-aware write guard'da
+  enforce et; UI policy'sine güvenme.
+- [ ] CTA metnini `Accept Duel`; rolleri `Creator` ve `Rival` yap.
+- [ ] Public open duel ile belirli wallet/agent'a private duel'i ayır.
+- [ ] XMTP konuşmasından duel oluşturma/accept deep-link akışı ekle.
+- [ ] Settlement sonrası `Run it back`, Best of 3 ve Best of 5 girişlerini ekle.
+
+**Kabul kriteri:** İkinci challenger katılamaz, eşit olmayan stake gönderilemez ve
+kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
+
+### 6.3 Creator-Backed Fixed Odds — P0 UI hardening
+
+- [ ] Create ekranında `1.25x`, `1.5x`, `2x`, `3x` total return preset'leri ekle.
+- [ ] “2x profit” yerine daima “2x total return” yaz.
+- [ ] `availableCreatorLiquidity = creatorStake - reservedCreatorLiability`
+  değerini göster.
+- [ ] Stake girilirken liability'yi kontratla aynı rounding ile önizle ve fazla
+  stake'i submit öncesi engelle.
+- [ ] Birden çok challenger sonrası kalan kapasiteyi canlı güncelle.
+- [ ] RPC ile UI state yarışırsa simulation/revert mesajını anlaşılır göster.
+- [ ] Concurrent challenge ve liability exhaustion testi ekle.
+
+### 6.4 Underdog Boost — P1 discovery modifier
+
+- [ ] Explorer'a `Underdog` badge, upside multiple sort ve filter ekle.
+- [ ] “Minority side” ve “crowded side” etiketlerini havuz büyüklüğünden türet.
+- [ ] Stake preview'da payout asimetrisini açıkla; kazanma ihtimali yorumu yapma.
+- [ ] Agent commentary'nin “underpriced” iddiası için evidence ve confidence zorunlu
+  olsun.
+- [ ] Fee discount düşünülürse önce fee kontratı ve abuse/sybil analizi tamamla.
+
+### 6.5 Rematch Ladder — P1 mevcut `parentId` üzerine
+
+- [ ] Settled VS sayfasında tüm parent/child zincirini görünür yap.
+- [ ] Read-index'te cycle guard ile rivalry root, round number ve seri skorunu
+  hesapla.
+- [ ] `Run it back`, Best of 3, Best of 5 akışlarında question/source/rule
+  metadata'sını devral; stake ve deadline'ı yeniden seçtir.
+- [ ] Zayıf settlement rule'u otomatik kopyalamadan önce kullanıcıya düzeltme
+  adımı göster.
+- [ ] Aynı parent'tan paralel rematch oluşması için branch/series policy belirle.
+
+### 6.6 Streak Mode — P1 off-chain scoring modifier
+
+- [ ] `current_streak`, `best_streak`, `resolved_count`, `win_rate` projection'ı
+  oluştur.
+- [ ] Draw/refund için streak'i değiştirme; cancel/unresolvable sonucu sayma.
+- [ ] Reorg/resync sonrası streak'in deterministik yeniden üretildiğini test et.
+- [ ] Dashboard, agents feed ve profile üzerinde streak badge ekle.
+- [ ] “Streak at risk” dilini riskli davranışı teşvik etmeyecek şekilde test et.
+- [ ] Kategori bazlı ve agent/human ayrı leaderboard ekle.
+
+### 6.7 Conviction Mode — P1 scoring modifier
+
+- [ ] v1 formülünü ADR'de açıkla ve version'la:
+  `correctness × cappedStakeFactor × timeFactor × underdogFactor`.
+- [ ] Evidence quality/confidence gibi öznel girdileri ilk sürümde ayrı göster;
+  doğrulanana kadar parasal skorla birleştirme.
+- [ ] Stake factor için log/cap kullan; zengin wallet'ın otomatik lider olmasını
+  engelle.
+- [ ] Early backer marker, realized PnL, win rate ve conviction leaderboard ekle.
+- [ ] Sybil, late-entry, micro-stake spam ve self-created-market gaming testleri.
+
+### 6.8 Squad vs Squad — P2, kontrat v2
+
+- [ ] V0 görsel prototip: creator'ı Side A captain, challengers'ı Side B olarak
+  sun; bunun gerçek two-sided deposit olmadığını açıkça belirt.
+- [ ] V1 kontrat tasarımı: her iki tarafa çoklu deposit, side shares, proportional
+  payout, withdrawal/cancel, deadline ve dust accounting.
+- [ ] Creator'a ayrı ekonomik ayrıcalık vermek gerekiyorsa açıkça modelle; gizli
+  bir avantaj bırakma.
+- [ ] `Back YES / Back NO`, iki taraf participant count/pool ve stacked avatar UI.
+- [ ] İki taraf için fee, late liquidity ve payout invariant fuzz testleri.
+
+### Game-mode rollout gate
+
+- [ ] Pool legibility tamamlanmadan yeni mode'u default yapma.
+- [ ] Sıra: Pool UI → Duel → Fixed Odds hardening → Underdog → Rematch →
+  Streak/Conviction → gerçek Squad vs Squad.
+
+---
+
+## 07. Bring Your Own Agent (BYOA) — P0 platform dönüşümü
+
+### 7.1 Agent identity ve registry
+
+- [ ] `agents` registry tasarla: `agent_id`, owner wallet, operator wallet,
+  payout wallet, metadata URI/hash, capabilities, categories, supported modes,
+  status, reputation, created/revoked timestamps.
+- [ ] Owner ve operator'ı ayır; owner fee alır ve operator key'i revoke/rotate eder.
+- [ ] Wallet signature challenge + nonce + expiry ile registration/auth uygula.
+- [ ] Agent metadata schema: name, description, avatar, reasoning policy, source
+  policy, model disclosure, contact, terms URL.
+- [ ] `market_creator`, `council_juror`, `researcher`, `copy_source`, `x402_seller`
+  capability'lerini ayrı ayrı grant/revoke et.
+- [ ] Basenames opsiyonel profil katmanı olsun; kimlik doğruluğu wallet signature'a
+  dayansın.
+
+### 7.2 Kademeli yetki modeli
+
+- [ ] Seviye 0: read-only market/context erişimi.
+- [ ] Seviye 1: market proposal; Mimir moderation/preflight sonrası yayınlar.
+- [ ] Seviye 2: kendi wallet'ıyla limitli market create.
+- [ ] Seviye 3: council vote/stake.
+- [ ] Seviye 4: takip edilebilir copy-source ve x402 seller.
+- [ ] Her seviyede rate limit, maksimum aktif market, günlük USDC exposure,
+  kategori/mode allowlist ve emergency pause uygula.
+- [ ] Reputation tek başına finansal yetki vermesin; explicit owner permission
+  her zaman zorunlu kalsın.
+
+### 7.3 Wallet seçenekleri
+
+- [ ] Human-owned agent için Base Account Sub Account + Spend Permission spike yap.
+- [ ] Server/standalone agent için CDP Agentic Wallet/AgentKit adapter'ını EOA ve
+  EIP-1271 uyumlu genel wallet interface arkasına al; vendor lock-in oluşturma.
+- [ ] Agent wallet'ı için per-call, per-session/day ve total exposure limitleri ekle.
+- [ ] Gas sponsorship/paymaster yalnızca allowlist contract calls için kullanılsın.
+- [ ] Mimir-managed legacy private-key persona'larını aynı registry interface'ine
+  adapte et; web process'e key taşıma.
+
+### 7.4 Agent API/SDK
+
+- [ ] `register`, `heartbeat`, `proposeMarket`, `createMarket`, `publishReasoning`,
+  `vote`, `stake`, `listPositions`, `listEarnings`, `revoke` endpointlerini version'la.
+- [ ] OpenAPI/JSON Schema ve TypeScript SDK yayınla.
+- [ ] Idempotency key, signed timestamp, nonce replay guard ve request audit log ekle.
+- [ ] Dry-run/simulation endpoint'i ekle; ajan işlem göndermeden payout, fee,
+  allowance ve policy sonucunu görebilsin.
+- [ ] Sandbox Base Sepolia onboarding örneği ve conformance test suite yayınla.
+
+**Kabul kriteri:** Dış geliştirici private key paylaşmadan ajanını kaydeder, proposal
+gönderir, açıkça verilen limit içinde market açar ve owner-fee attribution'ı
+doğrulanır; revoke sonrası yeni işlem yapamaz.
+
+---
+
+## 08. Copy trading, both directions — P1/P2
+
+Bağımlılıklar: analytics, agent registry, fee system, güvenilir position events ve
+harcama izinleri tamamlanmadan production'a çıkmaz.
+
+### 8.1 Human → agent copy MVP
+
+- [ ] Follow ile finansal copy permission'ı ayır; follow hiçbir zaman para harcatmaz.
+- [ ] Kullanıcı policy'si: agent, max per position, daily/weekly cap, total open
+  exposure, category/mode allowlist, min confidence, odds/payout floor, expiry.
+- [ ] Permission oluştururken worst-case USDC harcamayı açıkça göster ve imzalat.
+- [ ] Execution öncesi kontrat simulation, deadline, remaining slots, liquidity,
+  payout floor ve duplicate position guard uygula.
+- [ ] `executed`, `skipped`, `failed`, `expired` nedenlerini kullanıcıya göster.
+- [ ] Global pause ve tek permission revoke işlemini anında destekle.
+
+### 8.2 Agent → agent copy
+
+- [ ] İlk sürümde max copy depth = 1 uygula.
+- [ ] A→B→A cycle detection ve self-copy guard ekle.
+- [ ] Orijinal signal agent ile execution agent attribution'ını ayrı tut.
+- [ ] Owner fee ağacında aynı hacmi tekrar tekrar ücretlendirme; fee snapshot ve
+  tek source-of-truth attribution ID kullan.
+- [ ] Agent bütçe limiti bitince yeni izin istemeden işlemi skip et.
+
+### 8.3 Güvenlik ve kullanıcı kontrolü
+
+- [ ] Base Spend Permission kullanılıyorsa token=USDC, period, allowance ve spender
+  sınırlarını onchain doğrula; yalnız UI database'ine güvenme.
+- [ ] Upgradeable spender/target allowlist riskini açıkça incele.
+- [ ] Copy executor'ın key compromise, replay, frontrun ve stale odds senaryolarını
+  threat-model et.
+- [ ] Her copy işlemi için source position, permission ID, simulation snapshot,
+  tx hash, fee ve skip reason audit kaydı tut.
+
+**Kabul kriteri:** Kullanıcı imzaladığı maksimumdan fazla kaybedemez; izin iptalinden
+sonra execution yapılamaz; copy loop veya fee loop oluşamaz.
+
+---
+
+## 09. Agent baskets — P2, en son
+
+- [ ] Önce salt okunur “virtual basket” prototipi kur: seçili agent ağırlıkları,
+  backtest, drawdown, category/mode exposure ve simulated NAV.
+- [ ] Gerçek para MVP'si için non-custodial vault mimarisini değerlendir; ERC-4626
+  uygunluğunu, USDC decimal/donation/inflation risklerini ADR ile incele.
+- [ ] Deposit/redemption, weight rebalance, max single-agent/category exposure,
+  paused agent, stale signal ve failed copy kurallarını tanımla.
+- [ ] Management/performance fee varsa high-water mark, realized PnL ve fee
+  recipient accounting'i açıkça modelle.
+- [ ] NAV ve share price için atomic rounding/dust invariant'ları ekle.
+- [ ] Emergency withdrawal'ın agent executor ve oracle'dan bağımsız çalışmasını sağla.
+- [ ] Audit, legal/custody, sanctions/eligibility ve mainnet launch review tamamlanmadan
+  gerçek fon kabul etme.
+
+### USYC araştırma kapısı
+
+- [ ] USYC'yi Base roadmap varsayımından çıkar; güncel resmi chain support tekrar
+  doğrulanmadan entegrasyon kodu yazma.
+- [ ] Yatırımcı uygunluğu, minimum subscription, redemption, transfer allowlist,
+  smart-contract composability ve Base bridge riskleri için hukuk/ürün kararı al.
+- [ ] Bu kapı geçilmezse idle capital = USDC; UI'da yield sözü verme.
+
+**Kabul kriteri:** Basket fonları ve getirileri her an yeniden hesaplanabilir;
+kullanıcı riskleri görür ve exit yolu tek bir ajanın çalışmasına bağlı değildir.
+
+---
+
+## 10. Market Context Engine v2 + Agent Reach — P0
+
+Bugünkü market-creator az sayıda kaynak adapter'ı ve ağırlıklı olarak
+`binary + pool` üretimi kullanıyor. Amaç daha geniş konu kapsamı sağlarken
+ajanlara sınırsız browser/shell vermek değil, güvenli ve kaynak izli araştırma
+altyapısı sunmaktır.
+
+### 10.1 Research Gateway
+
+- [ ] Server-side, read-only `Research Gateway` oluştur; ajanlar doğrudan internet
+  veya internal network'e çıkmasın.
+- [ ] Adapter'lar: official web/API, RSS, GitHub public metadata, sports, weather,
+  market data, release calendars ve gerektiğinde x402/Bazaar kaynakları.
+- [ ] Domain allow/deny list, DNS/IP SSRF koruması, redirect limiti, response-size
+  limiti, MIME kontrolü ve timeout ekle.
+- [ ] Private browser session, cookie, localhost, cloud metadata, file URL ve write
+  action'larını yasakla.
+- [ ] Per-agent request, token, x402 USDC ve günlük bütçe uygula.
+- [ ] Sonuçları cache et; aynı kaynak için gereksiz ücret/istek tekrarını engelle.
+- [ ] Tool manifest'inde capability, fiyat, freshness ve trust tier yayınla.
+- [ ] x402 Bazaar discovery sonuçlarını fiyat/capability allowlist'inden geçir;
+  keşfedilen endpoint'i otomatik güvenilir sayma.
+
+### 10.2 Context pack schema
+
+- [ ] Her aday market için `MarketContextPack` üret:
+  - [ ] canonical claim ve taraflar
+  - [ ] category/topic ve entity'ler
+  - [ ] primary resolution source
+  - [ ] corroborating sources[]
+  - [ ] capturedAt, publish time, source timezone
+  - [ ] excerpt/structured fact ve content hash
+  - [ ] freshness, trust tier, corroboration/conflict flags
+  - [ ] deadline, resolution window, edge cases ve void rule
+  - [ ] geographic scope, units, threshold ve exact rounding rule
+  - [ ] agent confidence ve unresolved questions
+- [ ] Onchain'e uzun context yazma; immutable hash/URI ve settlement rule özeti yaz.
+- [ ] Primary resolution source değişirse version ve audit event üret.
+- [ ] Source kaybolursa snapshot/hash ve fallback source policy uygula.
+
+### 10.3 Konu kapsamını genişlet
+
+- [ ] İlk güvenilir adapter dalgası: crypto, sports, weather/climate, stocks,
+  macro/economic releases, technology/product releases, AI/open-source, gaming/esports,
+  entertainment/film/music, awards, science/space ve culture.
+- [ ] Her kategori için minimum source count, primary source allowlist, freshness,
+  deadline ve settlement template tanımla.
+- [ ] Elections/public policy gibi regülasyon ve manipülasyon riski yüksek alanları
+  ayrı compliance feature flag arkasında tut.
+- [ ] Sağlık, ölüm/şiddet, kişisel zarar, illegal activity ve doğrulanamaz özel kişi
+  claim'leri için mevcut moderation block policy'yi koru/genişlet.
+- [ ] Kategori coverage, reject reason, source failure ve settlement ambiguity
+  metriklerini PostHog/operational telemetry ile izle.
+
+### 10.4 Otomatik market-creator mode matrix
+
+- [ ] Market-creator output schema'sına canonical `subjectType`, `settlementMode`,
+  `productModifiers`, `contextPack`, `stakePolicy` ve `modeRationale` ekle.
+- [ ] Pool: public, çok katılımcılı konular için varsayılan otomatik mode.
+- [ ] Duel: yalnız belirli target agent/user varsa private duel üret; targetsızsa
+  `open_duel_invite` proposal olarak bırak.
+- [ ] Fixed Odds: creator wallet'ın available liquidity ve total liability cap'ini
+  kontrol etmeden market açma.
+- [ ] Underdog: create-time settlement mode değil; havuz oluşunca dinamik modifier.
+- [ ] Rematch: yalnız settled parent ve yeterli rivalry context varsa üret.
+- [ ] Streak/Conviction: finansal settlement mode değil; eligible marketlerde
+  read-index modifier/scoring olarak uygula.
+- [ ] Squad vs Squad: kontrat v2 deploy edilene kadar gerçek mode olarak üretme.
+- [ ] Her run için mode/category çeşitlilik kotası koy; kaliteyi düşüren rastgele
+  çeşitlilik üretme.
+- [ ] Active market cap'i kategori, mode, creator ve aynı event/entity bazında uygula.
+- [ ] Duplicate kontrolünü yalnız question string ile değil entity + event + threshold
+  + deadline signature ile yap.
+- [ ] Preflight council'e “resolution clarity”, “source independence”, “liquidity
+  fit” ve “best mode” skoru ekle.
+- [ ] Önce proposal-only shadow mode çalıştır; insan review sonuçlarıyla precision
+  ölçmeden autonomous publish'i açma.
+
+**Kabul kriteri:** Otomatik oluşturulan marketlerin context pack'i kaynaklı,
+çözülebilir ve mode'a uygun olur; ajan hiçbir zaman bütçe/allowlist dışı kaynağa
+erişemez veya mode'un teminat gereksinimini aşamaz.
+
+---
+
+## 11. Önerilen veri modeli ve API backlog'u
+
+### Yeni tablolar/projection'lar
+
+- [ ] `agent_registry`, `agent_operators`, `agent_capabilities`
+- [ ] `agent_reasoning_events`, `evidence_sources`, `market_context_packs`
+- [ ] `agent_follows`, `copy_permissions`, `copy_executions`
+- [ ] `fee_policies`, `fee_accruals`, `agent_revenue_attribution`
+- [ ] `market_series`, `profile_stats`, `conviction_scores`
+- [ ] `basket_definitions`, `basket_positions`, `basket_nav_snapshots`
+- [ ] Tüm tablolarda migration version, timestamps, stable IDs ve gerekli unique
+  idempotency constraint'leri.
+- [ ] Finansal tabloları PostHog'a kaynak yapma; analytics eventlerini finansal
+  ledger yerine kullanma.
+
+### API kuralları
+
+- [ ] Public read, authenticated user, registered agent ve internal worker route'larını
+  ayrı policy katmanlarına böl.
+- [ ] Zod/JSON Schema ile request/response versioning uygula.
+- [ ] Para veya yetki değiştiren her endpoint'te signature/nonce/idempotency/audit.
+- [ ] Rate limit'i IP yanında wallet, agent ID, route ve ekonomik bütçe bazında uygula.
+- [ ] API error'larına machine-readable code ve safe retry hint ekle.
+
+---
+
+## 12. Test, güvenlik ve operasyon checklist'i
+
+### Kontrat
+
+- [ ] Unit, invariant ve stateful fuzz: escrow conservation, liability cap, payout,
+  fee, refund, duplicate claim ve max participants.
+- [ ] Mode başına malicious ERC-1271 signer, reverting receiver, reentrancy ve
+  concurrent transaction senaryoları.
+- [ ] Deploy sonrası ABI/bytecode/address doğrulama ve Base Sepolia smoke test.
+- [ ] Yeni kontrat gerekiyorsa clean-state testnet redeploy planı; eski ağ için
+  data/branch compatibility katmanı ekleme.
+
+### Agent güvenliği
+
+- [ ] Prompt injection ve poisoned evidence fixture'ları.
+- [ ] Tool allowlist bypass, SSRF, redirect, DNS rebinding ve oversized content testleri.
+- [ ] Per-agent wallet/research/x402 bütçe kill-switch.
+- [ ] Agent key rotation, owner revoke ve compromised operator runbook'u.
+- [ ] Market create ve copy executor'ı için dry-run + simulation zorunluluğu.
+
+### Operasyon
+
+- [ ] Worker heartbeat, queue lag, RPC failure, facilitator failure, source failure,
+  oracle backlog ve settlement latency alarmı.
+- [ ] Postgres/read-index tamamen silinse onchain eventlerden yeniden kurulabildiğini
+  düzenli test et.
+- [ ] Feature flag'ler: mode, category, BYOA capability, copy execution, fee policy,
+  basket deposits.
+- [ ] Incident sırasında create/stake/copy/x402'yi birbirinden bağımsız pause et.
+
+---
+
+## 13. Uygulama dalgaları ve bağımlılık kapıları
+
+### Wave A — Ölçüm ve güven (1–2 sprint)
+
+- [ ] 01 PostHog event schema ve funnel.
+- [ ] Pool payout/imbalance UI.
+- [ ] Canonical mode registry.
+- [ ] Reasoning event schema ve public-safe summary policy.
+
+### Wave B — Dağıtım ve ilk yeni oyun (1–2 sprint)
+
+- [ ] 02 Share cards.
+- [ ] 03 Reasoning feed v1.
+- [ ] Duel mode.
+- [ ] Fixed Odds liquidity/liability UI.
+
+### Wave C — Market Context Engine (2–3 sprint)
+
+- [ ] Research Gateway ve `MarketContextPack`.
+- [ ] Yeni kategori adapter'ları.
+- [ ] Market-creator multi-mode proposal-only shadow run.
+- [ ] Underdog discovery ve Rematch Ladder.
+
+### Wave D — Agent platform (2–4 sprint)
+
+- [ ] 04 Philosopher track.
+- [ ] 07 Agent registry ve BYOA proposal-only.
+- [ ] Base Sub Account/Spend Permission ve CDP Agentic Wallet spike.
+- [ ] BYOA limitli create/vote rollout.
+
+### Wave E — Ekonomi ve otomasyon (3–5 sprint + audit)
+
+- [ ] 05 Fee contract, ledger ve revenue UI.
+- [ ] 08 Human → agent copy MVP.
+- [ ] Agent → agent copy; depth=1 ve cycle guard.
+- [ ] Streak/Conviction scoring.
+
+### Wave F — Yeni protokol yüzeyi (audit sonrası)
+
+- [ ] Gerçek Squad vs Squad kontratı.
+- [ ] Agent baskets virtual prototype.
+- [ ] Non-custodial basket vault ve yasal/security review.
+- [ ] USYC yalnız chain support + eligibility kapısı geçerse yeniden değerlendirilir.
+
+## 14. Launch gates
+
+- [ ] **Duel GA:** eşit stake enforcement + payout invariant + analytics hazır.
+- [ ] **Automated market GA:** shadow precision hedefi, source failure oranı ve
+  ambiguity review eşiği ürün ekibi tarafından yazılı onaylı.
+- [ ] **BYOA funded actions:** registry/revoke, budget, simulation ve audit log hazır.
+- [ ] **Fees:** kontrat audit/fuzz, fee disclosure ve reconciliation hazır.
+- [ ] **Copy trading:** signed permission, onchain cap, pause/revoke ve loss-limit
+  testleri hazır.
+- [ ] **Squad/Baskets:** ayrı kontrat audit'i ve ekonomik invariant raporu hazır.
+- [ ] **Mainnet:** testnet KPI hedefleri, incident runbook, legal/compliance review,
+  RPC/facilitator redundancy ve monitoring tamam.
+
+## 15. Başarı metrikleri
+
+- [ ] Market view → stake conversion, mode bazında.
+- [ ] Create start → confirmed market conversion.
+- [ ] D1/D7/D30 creator, challenger ve agent-owner retention.
+- [ ] Settlement sonrası rematch oranı ve series completion.
+- [ ] Reasoning open/purchase → stake conversion.
+- [ ] Share card → qualified market view → stake attribution.
+- [ ] Otomatik market proposal acceptance, ambiguity/reject ve source failure oranı.
+- [ ] BYOA registered → active → revenue-earning agent funnel.
+- [ ] Copy execution success/skip/failure, realized PnL ve permission revoke oranı.
+- [ ] Platform revenue, agent-owner revenue ve x402 revenue; gross volume'dan ayrı.
+- [ ] Oracle resolution latency, worker health ve read-index freshness.
+
+## 16. Teknik araştırma referansları
+
+- Base Account Sub Accounts ve Spend Permissions:
+  <https://docs.base.org/base-account/improve-ux/sub-accounts>
+- CDP Spend Permissions:
+  <https://docs.cdp.coinbase.com/wallets/using-wallets/spend-permissions>
+- CDP Agentic Wallet:
+  <https://docs.cdp.coinbase.com/agentic-wallet/cli/welcome>
+- AgentKit wallet management:
+  <https://docs.cdp.coinbase.com/agent-kit/core-concepts/wallet-management>
+- x402 seller/Bazaar discovery:
+  <https://docs.x402.org/getting-started/quickstart-for-sellers>
+- x402 buyer discovery ve payment schemes:
+  <https://docs.x402.org/getting-started/quickstart-for-buyers>
+- Circle USYC eligibility:
+  <https://developers.circle.com/tokenized/usyc/overview>
+- Circle supported chains/tokens (USYC Base desteği kontrolü):
+  <https://developers.circle.com/cctp/concepts/supported-chains-and-domains>
