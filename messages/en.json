@@ -945,7 +945,9 @@
     "sampleModeDemoBadge": "Demo",
     "sampleModeCTA": "Create Real Challenge",
     "invalidChallengeStakeMin": "Enter a stake of at least {amount} USDC",
-    "minimumStakeHint": "Minimum stake is {amount} USDC."
+    "minimumStakeHint": "Minimum stake is {amount} USDC.",
+    "underdogBadge": "Underdog",
+    "underdogBadgeHint": "The challenger side is the thin one here: a win returns about {multiple}x your stake. Payout asymmetry only — not a statement about what is likely to happen."
   },
   "stamp": {
     "provenDecided": "Mimir has decided",

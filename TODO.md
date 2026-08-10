@@ -269,8 +269,8 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 6.4 Underdog Boost — P1 discovery modifier
 
-- [ ] Explorer'a `Underdog` badge, upside multiple sort ve filter ekle.
-- [ ] “Minority side” ve “crowded side” etiketlerini havuz büyüklüğünden türet.
+- [x] Explorer'a `Underdog` badge, upside multiple sort ve filter ekle.
+- [x] “Minority side” ve “crowded side” etiketlerini havuz büyüklüğünden türet.
 - [ ] Stake preview'da payout asimetrisini açıkla; kazanma ihtimali yorumu yapma.
 - [ ] Agent commentary'nin “underpriced” iddiası için evidence ve confidence zorunlu
   olsun.

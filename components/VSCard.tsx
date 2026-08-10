@@ -10,6 +10,7 @@ import {
   type VSData,
 } from "@/lib/contract";
 import { shortenAddress, getCategoryInfo, ZERO_ADDRESS } from "@/lib/constants";
+import { assessUnderdog } from "@/lib/underdog";
 import VSStrip from "./ui/VSStrip";
 
 interface VSCardProps {
@@ -50,6 +51,9 @@ export default function VSCard({
     typeof vs.max_challengers === "number" && vs.max_challengers > 0
       ? vs.max_challengers
       : 1;
+  // Quoted for a 2 USDC probe stake: in a pool market a large stake dilutes its
+  // own payout, so an unqualified multiple would overstate what a joiner gets.
+  const underdog = assessUnderdog(vs);
   const marketType = vs.market_type ?? "binary";
   const oddsMode = vs.odds_mode ?? "pool";
   const t = useTranslations("vsDetail");
@@ -86,6 +90,20 @@ export default function VSCard({
             </span>
             {showChallengesLabel ? (
               <span className="text-xs text-pv-muted">{t("challenges")}</span>
+            ) : null}
+            {/* Payout asymmetry only — never a claim about who is likely to win.
+                Shown only when the side a browsing user CAN take is the thin one;
+                badging a market where the creator is the underdog would point at a
+                position nobody can join. */}
+            {underdog.isUnderdog && underdog.minoritySide === "challengers" ? (
+              <span
+                title={t("underdogBadgeHint", {
+                  multiple: underdog.challengerReturnMultiple.toFixed(2),
+                })}
+                className="shrink-0 rounded-full border border-pv-gold/30 bg-pv-gold/[0.1] px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.14em] text-pv-gold"
+              >
+                {t("underdogBadge")}
+              </span>
             ) : null}
           </div>
           <div className="flex items-center gap-2">
