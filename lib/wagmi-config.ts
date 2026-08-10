@@ -1,0 +1,58 @@
+/**
+ * wagmi config for Mimir on BOT Chain
+ *
+ * Supports: MetaMask, Coinbase Wallet, Rainbow, Phantom, Trust, Brave,
+ * any EIP-6963 injected wallet, and WalletConnect QR (380+ mobile wallets).
+ * Connect UX is a lightweight picker in lib/wallet.tsx (wagmi v3 native).
+ *
+ * Primary chain: BOT Chain Testnet (968), BOT native (18 decimals).
+ */
+import { createConfig, http } from "wagmi";
+// Import from wagmi's own re-export so connector types match createConfig (wagmi v3).
+import { coinbaseWallet, injected, metaMask, walletConnect } from "wagmi/connectors";
+import { botchainTestnet, getBotchainRpcUrl } from "./botchain";
+
+// WalletConnect Cloud project id — get one free at https://cloud.walletconnect.com.
+// When the var is missing we skip the walletconnect connector so local dev still
+// works; the connect modal just won't show the QR option until it's set.
+const WC_PROJECT_ID = process.env.NEXT_PUBLIC_WC_PROJECT_ID?.trim();
+
+const APP_METADATA = {
+  name:        "Mimir",
+  description: "AI-settled BOT claim markets on BOT Chain",
+  url:         "https://mimir.app",
+  icons:       ["https://mimir.app/logo.png"],
+};
+
+export const wagmiConfig = createConfig({
+  chains: [botchainTestnet],
+  connectors: [
+    metaMask(),
+    coinbaseWallet({
+      appName:    APP_METADATA.name,
+      appLogoUrl: APP_METADATA.icons[0],
+    }),
+    // EIP-6963 discovery picks up Phantom, Rainbow, Trust, Brave, OKX, etc.
+    // automatically — no per-wallet config needed.
+    injected({ shimDisconnect: true }),
+    ...(WC_PROJECT_ID
+      ? [walletConnect({
+          projectId:    WC_PROJECT_ID,
+          metadata:     APP_METADATA,
+          showQrModal:  true,
+        })]
+      : []),
+  ],
+  // JSON-RPC batching + retry keeps the browser from getting throttled
+  // (HTTP 429) when wagmi's react-query layer fans out useReadContract calls
+  // — every claim card on the feed page would otherwise issue its own POST.
+  transports: {
+    [botchainTestnet.id]: http(getBotchainRpcUrl(), {
+      batch: { batchSize: 200, wait: 16 },
+      retryCount: 3,
+      retryDelay: 300,
+      timeout: 20_000,
+    }),
+  },
+  ssr: true,
+});
