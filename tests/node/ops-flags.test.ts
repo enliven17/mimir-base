@@ -6,6 +6,8 @@ import {
   NEVER_PAUSABLE,
   PAUSABLE,
   checkWriteAllowed,
+  disabledCategories,
+  isCategoryEnabled,
   gatedFeatures,
   isFeature,
   isFeatureEnabled,
@@ -133,6 +135,8 @@ test("gatedFeatures names exactly what still needs a review gate", () => {
     "agent_baskets",
     "byoa_funded_actions",
     "copy_trading",
+    // Fees only exist in MimirV2, which is unaudited and holds nothing yet.
+    "fee_policy",
   ]);
 });
 
@@ -200,5 +204,51 @@ test("a capability with no feature flag is gated by the pause alone", () => {
     checkWriteAllowed({ capability: "oracle_settlement" }, { MIMIR_PAUSE_ORACLE_SETTLEMENT: "1" })
       .allowed,
     false,
+  );
+});
+
+// ── Per-category kill switch ─────────────────────────────────────────────
+
+test("a category is enabled unless an operator switched it off", () => {
+  // Disable-list, not allow-list: an allow-list kept in sync by hand silently
+  // drops a new category the day it ships.
+  assert.equal(isCategoryEnabled("crypto", {}), true);
+  assert.equal(isCategoryEnabled("crypto", { MIMIR_DISABLE_CATEGORY_CRYPTO: "1" }), false);
+});
+
+test("category keys are normalised so a dashed id still maps to its switch", () => {
+  assert.equal(isCategoryEnabled("macro-data", { MIMIR_DISABLE_CATEGORY_MACRO_DATA: "1" }), false);
+  assert.equal(isCategoryEnabled(" Crypto ", { MIMIR_DISABLE_CATEGORY_CRYPTO: "1" }), false);
+});
+
+test("an empty category id is refused rather than treated as enabled", () => {
+  assert.equal(isCategoryEnabled("  ", {}), false);
+});
+
+test("disabledCategories lists what an operator switched off", () => {
+  assert.deepEqual(
+    disabledCategories(["crypto", "sports", "macro"], { MIMIR_DISABLE_CATEGORY_SPORTS: "1" }),
+    ["sports"],
+  );
+});
+
+test("a disabled category blocks a write whose feature is on", () => {
+  const result = checkWriteAllowed(
+    { feature: "duel_mode", capability: "create_market", category: "sports" },
+    { MIMIR_DISABLE_CATEGORY_SPORTS: "1" },
+  );
+  assert.equal(result.allowed, false);
+  assert.equal(result.reason, "category_disabled");
+});
+
+test("a category switch does not affect writes that name no category", () => {
+  // Settling an existing market must not be blocked by a creation-side switch,
+  // or disabling a category would trap the funds already staked in it.
+  assert.equal(
+    checkWriteAllowed(
+      { capability: "oracle_settlement" },
+      { MIMIR_DISABLE_CATEGORY_SPORTS: "1" },
+    ).allowed,
+    true,
   );
 });

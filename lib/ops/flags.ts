@@ -118,6 +118,7 @@ export const FEATURES = [
   "byoa_funded_actions",
   "copy_trading",
   "agent_baskets",
+  "fee_policy",
 ] as const;
 export type Feature = (typeof FEATURES)[number];
 
@@ -144,6 +145,9 @@ const FEATURE_DEFAULTS: Record<Feature, boolean> = {
   byoa_funded_actions: false,
   copy_trading: false,
   agent_baskets: false,
+  // Fees only exist in MimirV2, which is unaudited and holds nothing yet. Turning
+  // this on before that contract is live would charge fees the escrow cannot pay.
+  fee_policy: false,
 };
 
 function featureEnvKey(feature: Feature): string {
@@ -165,9 +169,40 @@ export function gatedFeatures(): Feature[] {
   return FEATURES.filter((feature) => !FEATURE_DEFAULTS[feature]);
 }
 
+// ── Per-category kill switch ──────────────────────────────────────────────────
+
+/**
+ * Stop creating markets in one category without a deploy.
+ *
+ * Distinct from the compliance gate in `lib/research/categories.ts`, which decides
+ * whether a category is ever permissible. This is the operational case: a category
+ * that is allowed in principle is producing bad settlements right now and should
+ * stop until someone looks at it.
+ *
+ * Disable-list rather than an allow-list on purpose — an allow-list that has to be
+ * kept in sync with the category registry silently drops a new category the day it
+ * ships.
+ */
+export function isCategoryEnabled(
+  categoryId: string,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const id = categoryId.trim().toUpperCase().replace(/[^A-Z0-9]+/g, "_");
+  if (id.length === 0) return false;
+  return env[`MIMIR_DISABLE_CATEGORY_${id}`] !== "1";
+}
+
+/** Categories an operator has switched off, for a status endpoint. */
+export function disabledCategories(
+  categoryIds: readonly string[],
+  env: Record<string, string | undefined> = process.env,
+): string[] {
+  return categoryIds.filter((id) => !isCategoryEnabled(id, env));
+}
+
 // ── The single gate a write path calls ────────────────────────────────────────
 
-export type WriteBlockReason = "feature_disabled" | "paused";
+export type WriteBlockReason = "feature_disabled" | "category_disabled" | "paused";
 
 export interface WriteGateResult {
   allowed: boolean;
@@ -183,7 +218,7 @@ export interface WriteGateResult {
  * paused" for something that was never enabled.
  */
 export function checkWriteAllowed(
-  args: { feature?: Feature; capability: Pausable },
+  args: { feature?: Feature; capability: Pausable; category?: string },
   env: Record<string, string | undefined> = process.env,
 ): WriteGateResult {
   if (args.feature && !isFeatureEnabled(args.feature, env)) {
@@ -191,6 +226,13 @@ export function checkWriteAllowed(
       allowed: false,
       reason: "feature_disabled",
       detail: `${args.feature.replace(/_/g, " ")} is not enabled`,
+    };
+  }
+  if (args.category && !isCategoryEnabled(args.category, env)) {
+    return {
+      allowed: false,
+      reason: "category_disabled",
+      detail: `${args.category} markets are temporarily disabled`,
     };
   }
   const pause = pauseState(args.capability, env);

@@ -574,13 +574,13 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 ### Operasyon
 
-- [ ] Worker heartbeat, queue lag, RPC failure, facilitator failure, source failure,
+- [x] Worker heartbeat, queue lag, RPC failure, facilitator failure, source failure,
   oracle backlog ve settlement latency alarmı.
-- [ ] Postgres/read-index tamamen silinse onchain eventlerden yeniden kurulabildiğini
+- [x] Postgres/read-index tamamen silinse onchain eventlerden yeniden kurulabildiğini
   düzenli test et.
-- [ ] Feature flag'ler: mode, category, BYOA capability, copy execution, fee policy,
+- [x] Feature flag'ler: mode, category, BYOA capability, copy execution, fee policy,
   basket deposits.
-- [ ] Incident sırasında create/stake/copy/x402'yi birbirinden bağımsız pause et.
+- [x] Incident sırasında create/stake/copy/x402'yi birbirinden bağımsız pause et.
 
 ---
 
