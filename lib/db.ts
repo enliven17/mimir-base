@@ -199,6 +199,35 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   { sql: "CREATE INDEX IF NOT EXISTS idx_challenge_opportunities_locale ON challenge_opportunities(locale)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_challenge_opportunities_expires_at ON challenge_opportunities(expires_at)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_challenge_opportunities_action ON challenge_opportunities(action)" },
+  // Append-only agent reasoning log. A reasoning event is a claim about what an
+  // agent believed at a point in time, so rows are never rewritten: corrections
+  // are new events and withdrawals set tombstoned_at, keeping the audit trail.
+  { sql: `CREATE TABLE IF NOT EXISTS agent_reasoning_events (
+    event_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL DEFAULT 1,
+    claim_id BIGINT NOT NULL,
+    agent_id TEXT NOT NULL,
+    track TEXT NOT NULL,
+    stage TEXT NOT NULL,
+    position TEXT NOT NULL,
+    confidence_bps INTEGER NOT NULL DEFAULT 0,
+    summary TEXT NOT NULL,
+    uncertainty TEXT NOT NULL DEFAULT '',
+    evidence_refs_json TEXT NOT NULL DEFAULT '[]',
+    model TEXT,
+    provider TEXT,
+    prompt_version INTEGER,
+    payment_identifier TEXT,
+    visibility TEXT NOT NULL DEFAULT 'public',
+    safety_findings_json TEXT NOT NULL DEFAULT '[]',
+    created_at BIGINT NOT NULL DEFAULT 0,
+    tombstoned_at BIGINT,
+    tombstone_reason TEXT
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_claim ON agent_reasoning_events(claim_id, created_at)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_agent ON agent_reasoning_events(agent_id)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_track ON agent_reasoning_events(track)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_visibility ON agent_reasoning_events(visibility)" },
   // x402 settlement ledger. Amounts are ATOMIC token units, never floats — a
   // DOUBLE PRECISION column cannot hold 6dp money without rounding drift, and
   // SUM() over it compounds it. The old float `payments` table is deliberately
@@ -992,4 +1021,143 @@ export async function getPaymentsRevenueSummary(limit = 25): Promise<PaymentsRev
       created_at: getNumber(r.created_at),
     })),
   };
+}
+
+// ── Agent reasoning feed ──────────────────────────────────────────────────────
+// Append-only. insertReasoningEvent is idempotent on the deterministic event_id,
+// so a worker retry cannot duplicate a juror's published rationale.
+
+export interface ReasoningEventRow {
+  event_id: string;
+  schema_version: number;
+  claim_id: number;
+  agent_id: string;
+  track: string;
+  stage: string;
+  position: string;
+  confidence_bps: number;
+  summary: string;
+  uncertainty: string;
+  evidence_refs_json: string;
+  model: string | null;
+  provider: string | null;
+  prompt_version: number | null;
+  payment_identifier: string | null;
+  visibility: string;
+  safety_findings_json: string;
+  created_at: number;
+  tombstoned_at: number | null;
+  tombstone_reason: string | null;
+}
+
+function normalizeReasoningRow(row: Record<string, unknown>): ReasoningEventRow {
+  return {
+    event_id: getString(row.event_id),
+    schema_version: getNumber(row.schema_version),
+    claim_id: getNumber(row.claim_id),
+    agent_id: getString(row.agent_id),
+    track: getString(row.track),
+    stage: getString(row.stage),
+    position: getString(row.position),
+    confidence_bps: getNumber(row.confidence_bps),
+    summary: getString(row.summary),
+    uncertainty: getString(row.uncertainty),
+    evidence_refs_json: getString(row.evidence_refs_json),
+    model: getNullableString(row.model),
+    provider: getNullableString(row.provider),
+    prompt_version: row.prompt_version == null ? null : getNumber(row.prompt_version),
+    payment_identifier: getNullableString(row.payment_identifier),
+    visibility: getString(row.visibility),
+    safety_findings_json: getString(row.safety_findings_json),
+    created_at: getNumber(row.created_at),
+    tombstoned_at: row.tombstoned_at == null ? null : getNumber(row.tombstoned_at),
+    tombstone_reason: getNullableString(row.tombstone_reason),
+  };
+}
+
+export async function insertReasoningEvent(row: Omit<ReasoningEventRow, "tombstoned_at" | "tombstone_reason">): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO agent_reasoning_events (
+      event_id, schema_version, claim_id, agent_id, track, stage, position,
+      confidence_bps, summary, uncertainty, evidence_refs_json, model, provider,
+      prompt_version, payment_identifier, visibility, safety_findings_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(event_id) DO NOTHING`,
+    args: [
+      row.event_id,
+      row.schema_version,
+      row.claim_id,
+      row.agent_id,
+      row.track,
+      row.stage,
+      row.position,
+      row.confidence_bps,
+      row.summary,
+      row.uncertainty,
+      row.evidence_refs_json,
+      row.model,
+      row.provider,
+      row.prompt_version,
+      row.payment_identifier,
+      row.visibility,
+      row.safety_findings_json,
+      row.created_at,
+    ],
+  });
+}
+
+export interface ReasoningFeedFilters {
+  claimId: number;
+  /** Omit to return every track. */
+  track?: string;
+  agentId?: string;
+  stage?: string;
+  limit?: number;
+}
+
+/**
+ * Chronological feed for one claim. Withheld and tombstoned events are excluded
+ * from the public read; they stay in the table as the audit trail.
+ */
+export async function getReasoningFeed(filters: ReasoningFeedFilters): Promise<ReasoningEventRow[]> {
+  const pool = await getDb();
+  const clauses = ["claim_id = ?", "visibility <> 'withheld'", "tombstoned_at IS NULL"];
+  const args: Array<string | number> = [filters.claimId];
+  if (filters.track) {
+    clauses.push("track = ?");
+    args.push(filters.track);
+  }
+  if (filters.agentId) {
+    clauses.push("agent_id = ?");
+    args.push(filters.agentId);
+  }
+  if (filters.stage) {
+    clauses.push("stage = ?");
+    args.push(filters.stage);
+  }
+  const limit = typeof filters.limit === "number" && filters.limit > 0 ? Math.floor(filters.limit) : 200;
+  args.push(limit);
+  const result = await execute(pool, {
+    sql: `SELECT * FROM agent_reasoning_events
+      WHERE ${clauses.join(" AND ")}
+      ORDER BY created_at ASC, event_id ASC
+      LIMIT ?`,
+    args,
+  });
+  return result.rows.map((row) => normalizeReasoningRow(row as Record<string, unknown>));
+}
+
+/**
+ * Withdraw an event. The row is kept and marked, never deleted — a deletion would
+ * silently rewrite the record of what an agent said.
+ */
+export async function tombstoneReasoningEvent(eventId: string, reason: string): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `UPDATE agent_reasoning_events
+      SET tombstoned_at = ?, tombstone_reason = ?, visibility = 'withheld'
+      WHERE event_id = ? AND tombstoned_at IS NULL`,
+    args: [Date.now(), reason, eventId],
+  });
 }
