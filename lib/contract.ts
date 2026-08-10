@@ -34,6 +34,7 @@ import { MIMIR_ABI, STATE, WINNER_SIDE, BPS_DIVISOR } from "./mimir-abi";
 import { normalizeCategoryId, ZERO_ADDRESS } from "./constants";
 import { decodeClaimTuple } from "./claim-codec";
 import { guardChallenge, toCanonicalMode } from "./market-modes";
+import { checkWriteAllowed } from "./ops/flags";
 import { availableCreatorLiquidityUnits } from "./payout";
 import type { VSCacheFreshness } from "./vs-freshness";
 
@@ -710,6 +711,11 @@ export async function createClaim(
   wallet: string,
   params: CreateClaimParams
 ): Promise<ClaimWriteResult> {
+  // Incident kill switch. Create and stake pause independently, so a pricing bug
+  // can stop new markets without freezing settlement or withdrawals.
+  const gate = checkWriteAllowed({ capability: "create_market" });
+  if (!gate.allowed) throw new Error(gate.detail ?? "market creation is unavailable");
+
   const args = buildCreateArgs(params);
 
   if (isDemoMode()) {
@@ -773,6 +779,8 @@ export async function challengeClaim(
   if (isDemoMode()) {
     return sendDemoTx("challenge_claim", { claimId, stakeAmount, inviteKey });
   }
+  const stakeGate = checkWriteAllowed({ capability: "stake" });
+  if (!stakeGate.allowed) throw new Error(stakeGate.detail ?? "staking is unavailable");
   await assertChallengeAllowed(claimId, stakeAmount);
   const result = await sendBrowserTx(
     "challengeClaim",

@@ -16,7 +16,8 @@
  */
 
 import "server-only";
-import type { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 import { withX402, x402ResourceServer } from "@x402/next";
 import { HTTPFacilitatorClient, decodePaymentSignatureHeader } from "@x402/core/http";
 import type { DynamicPayTo, HTTPRequestContext } from "@x402/core/http";
@@ -32,6 +33,7 @@ import {
   type PriceKey,
 } from "./config";
 import { recordPayment } from "../paid-revenue";
+import { checkWriteAllowed } from "../ops/flags";
 
 /**
  * A settled payment lands here exactly once per request. Awaited by the SDK, so
@@ -201,8 +203,21 @@ export function paidRoute<T>(
     getResourceServer(),
   );
 
-  if (!opts.skipPayment) return guarded;
+  // x402 selling pauses independently of the rest of the app: if the facilitator
+  // is degraded we stop selling while settlement and withdrawal keep working.
+  const withKillSwitch = async (req: NextRequest): Promise<NextResponse<T>> => {
+    const gate = checkWriteAllowed({ capability: "x402_selling" });
+    if (!gate.allowed) {
+      return NextResponse.json(
+        { error: "paid endpoints are temporarily unavailable", detail: gate.detail },
+        { status: 503, headers: { "retry-after": "60" } },
+      ) as NextResponse<T>;
+    }
+    return guarded(req);
+  };
+
+  if (!opts.skipPayment) return withKillSwitch;
 
   return async (req: NextRequest) =>
-    (await opts.skipPayment!(req)) ? handler(req) : guarded(req);
+    (await opts.skipPayment!(req)) ? handler(req) : withKillSwitch(req);
 }
