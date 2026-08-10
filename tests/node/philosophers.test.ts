@@ -1,0 +1,172 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  PHILOSOPHER_PERSONAS,
+  PHILOSOPHER_PROMPT_VERSION,
+  activePhilosophers,
+  isPhilosopher,
+  philosopherAddressEnv,
+  philosopherPrivateKeyEnv,
+} from "../../agents/council/philosophers";
+import { COUNCIL_PERSONAS } from "../../agents/council/personas";
+
+test("the philosopher jury is non-empty and every member is tagged", () => {
+  assert.ok(PHILOSOPHER_PERSONAS.length >= 6);
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.equal(p.track, "philosopher");
+    assert.equal(isPhilosopher(p), true);
+  }
+});
+
+test("no philosopher slug collides with the classic council", () => {
+  // Wallet env vars are COUNCIL_<SLUG>_PRIVATE_KEY across BOTH tracks, so a
+  // duplicate slug would silently make two jurors share one wallet and one vote.
+  const classic = new Set(COUNCIL_PERSONAS.map((p) => p.slug));
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.equal(classic.has(p.slug), false, `slug '${p.slug}' exists in both tracks`);
+  }
+});
+
+test("philosopher slugs are unique and env-var safe", () => {
+  const seen = new Set<string>();
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.equal(seen.has(p.slug), false, `duplicate slug '${p.slug}'`);
+    seen.add(p.slug);
+    assert.match(p.slug, /^[a-z][a-z0-9-]*$/, `slug '${p.slug}' is not kebab-case`);
+  }
+});
+
+test("wallet env names are derived deterministically from the slug", () => {
+  assert.equal(philosopherPrivateKeyEnv("lao-tzu"), "COUNCIL_LAO_TZU_PRIVATE_KEY");
+  assert.equal(philosopherAddressEnv("lao-tzu"), "COUNCIL_LAO_TZU_ADDRESS");
+  assert.equal(philosopherPrivateKeyEnv("socrates"), "COUNCIL_SOCRATES_PRIVATE_KEY");
+});
+
+test("classic council members are not mistaken for philosophers", () => {
+  for (const p of COUNCIL_PERSONAS) {
+    assert.equal(isPhilosopher(p), false);
+  }
+});
+
+// ── Rubrics must be real, distinct methods — not decoration ───────────────────
+
+test("every philosopher carries a multi-step rubric", () => {
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.ok(p.rubric.length >= 4, `${p.slug} has only ${p.rubric.length} rubric steps`);
+    for (const step of p.rubric) {
+      assert.ok(step.trim().length > 12, `${p.slug} has a stub rubric step`);
+    }
+  }
+});
+
+test("no two philosophers share a rubric or a reasoning method", () => {
+  // Identical methods would mean the spread of votes is stylistic, not
+  // epistemic — exactly what the roadmap says not to build.
+  const rubrics = new Set<string>();
+  const methods = new Set<string>();
+  for (const p of PHILOSOPHER_PERSONAS) {
+    const rubric = p.rubric.join("|");
+    assert.equal(rubrics.has(rubric), false, `${p.slug} duplicates another rubric`);
+    rubrics.add(rubric);
+    assert.equal(methods.has(p.reasoningMethod), false, `${p.slug} duplicates a reasoning method`);
+    methods.add(p.reasoningMethod);
+  }
+});
+
+test("every rubric ends with an explicit route to a verdict or abstention", () => {
+  for (const p of PHILOSOPHER_PERSONAS) {
+    const last = p.rubric[p.rubric.length - 1];
+    assert.match(
+      last,
+      /UNRESOLVABLE|verdict|confidence/i,
+      `${p.slug}'s rubric does not end by producing a verdict`,
+    );
+  }
+});
+
+test("at least one juror can reach UNRESOLVABLE, and lao-tzu defaults to it", () => {
+  // Without a principled abstainer a jury manufactures confidence on
+  // genuinely undecidable claims.
+  const abstainers = PHILOSOPHER_PERSONAS.filter((p) =>
+    p.rubric.some((step) => /UNRESOLVABLE/.test(step)),
+  );
+  assert.ok(abstainers.length >= 3);
+
+  const laoTzu = PHILOSOPHER_PERSONAS.find((p) => p.slug === "lao-tzu");
+  assert.ok(laoTzu);
+  assert.match(laoTzu!.promptBias ?? "", /abstention is your default/i);
+  // Strictest confidence bar in the jury.
+  const bars = PHILOSOPHER_PERSONAS.map((p) => p.minConfidence ?? 0);
+  assert.equal(laoTzu!.minConfidence, Math.max(...bars));
+});
+
+test("the shared adjudication contract is in every prompt", () => {
+  for (const p of PHILOSOPHER_PERSONAS) {
+    const prompt = p.promptBias ?? "";
+    assert.match(prompt, /adjudicating a settled prediction market/i, `${p.slug} lost the contract`);
+    assert.match(prompt, /[Nn]ever invent evidence/, `${p.slug} may invent evidence`);
+    assert.match(prompt, /UNRESOLVABLE/, `${p.slug} has no abstention route`);
+    // The rubric must be visible in the prompt so published reasoning can be
+    // checked against the method the persona claims to follow.
+    for (const step of p.rubric) {
+      assert.ok(prompt.includes(step), `${p.slug}'s prompt omits a rubric step`);
+    }
+  }
+});
+
+test("polarity pairs reference philosophers that actually exist", () => {
+  const slugs = new Set(PHILOSOPHER_PERSONAS.map((p) => p.slug));
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.ok(p.polarityPairs.length > 0, `${p.slug} has no opposing frame`);
+    for (const pair of p.polarityPairs) {
+      assert.equal(slugs.has(pair), true, `${p.slug} pairs with unknown '${pair}'`);
+      assert.notEqual(pair, p.slug, `${p.slug} is paired with itself`);
+    }
+  }
+});
+
+// ── Risk limits are data, not prompt text ─────────────────────────────────────
+
+test("every philosopher has bounded, non-zero risk limits", () => {
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.ok(p.limits.maxStakeUsdc > 0, `${p.slug} has no stake limit`);
+    assert.ok(p.limits.maxStakeUsdc <= 5, `${p.slug} stake limit ${p.limits.maxStakeUsdc} is too high`);
+    assert.ok(p.limits.maxX402BudgetUsdc > 0, `${p.slug} has no x402 budget`);
+    assert.ok(
+      p.limits.maxX402BudgetUsdc <= 0.05,
+      `${p.slug} x402 budget ${p.limits.maxX402BudgetUsdc} is too high`,
+    );
+    assert.ok(p.limits.maxClaimsPerCycle >= 1);
+  }
+});
+
+test("the declared stake never exceeds the persona's own limit", () => {
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.ok(
+      (p.stakeUsdc ?? 0) <= p.limits.maxStakeUsdc,
+      `${p.slug} stakes ${p.stakeUsdc} against a ${p.limits.maxStakeUsdc} limit`,
+    );
+  }
+});
+
+test("prompt versions are stamped so votes stay comparable across changes", () => {
+  for (const p of PHILOSOPHER_PERSONAS) {
+    assert.equal(p.promptVersion, PHILOSOPHER_PROMPT_VERSION);
+  }
+});
+
+// ── Registry seam ─────────────────────────────────────────────────────────────
+
+test("activePhilosophers returns everyone when unset", () => {
+  assert.equal(activePhilosophers("").length, PHILOSOPHER_PERSONAS.length);
+  assert.equal(activePhilosophers(undefined).length, PHILOSOPHER_PERSONAS.length);
+});
+
+test("activePhilosophers narrows to a csv subset and ignores unknown slugs", () => {
+  const subset = activePhilosophers("socrates, lao-tzu ,nobody");
+  assert.deepEqual(
+    subset.map((p) => p.slug),
+    ["socrates", "lao-tzu"],
+  );
+});
