@@ -185,9 +185,11 @@ export function paidRoute<T>(
         scheme: X402_SCHEME,
         network: X402_NETWORK,
         price: PRICES[priceKey],
-        payTo: opts.payTo
-          ? async (ctx: HTTPRequestContext) => sellerAddress(await opts.payTo!(ctx))
-          : sellerAddress(),
+        // Always a function: resolving SELLER_ADDRESS at module scope would make
+        // the route fail to even load (and `next build` fail to collect page
+        // data) in any environment where the var isn't set yet.
+        payTo: async (ctx: HTTPRequestContext) =>
+          sellerAddress(opts.payTo ? await opts.payTo(ctx) : undefined),
       },
       description: meta.description,
       mimeType: meta.mimeType,

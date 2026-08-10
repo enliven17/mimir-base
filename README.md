@@ -1,50 +1,65 @@
 # Mimir
 
-**An AI-settled claim market on [BOT Chain](https://dev-docs.botchain.ai) — an EVM L1 whose native BOT token pays for gas and stakes alike.**
+**An AI-settled claim market on [Base](https://docs.base.org) — stakes and agent payments in USDC, gas in ETH.**
 
 > *In Norse mythology, Mimir is the guardian of the Well of Wisdom — an oracle who knows all things past, present, and future.*
 
-Mimir is a peer-to-peer market for public claims about future outcomes. Two parties stake BOT on opposite sides of a question; when the deadline passes, an off-chain AI oracle reads the agreed-upon evidence source, evaluates the verdict, and settles the payout on-chain. Every step — staking, challenging, resolution, payout — happens in native BOT with ≈0.75s blocks, fast finality, and fees around $0.06.
+Mimir is a peer-to-peer market for public claims about future outcomes. Two parties stake USDC on opposite sides of a question; when the deadline passes, an off-chain AI oracle reads the agreed-upon evidence source, evaluates the verdict, and settles the payout on-chain. Staking, challenging, resolution and payout all move USDC — Circle's official Base Sepolia token, 6 decimals — while native ETH pays gas and nothing else.
 
-The agents that run Mimir each sign with their own locally held private key — provisioned per agent, never exposed to the web server — and pay each other small BOT amounts for data and verdicts over HTTP 402, settled as plain native transfers and verified on-chain per request. The result is an economy where AI services are first-class on-chain participants, not just off-chain observers.
+The agents that run Mimir each sign with their own locally held private key — provisioned per agent, never exposed to the web server — and pay each other small USDC amounts for data and verdicts over **x402 v2**. The result is an economy where AI services are first-class on-chain participants, not just off-chain observers.
+
+| | |
+| --- | --- |
+| Chain | Base Sepolia — chain ID `84532`, CAIP-2 `eip155:84532` |
+| Gas | Native ETH |
+| Stakes, payouts, agent payments | USDC `0x036CbD53842c5426634e7929541eC2318f3dCF7e` (6 decimals) |
+| Paid endpoints | x402 v2, `exact` scheme, facilitator-settled |
 
 ---
 
 ## Agents as paying + selling economic actors
 
-Mimir's agents are not just operational workers — they pay each other small BOT amounts for data and verdicts and sell their own outputs. The mechanism is deliberately simple: **HTTP 402 price quotes settled as plain native BOT transfers, verified on-chain per request.** No facilitator contract, no batching layer — the buyer sends a transfer, retries with the tx hash, and the seller checks recipient, amount, sender, freshness, and replay before serving.
+Mimir's agents are not just operational workers — they pay each other small USDC amounts for data and verdicts and sell their own outputs. The mechanism is **x402 v2**: an unpaid call gets a `402` carrying the price, the buyer signs a USDC authorization, and a facilitator verifies and settles it on chain.
+
+Because the `exact` scheme uses USDC [EIP-3009](https://eips.ethereum.org/EIPS/eip-3009) `transferWithAuthorization`, a buying agent only ever **signs** — the facilitator submits the transaction and pays its gas. Buying data therefore needs no USDC approval and no ETH in the buyer's wallet; agents need ETH only for their own contract writes.
 
 | Piece | What it does | Endpoint / module |
 | --- | --- | --- |
-| **Paying oracle** | Oracle pays per-fetch for paywalled evidence (HTTP 402), budgeting a fraction of the claim pot — the agent *decides* what evidence is worth buying | `lib/paid-client.ts`, `lib/server/evidence-fetcher.ts` |
-| **Premium data API** | Sells price snapshots per call (0.001 BOT) — any agent can buy | `GET /api/premium/price` |
-| **Oracle-as-a-Service** | Sells the oracle's verdict per call (0.005 BOT) | `POST /api/oracle` |
-| **Creator monetization** | Each of the 10 council personas sells its reasoning pay-per-read (0.001 BOT); **revenue lands in that persona's own wallet** | `GET /api/council/reasoning` |
+| **Paying oracle** | Oracle pays per-fetch for paywalled evidence, budgeting a fraction of the claim pot — the agent *decides* what evidence is worth buying | `lib/x402/buyer.ts`, `lib/server/evidence-fetcher.ts` |
+| **Premium data API** | Sells price snapshots per call ($0.001) — any agent can buy | `GET /api/premium/price` |
+| **Oracle-as-a-Service** | Sells the oracle's verdict per call ($0.005) | `POST /api/oracle` |
+| **Creator monetization** | Each of the 10 council personas sells its reasoning pay-per-read ($0.001); **revenue lands in that persona's own wallet** | `GET /api/council/reasoning` |
 | **Market-creator preflight** | Market-creator buys council persona opinions before opening a market, then filters low-consensus candidates | `POST /api/council/preflight`, `agents/market-creator/council-preflight.ts` |
-| **Council-as-jury settlement** | At settlement the oracle *buys* each eligible persona's verdict (0.001 BOT → persona wallet) and settles by their tally — multi-agent consensus, committed on-chain via `evidenceHash` | `GET /api/council/vote`, `agents/oracle/council-vote.ts` |
-| **Subscription pass** | One payment (0.01 BOT) buys a time-boxed window of free council reads — the recurring-access tier on top of per-read | `POST /api/council/subscribe` |
-| **Revenue dashboard** | Live BOT earned, paying agents, per-endpoint — durable (Neon `payments` table), each payment links to its on-chain transfer | `/revenue`, `GET /api/payments/revenue` |
-| **Pull-payment safety** | Failed payout pushes park in `pendingWithdrawals` (claim via `withdraw()`) instead of reverting settlement — one bad recipient can't freeze everyone's payout | `contracts/Mimir.sol` |
+| **Council-as-jury settlement** | At settlement the oracle *buys* each eligible persona's verdict ($0.001 → persona wallet) and settles by their tally — multi-agent consensus, committed on-chain via `evidenceHash` | `GET /api/council/vote`, `agents/oracle/council-vote.ts` |
+| **Council pass** | One payment ($0.01) buys a time-boxed window of free council reads — a bundled-access tier on top of per-read | `POST /api/council/subscribe` |
+| **Budget caps** | A quote above the agent's cap is rejected **inside the payment policy**, so an over-budget resource never gets a signature | `PaymentBudgetExceeded` in `lib/x402/buyer.ts` |
+| **Revenue dashboard** | Live USDC earned, paying agents, per-endpoint — durable (Neon `payments_v2`, atomic integers), each receipt links to its settlement on BaseScan | `/revenue`, `GET /api/payments/revenue` |
+| **Bazaar discovery** | Every paid route publishes a description, MIME type, tags and an example payload so agents can find the service | `lib/x402/config.ts` |
+| **Pull-payment safety** | Failed payout pushes park in `pendingWithdrawals` (claim via `withdraw()`) instead of reverting settlement — one blacklisted recipient can't freeze everyone's payout | `contracts/Mimir.sol` |
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Agent as Paying agent
-    participant API as Paid endpoint
-    participant Chain as BOT Chain
+    participant API as Paid endpoint (seller)
+    participant Fac as Facilitator
+    participant Chain as Base Sepolia
     participant DB as Neon ledger
 
     Agent->>API: request paid resource
-    API-->>Agent: HTTP 402 + { payTo, amountUnits, chainId }
-    Agent->>Chain: native BOT transfer to payTo
-    Chain-->>Agent: tx hash
-    Agent->>API: retry with X-Payment-Tx: <hash>
-    API->>Chain: getTransaction + receipt (verify to/value/from/freshness, no replay)
-    API->>DB: record receipt
-    API-->>Agent: paid response
+    API-->>Agent: 402 + PAYMENT-REQUIRED { scheme, network, asset, amount, payTo }
+    Note over Agent: reject the quote if it exceeds the budget cap<br/>(no signature is produced)
+    Agent->>API: retry with PAYMENT-SIGNATURE (signed USDC authorization)
+    API->>Fac: verify
+    Fac-->>API: valid
+    API->>Fac: settle
+    Fac->>Chain: transferWithAuthorization (facilitator pays gas)
+    Fac-->>API: settlement + tx hash
+    API->>DB: record atomic USDC amount, idempotent on (network, payment id)
+    API-->>Agent: paid response + PAYMENT-RESPONSE
 ```
 
-See `lib/paid-client.ts` (buy side) and `lib/paid-server.ts` (sell side).
+See `lib/x402/buyer.ts` (buy side), `lib/x402/server.ts` (sell side) and `lib/x402/config.ts` (prices, network, discovery metadata).
 
 ---
 
@@ -76,7 +91,7 @@ A **claim** in Mimir is a single, verifiable question with a deadline and a desi
 
 > *"Will BTC close above $100,000 USD on 2026-05-25 according to CoinGecko?"*
 
-Anyone can create a claim, stake BOT on one side, and publish it. Another party (or the autonomous market-creator agent) can **challenge** by staking BOT on the opposite side. When the deadline passes, the **oracle agent** fetches the agreed-upon evidence URL, asks a large language model to evaluate the outcome against the stated rule, and submits the verdict on-chain. The smart contract then atomically pays out the winning side.
+Anyone can create a claim, stake USDC on one side, and publish it. Another party (or the autonomous market-creator agent) can **challenge** by staking USDC on the opposite side. When the deadline passes, the **oracle agent** fetches the agreed-upon evidence URL, asks a large language model to evaluate the outcome against the stated rule, and submits the verdict on-chain. The smart contract then atomically pays out the winning side.
 
 There are no judges, no committees, no manual disputes. The product surfaces are:
 
@@ -115,9 +130,10 @@ flowchart LR
         CO[Council personas<br/>paid jurors + challengers]
     end
 
-    subgraph botchain[BOT Chain Testnet]
+    subgraph base[Base Sepolia]
         CT[Mimir.sol<br/>claim market]
-        BOT[Native BOT<br/>18 decimals]
+        USDC[USDC<br/>6 decimals]
+        ETH[ETH<br/>gas only]
     end
 
     NEON[(Neon Postgres<br/>read-index cache)]
@@ -138,15 +154,16 @@ flowchart LR
     OR -->|index claims| NEON
     MC -->|index claims| NEON
 
-    OR -.->|buys verdicts / evidence in BOT| API
-    CO -.->|sells reasoning in BOT| API
+    OR -.->|buys verdicts / evidence in USDC| API
+    CO -.->|sells reasoning in USDC| API
 
-    CT -.->|stakes + payouts| BOT
+    CT -.->|stakes + payouts| USDC
+    FE -.->|tx fees| ETH
 ```
 
 The diagram shows three independent runtime tiers:
 
-1. **Frontend tier (Vercel)** — Next.js App Router with API routes. Pure read paths talk to the BOT Chain RPC directly; writes are user-signed via wagmi/viem.
+1. **Frontend tier (Vercel)** — Next.js App Router with API routes. Pure read paths talk to the Base RPC directly; writes are user-signed via wagmi/viem.
 2. **Worker tier (Railway)** — long-lived Node processes that poll the chain, evaluate claims with an LLM, and submit settlement transactions. Each agent signs with its own locally held private key.
 3. **Data tier (Neon Postgres)** — a denormalised read-index of the on-chain state. Optional; the app boots without it and the contract remains the source of truth.
 
@@ -157,14 +174,14 @@ The diagram shows three independent runtime tiers:
 ```mermaid
 flowchart LR
     Q[Question + source + settlement rule]
-    C[Create claim<br/>creator stakes BOT]
-    B[Challenge claim<br/>counter-side stakes BOT]
+    C[Create claim<br/>creator stakes USDC]
+    B[Challenge claim<br/>counter-side stakes USDC]
     D[Deadline passes<br/>market locks]
     E[Fetch evidence<br/>hash raw bytes]
     L[LLM read<br/>verdict + confidence]
     J[Optional council vote<br/>paid persona verdicts]
-    R[resolveClaim<br/>write result on BOT Chain]
-    P[Payout or refund<br/>native BOT]
+    R[resolveClaim<br/>write result on Base]
+    P[Payout or refund<br/>USDC]
 
     Q --> C --> B --> D --> E --> L --> J --> R --> P
     E -. evidenceHash .-> R
@@ -182,14 +199,14 @@ sequenceDiagram
     autonumber
     participant Creator
     participant Challenger
-    participant Contract as Mimir.sol (BOT Chain)
+    participant Contract as Mimir.sol (Base Sepolia)
     participant Oracle as Oracle Agent
     participant LLM as LLM layer
     participant Source as Resolution URL
 
-    Creator->>Contract: createClaim(question, URL, deadline, stake BOT)
+    Creator->>Contract: createClaim(question, URL, deadline, stake USDC)
     Note over Contract: state = OPEN<br/>creatorStake stored
-    Challenger->>Contract: challengeClaim(claimId, stake BOT)
+    Challenger->>Contract: challengeClaim(claimId, stake USDC)
     Note over Contract: state = ACTIVE<br/>challengerStake stored
 
     Note over Contract: ... deadline passes ...
@@ -229,7 +246,7 @@ sequenceDiagram
     participant Contract as Mimir.sol
 
     Note over Oracle: common prior q0 = 0.5
-    Oracle->>J1: buy vote (HTTP 402 ~0.001 BOT) — no history yet
+    Oracle->>J1: buy vote (x402, $0.001 USDC) — no history yet
     J1-->>Oracle: verdict + confidence → q1
     Oracle->>J2: buy vote — prompt includes J1's report
     J2-->>Oracle: q2
@@ -238,11 +255,11 @@ sequenceDiagram
     Jn-->>Oracle: qn
     Note over Oracle: terminal (reference) assessment:<br/>own evidence + all juror reports → qT
     Oracle->>Contract: resolveClaim(verdict, confidence,<br/>evidenceHash incl. q-chain + CE scores)
-    Oracle->>J1: cross-entropy bonus (native BOT)<br/>only if score > 0
+    Oracle->>J1: cross-entropy bonus (USDC)<br/>only if score > 0
 ```
 
 - **Sequential, visible history.** Jurors vote in shuffled order and each sees the prior reports (`"The Optimist: 90% challengers — …"`), so information aggregates like a real market instead of ten blind parallel opinions.
-- **Cross-entropy scoring.** Each report maps to `q = P(challengers win)` and is scored against the oracle's terminal, history-informed assessment: `S = qT·ln(qt/qprev) + (1−qT)·ln((1−qt)/(1−qprev))`. Parroting the prior scores **exactly zero**; informative updates toward the reference split the `COUNCIL_BONUS_USDC` pool, paid after settlement as native BOT transfers into juror wallets. The flat ~0.001 BOT HTTP 402 vote fee remains the participation floor.
+- **Cross-entropy scoring.** Each report maps to `q = P(challengers win)` and is scored against the oracle's terminal, history-informed assessment: `S = qT·ln(qt/qprev) + (1−qT)·ln((1−qt)/(1−qprev))`. Parroting the prior scores **exactly zero**; informative updates toward the reference split the `COUNCIL_BONUS_USDC` pool, paid after settlement as native USDC transfers into juror wallets. The flat ~0.001 USDC HTTP 402 vote fee remains the participation floor.
 - **Random termination.** Once `COUNCIL_QUORUM` decisive reports exist, every further vote happens only with probability `1 − COUNCIL_ALPHA` — the terminal position stays unpredictable and LLM spend per settlement is bounded.
 - **Verifiable.** The q-chain, reference belief, and per-juror scores are embedded in the committed `evidenceHash` payload, so the whole scored market can be audited against the on-chain hash.
 
@@ -281,7 +298,7 @@ This narrow state machine is why the UI can stay deterministic: open markets inv
 
 ## Agents as economic actors
 
-**Twelve** background agents run continuously: the oracle (settler + optional auto-challenger), the market-creator, and the ten-persona Mimir Council. Each holds a local private key only in the worker env — every transaction is signed as a plain EOA on BOT Chain.
+**Twelve** background agents run continuously: the oracle (settler + optional auto-challenger), the market-creator, and the ten-persona Mimir Council. Each holds a local private key only in the worker env — every transaction is signed as a plain EOA on Base Sepolia.
 
 > **Deep dive:** see [`docs/COUNCIL.md`](docs/COUNCIL.md) for the full council architecture, persona-by-persona strategy, and rate-limit design.
 
@@ -331,7 +348,7 @@ Ten distinct AI personas, each with its own local EOA wallet and its own way of 
 | 📊 Statistician | LLM-biased with a 90% confidence floor — rare but decisive bets. |
 | 🔁 Contrarian · 🐋 Whale-Watcher | Pure rule-based, never call the LLM. Contrarian stakes the smaller pool; Whale-Watcher copies the biggest individual challenger. |
 | ₿ Crypto Maximalist · 🏈 Sports Pundit · 🌤️ Weatherman | Category specialists — only evaluate claims in their domain. |
-| 🗣️ Yapper | Micro-stakes (0.5 BOT) at a low 60% confidence threshold for maximum market presence. |
+| 🗣️ Yapper | Micro-stakes (0.5 USDC) at a low 60% confidence threshold for maximum market presence. |
 
 Personas can only call `challengeClaim` (settlement stays with the oracle, market creation stays with the market-creator). A persona that agrees with the creator simply abstains. Decisions are made through the same Kelly-sized, evidence-hashed pipeline the oracle uses — just with persona-specific prompt biases and a shared per-cycle evidence cache so ten personas don't re-fetch the same URL.
 
@@ -347,10 +364,10 @@ See [`docs/COUNCIL.md`](docs/COUNCIL.md) for the full architecture, rate-limit s
 
 | Piece                          | Where it lives                                                                | What it actually does in Mimir                                                                                       |
 | ------------------------------ | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| **BOT** as native token        | `contracts/Mimir.sol`, `lib/base.ts`                                      | Stakes use `msg.value` — no ERC-20 approval flow, no allowance dance, ~$0.06 per call                                |
+| **USDC** as the market asset   | `contracts/Mimir.sol`, `lib/usdc.ts`                                          | Stakes, payouts and refunds are ERC-20 transfers of Circle's Base Sepolia USDC (6 decimals). Native ETH is gas only |
 | **Local agent wallets**        | `lib/agent-wallets.ts`, all agent entry points                                | Oracle, market-creator, and council personas each hold a private key in the worker env. Writes go through `agentContractWrite(...)` (viem `writeContract` + receipt wait) |
-| **Wallet provisioning**        | `scripts/create-agent-wallets.ts`, `scripts/fund-agents.ts`                   | One command generates all twelve keys (+ the public address block for the web server); another distributes BOT from a master wallet |
-| **Native transfers**           | `transferBot(...)` in `lib/agent-wallets.ts`                                  | Oracle's cross-entropy jury bonuses and agent funding are plain BOT transfers with receipt verification              |
+| **Wallet provisioning**        | `scripts/create-agent-wallets.ts`, `scripts/fund-agents.ts`                   | One command generates all twelve keys (+ the public address block for the web server); another distributes USDC (plus a little ETH for gas) from a master wallet |
+| **USDC transfers**             | `transferUsdc(...)` in `lib/agent-wallets.ts`                                 | Oracle's cross-entropy jury bonuses and agent funding are ERC-20 USDC transfers with receipt verification. `transferEth(...)` exists only for gas top-ups |
 
 The web server never holds an agent key. It only knows the **public** addresses (`SELLER_ADDRESS`, `COUNCIL_<SLUG>_ADDRESS`) for payment routing and display. Workers (Railway) hold the keys; the split is by design.
 
@@ -361,10 +378,10 @@ sequenceDiagram
     autonumber
     participant Agent
     participant Helper as lib/agent-wallets.ts
-    participant Chain as BOT Chain RPC
+    participant Chain as Base RPC
 
     Agent->>Helper: agentContractWrite({ wallet, abi, functionName, args, amountUsdc })
-    Helper->>Chain: writeContract (signed locally, msg.value = amountUsdc)
+    Helper->>Chain: approve USDC if short, then writeContract (signed locally)
     Chain-->>Helper: tx hash
     Helper->>Chain: waitForTransactionReceipt
     Chain-->>Helper: receipt (status = success)
@@ -373,32 +390,36 @@ sequenceDiagram
 
 ---
 
-## Paid resources over HTTP 402
+## Paid resources over x402
 
-Mimir's paid endpoints (`/api/premium/price`, `/api/oracle`, `/api/council/*`) sell data per request. There is no payment processor in the loop: the 402 response quotes a `payTo` address and an amount, the buyer sends a plain BOT transfer, and the seller verifies that transfer on-chain before serving.
+Mimir's paid endpoints (`/api/premium/price`, `/api/oracle`, `/api/council/*`) sell data per request over [x402](https://docs.cdp.coinbase.com/x402/welcome) v2. The 402 response quotes the scheme, network, asset, amount and recipient; the buyer signs a USDC authorization and retries; a facilitator verifies it, settles it on chain, and pays the settlement gas.
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant Buyer as Buyer agent
     participant API as Paid endpoint
-    participant Chain as BOT Chain
+    participant Fac as Facilitator
+    participant Chain as Base Sepolia
 
     Buyer->>API: GET /api/premium/price?symbol=bitcoin
-    API-->>Buyer: 402 { payTo, amountUnits, chainId: 968 }
-    Buyer->>Chain: sendTransaction(to=payTo, value=amountUnits)
-    Chain-->>Buyer: tx hash
-    Buyer->>API: retry + X-Payment-Tx: hash
-    API->>Chain: getTransaction + getTransactionReceipt
-    Note over API: status ok · to == payTo · value ≥ amount<br/>from == claimed payer · age < 1h · hash not reused
-    API-->>Buyer: 200 { price snapshot } + X-Payment-Tx
+    API-->>Buyer: 402 + PAYMENT-REQUIRED<br/>{ scheme: exact, network: eip155:84532, asset: USDC, amount, payTo }
+    Note over Buyer: budget policy rejects an over-cap quote here —<br/>no signature is ever produced
+    Buyer->>API: retry + PAYMENT-SIGNATURE (EIP-3009 authorization)
+    API->>Fac: verify
+    API->>Fac: settle
+    Fac->>Chain: transferWithAuthorization
+    Fac-->>API: { success, transaction, amount, payer }
+    API-->>Buyer: 200 { price snapshot } + PAYMENT-RESPONSE
 ```
 
 Key facts:
 
-- **No facilitator contract.** Verification is a pair of RPC reads (`eth_getTransaction`, `eth_getTransactionReceipt`) — the chain itself is the settlement proof.
-- **Replay-proof.** Spent hashes are rejected against the durable Neon `payments` ledger (plus an in-process guard), and transfers older than an hour are refused.
-- **Budgeted on the buy side.** Agents probe the price first and walk away when the quote exceeds their cap (`fetchWithBudget` in `lib/paid-client.ts`) — the "agent decides what data is worth paying for" moment lives in code.
+- **The facilitator owns verification and settlement.** Mimir declares what a route costs and who is paid; it never inspects transactions itself. Testnet defaults to `https://x402.org/facilitator` (no signup); staging and production point at CDP via `X402_FACILITATOR_URL` plus server-side credentials.
+- **Buyers need no ETH and no approval.** The `exact` scheme signs a USDC EIP-3009 authorization and the facilitator pays the settlement gas. Agents hold ETH only for their own contract writes.
+- **Replay-proof by construction.** An authorization is single-use at the facilitator, and `payments_v2` carries a unique index on `(network, payment_identifier)` — a retried settlement cannot be double-counted.
+- **Settlement follows the handler.** `withX402` settles only after the route returns `< 400`, so an upstream failure costs the buyer nothing.
+- **Budgeted on the buy side.** The cap is enforced inside the payment-requirements policy, so an over-budget quote never produces a signature (`PaymentBudgetExceeded` in `lib/x402/buyer.ts`) — the "agent decides what data is worth paying for" moment lives in code.
 
 ---
 
@@ -407,12 +428,13 @@ Key facts:
 | Layer              | Choice                                                                            | Why                                                                                                              |
 | ------------------ | --------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | Frontend           | Next.js 16 (App Router) + React 18 + TypeScript + Tailwind CSS + Framer Motion    | App Router for streaming + parallel route handlers; Framer Motion for the bridge stepper and live deadline UI    |
-| Wallet             | wagmi v3 + viem v2                                                                | BOT Chain Testnet (968); MetaMask, Coinbase, WalletConnect, EIP-6963 injected wallets                            |
+| Wallet             | wagmi v3 + viem v2                                                                | Base Sepolia (84532); Base Account, MetaMask, Coinbase, WalletConnect, EIP-6963 injected wallets                 |
 | Smart contract     | Solidity ^0.8.20, compiled with solc 0.8.28 `viaIR`                               | Mimir.sol is dependency-free. `viaIR` is required because the create flow exceeds stack-depth without it         |
-| Blockchain         | BOT Chain Testnet (chain ID `968`)                                                | EVM L1: ≈0.75s blocks, fast deterministic finality, fees around $0.06                                            |
-| Native currency    | BOT (18 decimals at the EVM level)                                                | `msg.value` accepts BOT directly; stakes settle without ERC-20 approval rounds                                   |
+| Blockchain         | Base Sepolia (chain ID `84532`, `eip155:84532`)                                    | Ethereum L2: ~2s blocks, cent-level fees, and the deepest testnet USDC + x402 support                            |
+| Market asset       | USDC (ERC-20, 6 decimals)                                                         | Stakes hold their dollar value for the life of a market; ETH is gas only                                          |
+| Batching           | EIP-5792 `wallet_sendCalls` (`lib/contract.ts`)                                    | Base Account approves USDC and stakes in one confirmation; plain EOAs fall back to two transactions              |
 | Agent signer       | Local private keys per agent (`lib/agent-wallets.ts`)                             | Keys live only in the worker env; the web server holds public addresses only                                     |
-| Payments           | HTTP 402 + native BOT transfers (`lib/paid-client.ts`, `lib/paid-server.ts`)      | No facilitator contract — the seller verifies each transfer on-chain (amount, sender, freshness, no replay)      |
+| Payments           | x402 v2 in USDC (`lib/x402/*`, `@x402/next` + `@x402/fetch`)                       | Facilitator handles verify + settle, so buyers need no approval and no ETH; budget caps applied before signing    |
 | LLM layer          | Routed language model layer                                                      | `lib/llm.ts` handles model calls, cooldowns, and fallback routing                                                  |
 | Messaging          | XMTP Browser SDK v7 (`@xmtp/browser-sdk`)                                         | Optional E2E-encrypted chat between creator and challenger before/after settlement                               |
 | Database           | Neon Postgres via `@neondatabase/serverless`                                      | Serverless-friendly driver, works on both Vercel functions and Railway long-running workers                      |
@@ -425,7 +447,7 @@ Key facts:
 ## Repository layout
 
 ```
-mimir-botchain/
+mimir-base/
 ├── app/
 │   ├── [locale]/
 │   │   ├── dashboard/                    # personal W/L view
@@ -455,18 +477,20 @@ mimir-botchain/
 │       ├── personas.ts                   # 10 persona configs (bios, biases, accents)
 │       └── shared/                       # runner, evidence cache, rule evaluators, persona-LLM
 ├── contracts/
-│   └── Mimir.sol                         # the only contract; deployed on BOT Chain
+│   └── Mimir.sol                         # the only contract; USDC escrow on Base Sepolia
 ├── deploy/
 │   └── deploy.ts                         # compile + deploy via viem
 ├── lib/
-│   ├── botchain.ts                       # chain 968 config + viem clients + BOT helpers
+│   ├── base.ts                           # baseSepolia + viem clients + log scans
+│   ├── usdc.ts                           # official Base Sepolia USDC + 6dp helpers
 │   ├── agent-wallets.ts                  # local private-key wallets for workers
-│   ├── paid-client.ts / paid-server.ts   # HTTP 402 native BOT micropayments
+│   ├── x402/                             # config.ts (prices) · server.ts · buyer.ts
+│   ├── paid-revenue.ts                   # atomic USDC settlement ledger
 │   ├── contract.ts                       # high-level TypeScript contract client
 │   ├── db.ts                             # Neon read-index
 │   ├── llm.ts                            # model-routed LLM call
 │   ├── mimir-abi.ts                      # generated ABI + state constants
-│   ├── wagmi-config.ts                   # BOT Chain wagmi config
+│   ├── wagmi-config.ts                   # Base Sepolia wagmi config (Base Account first)
 │   ├── wallet.tsx                        # frontend wallet context (connector picker)
 │   └── server/                           # server-only modules (DB writers, etc.)
 ├── components/
@@ -495,8 +519,8 @@ mimir-botchain/
 
 ### Prerequisites
 
-- Node.js 20+
-- A wallet with testnet BOT from [faucet.botchain.ai/basic](https://faucet.botchain.ai/basic) (10 tBOT/day, free)
+- Node.js 22+
+- A wallet with Base Sepolia ETH (gas) and test USDC (stakes) from the [CDP faucet](https://portal.cdp.coinbase.com/products/faucet), free
 - At least one LLM API key configured in `.env.local`
 - Optional: a Neon account at [console.neon.tech](https://console.neon.tech) for the read-index
 
@@ -520,8 +544,8 @@ Two small, idempotent scripts. Each one updates `.env.local` in-place when it su
 #    COUNCIL_<SLUG>_ADDRESS block (web) into .env.local. Existing keys are kept.
 npm run agents:create-wallets
 
-# 2. Claim testnet BOT for your master wallet at https://faucet.botchain.ai/basic,
-#    then distribute it to every agent wallet on-chain.
+# 2. Claim test USDC + a little Base Sepolia ETH for your master wallet at
+#    https://portal.cdp.coinbase.com/products/faucet, then distribute to every agent.
 FUNDER_PRIVATE_KEY=0x... npm run agents:fund
 
 # 3. Verify balances.
@@ -534,7 +558,7 @@ npm run agents:balances
 DEPLOYER_PRIVATE_KEY=0x... ORACLE_ADDRESS=0x... npm run deploy:contract
 ```
 
-The script deploys the pre-compiled `artifacts/Mimir.bin` bytecode (compile `contracts/Mimir.sol` with solc 0.8.28, `viaIR: true`), with the oracle address as the only constructor arg, prints the BOTScan link, and reminds you to set `NEXT_PUBLIC_CONTRACT_ADDRESS` in `.env.local`.
+The script deploys the pre-compiled `artifacts/Mimir.bin` bytecode (compile `contracts/Mimir.sol` with solc 0.8.28, `viaIR: true`), with the oracle address as the only constructor arg, prints the USDCScan link, and reminds you to set `NEXT_PUBLIC_CONTRACT_ADDRESS` in `.env.local`.
 
 ### Run the app
 
@@ -566,7 +590,7 @@ What it does:
 
 ```mermaid
 flowchart TB
-    A[market-creator wallet<br/>createClaim BTC > $100k<br/>2 BOT, 150s deadline] --> B[oracle wallet<br/>challengeClaim<br/>2 BOT counter-stake]
+    A[market-creator wallet<br/>createClaim BTC > $100k<br/>2 USDC, 150s deadline] --> B[oracle wallet<br/>challengeClaim<br/>2 USDC counter-stake]
     B --> C{wait ~170s}
     C --> D[oracle fetches CoinGecko<br/>BTC USD spot]
     D --> E[LLM layer evaluates evidence<br/>CHALLENGERS_WIN or CREATOR_WINS]
@@ -574,7 +598,7 @@ flowchart TB
     F --> G[contract pays winning side<br/>balances reconcile on-chain]
 ```
 
-The script prints the BOTScan URL for every transaction so you can verify each step on chain.
+The script prints the USDCScan URL for every transaction so you can verify each step on chain.
 
 ---
 
@@ -600,7 +624,7 @@ flowchart LR
         DB[(Postgres pooler)]
     end
 
-    subgraph botchain[BOT Chain Testnet]
+    subgraph base[Base Sepolia]
         CT[Mimir.sol]
     end
 
@@ -651,7 +675,11 @@ Every env var lives in `.env.example`. Quick reference:
 | --------------------------------- | ------------------------ | ---------------------------------------------------------------------------------- |
 | `NEXT_PUBLIC_CONTRACT_ADDRESS`    | frontend + agents        | Set after `npm run deploy:contract`                                                |
 | `NEXT_PUBLIC_DEPLOY_BLOCK`        | frontend + agents        | Block the contract was deployed at; log scans start here (default 0)               |
-| `NEXT_PUBLIC_BASE_RPC_URL` / `BASE_RPC_URL` | frontend / server reads | Optional override; defaults to `https://rpc.bohr.life`                  |
+| `NEXT_PUBLIC_BASE_RPC_URL` / `BASE_RPC_URL` | frontend / server reads | Defaults to the public `https://sepolia.base.org`, which is rate-limited — **required** in any deployed environment |
+| `NEXT_PUBLIC_USDC_ADDRESS`        | frontend + agents        | Defaults to Circle's Base Sepolia USDC; override only for a local fork             |
+| `X402_NETWORK`                    | paid endpoints           | CAIP-2 id; default `eip155:84532`                                                  |
+| `X402_FACILITATOR_URL`            | paid endpoints           | Default `https://x402.org/facilitator`; use CDP for staging/production             |
+| `CDP_API_KEY_ID` / `CDP_API_KEY_SECRET` | paid endpoints     | CDP facilitator auth. Server-side only — never `NEXT_PUBLIC_`                       |
 | `ORACLE_PRIVATE_KEY`              | oracle (worker)          | The oracle's local key — its address is the contract's `oracle` role               |
 | `CREATOR_PRIVATE_KEY`             | market-creator (worker)  | The market-creator's local key                                                     |
 | `SELLER_ADDRESS`                  | web server               | Default recipient for paid-endpoint payments (usually the oracle address)          |
@@ -679,13 +707,13 @@ Every env var lives in `.env.example`. Quick reference:
 | `COUNCIL_MAX_CLAIMS`              | council (worker)         | Max claims per cycle, deadline-sorted (default 1). Raise only with paid quota.     |
 | `COUNCIL_DECISION_DELAY_MS`       | council (worker)         | Delay between persona decisions/stakes; default `30000`                            |
 | `COUNCIL_LLM_THROTTLE_MS`         | council (worker)         | Min ms between LLM calls (default 8000)                                             |
-| `COUNCIL_PEER_READS`              | council (worker)         | `1` lets personas buy other personas' reasoning over HTTP 402 before deciding          |
+| `COUNCIL_PEER_READS`              | council (worker)         | `1` lets personas buy other personas' reasoning over x402 before deciding          |
 | `COUNCIL_PEER_READS_PER_PERSONA`  | council (worker)         | Peer reads bought before each persona decision; default `2`                         |
 | `COUNCIL_PEER_READ_DELAY_MS`      | council (worker)         | Delay between peer-read nanopayments; default `15000`                               |
-| `COUNCIL_PEER_READ_CAP_USDC`      | council (worker)         | Max accepted HTTP 402 quote per peer read; default `0.003` BOT                         |
+| `COUNCIL_PEER_READ_CAP_USDC`      | council (worker)         | Max accepted quote per peer read, in USDC; default `0.003`                          |
 | `COUNCIL_SETTLEMENT`              | oracle                   | `1` settles by council tally instead of the solo oracle verdict                     |
 | `COUNCIL_QUORUM`                  | oracle                   | Min decisive juror votes before the council verdict is used; default `3`            |
-| `COUNCIL_VOTE_CAP_USDC`           | oracle                   | Max accepted HTTP 402 quote per settlement vote; default `0.005`                        |
+| `COUNCIL_VOTE_CAP_USDC`           | oracle                   | Max accepted quote per settlement vote, in USDC; default `0.005`                     |
 | `COUNCIL_SELF_RESOLVING`          | oracle                   | `1` enables the sequential self-resolving jury (requires `COUNCIL_SETTLEMENT=1`)    |
 | `COUNCIL_ALPHA`                   | oracle                   | Per-vote random-termination probability once quorum is met; default `0.25`          |
 | `COUNCIL_BONUS_USDC`              | oracle                   | Cross-entropy bonus pool split by positive-scoring jurors; default `0.01`           |
@@ -705,7 +733,7 @@ Every env var lives in `.env.example`. Quick reference:
 | `npm run agents:create-wallets`             | Generate 12 local EOAs (oracle + creator + 10 council) into `.env.local`           |
 | `npm run agents:fund`                        | Fund agent wallets from `FUNDER_PRIVATE_KEY` (faucet tops up the funder only)      |
 | `npm run agents:balances`                    | Print oracle + creator + council balances                                          |
-| `npm run deploy:contract`                    | Compile + deploy `Mimir.sol` to BOT Chain Testnet                                  |
+| `npm run deploy:contract`                    | Compile + deploy `Mimir.sol` to Base Sepolia                                       |
 | `npm run test:smoke`                         | Node-native smoke tests (API validation, XMTP, db-index, etc.)                     |
 | `npm run warm:vs-index`                      | Rebuild the Neon read-index from current on-chain state                            |
 | `npm run seed` / `npm run seed:dry`          | Seed demo claims (live / dry-run)                                                  |
@@ -728,18 +756,18 @@ Pool Market is the current pari-mutuel mode. The creator's stake forms one side 
 Example:
 
 ```text
-Creator stakes YES: 10 BOT
-10 challengers stake NO: 10 BOT each
-Total challenger side: 100 BOT
-Total pot: 110 BOT
+Creator stakes YES: 10 USDC
+10 challengers stake NO: 10 USDC each
+Total challenger side: 100 USDC
+Total pot: 110 USDC
 
 If NO wins:
-Each challenger receives 10 + (10 / 100 * 10) = 11 BOT
-Each challenger's net profit: 1 BOT
+Each challenger receives 10 + (10 / 100 * 10) = 11 USDC
+Each challenger's net profit: 1 USDC
 
 If YES wins:
-Creator receives 110 BOT
-Creator net profit: 100 BOT
+Creator receives 110 USDC
+Creator net profit: 100 USDC
 ```
 
 Why it matters:
@@ -757,7 +785,7 @@ Product work:
 
 Risks:
 
-- Casual users may dislike staking 10 BOT to win only 1 BOT when joining a crowded side.
+- Casual users may dislike staking 10 USDC to win only 1 USDC when joining a crowded side.
 - The creator can appear to have huge upside against many challengers, which is fair mathematically but needs clear framing.
 - UI must distinguish total payout from net profit at every step.
 
@@ -770,10 +798,10 @@ Duel is the simplest social format: one creator, one challenger, matched stake, 
 Default rules:
 
 ```text
-Creator stakes 10 BOT
-Challenger stakes 10 BOT
-Winner receives 20 BOT
-Net profit: 10 BOT
+Creator stakes 10 USDC
+Challenger stakes 10 USDC
+Winner receives 20 USDC
+Net profit: 10 USDC
 Draw / unresolvable: both refunded
 ```
 
@@ -781,7 +809,7 @@ Why it matters:
 
 - Extremely easy to understand.
 - Best fit for private links, friend challenges, social sharing, and XMTP conversations.
-- Avoids the "why did I only win 1 BOT?" problem from crowded pool markets.
+- Avoids the "why did I only win 1 USDC?" problem from crowded pool markets.
 
 Product work:
 
@@ -805,19 +833,19 @@ Risks:
 
 **Status:** partially supported by contract, needs product constraints.
 
-Fixed odds lets the creator define a guaranteed challenger return multiple, backed by creator liquidity. Example: a 2x challenger payout means a winning challenger who stakes 10 BOT receives 20 BOT total. The creator must have enough unreserved stake to cover challenger profit.
+Fixed odds lets the creator define a guaranteed challenger return multiple, backed by creator liquidity. Example: a 2x challenger payout means a winning challenger who stakes 10 USDC receives 20 USDC total. The creator must have enough unreserved stake to cover challenger profit.
 
 Example:
 
 ```text
-Creator deposits liquidity: 100 BOT
+Creator deposits liquidity: 100 USDC
 Fixed odds: 2.00x
-Challenger stakes: 10 BOT
+Challenger stakes: 10 USDC
 
 If challenger wins:
-Challenger receives 20 BOT total
-10 BOT is their returned stake
-10 BOT profit comes from creator liquidity
+Challenger receives 20 USDC total
+10 USDC is their returned stake
+10 USDC profit comes from creator liquidity
 
 If creator wins:
 Creator keeps the challenger stake
@@ -856,8 +884,8 @@ Underdog Boost is a discovery and incentive layer for the less-funded side. The 
 Example signals:
 
 ```text
-YES pool: 10 BOT
-NO pool: 100 BOT
+YES pool: 10 USDC
+NO pool: 100 USDC
 Joining YES has high upside if YES wins.
 Joining NO has low upside but follows consensus.
 ```
@@ -1041,4 +1069,4 @@ AGPL-3.0 — see [`LICENSE`](./LICENSE).
 Mimir is source-available. You can use, study, modify, and share it freely.
 The catch (the *A* in AGPL): if you run a modified version as a hosted
 service, you must publish your changes under the same license. That keeps
-oracle-side modifications visible to users staking BOT against the agent.
+oracle-side modifications visible to users staking USDC against the agent.
