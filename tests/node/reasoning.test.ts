@@ -151,8 +151,8 @@ test("unknown stages and positions are rejected", () => {
 });
 
 test("verdicts map onto feed positions", () => {
-  assert.equal(positionFromVerdict("CREATOR"), "creator");
-  assert.equal(positionFromVerdict("CHALLENGERS"), "challengers");
+  assert.equal(positionFromVerdict("CREATOR_WINS"), "creator");
+  assert.equal(positionFromVerdict("CHALLENGERS_WIN"), "challengers");
   assert.equal(positionFromVerdict("DRAW"), "draw");
   assert.equal(positionFromVerdict("UNRESOLVABLE"), "unresolvable");
 });

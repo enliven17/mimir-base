@@ -140,9 +140,9 @@ export function isReasoningPosition(value: string): value is ReasoningPosition {
 /** Map an oracle/juror verdict onto a feed position. */
 export function positionFromVerdict(verdict: Verdict): ReasoningPosition {
   switch (verdict) {
-    case "CREATOR":
+    case "CREATOR_WINS":
       return "creator";
-    case "CHALLENGERS":
+    case "CHALLENGERS_WIN":
       return "challengers";
     case "DRAW":
       return "draw";
