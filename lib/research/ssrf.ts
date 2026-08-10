@@ -204,7 +204,13 @@ export function parseDomainList(raw: string | undefined): string[] {
     .filter(Boolean);
 }
 
-export function domainPolicyFromEnv(env = process.env): DomainPolicy {
+/**
+ * Reads the operator policy. The parameter is a plain record rather than
+ * NodeJS.ProcessEnv so tests can pass just the two keys that matter.
+ */
+export function domainPolicyFromEnv(
+  env: Record<string, string | undefined> = process.env,
+): DomainPolicy {
   return {
     allow: parseDomainList(env.RESEARCH_ALLOWED_DOMAINS),
     deny: parseDomainList(env.RESEARCH_DENIED_DOMAINS),

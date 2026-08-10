@@ -209,6 +209,6 @@ test("domain lists are parsed from env, trimmed and lowercased", () => {
   const policy = domainPolicyFromEnv({
     RESEARCH_ALLOWED_DOMAINS: "coingecko.com",
     RESEARCH_DENIED_DOMAINS: "evil.com",
-  } as NodeJS.ProcessEnv);
+  });
   assert.deepEqual(policy, { allow: ["coingecko.com"], deny: ["evil.com"] });
 });
