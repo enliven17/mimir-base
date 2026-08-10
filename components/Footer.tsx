@@ -12,7 +12,7 @@ export default function Footer() {
                 Mimir<span className="text-pv-emerald">.</span>
               </span>
               <p className="mt-2 font-mono text-[13px] leading-relaxed text-pv-muted">
-                AI-settled claim markets on BOT Chain. Stand behind your claim —
+                AI-settled claim markets on Base. Stand behind your claim —
                 Mimir settles stakes on-chain in USDC.
               </p>
             </div>

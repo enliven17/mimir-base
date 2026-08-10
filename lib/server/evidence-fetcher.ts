@@ -40,7 +40,7 @@ export type EvidenceFetcherKind = "coingecko-api" | "direct" | "jina" | "bot-pai
 
 /** What the agent paid to obtain a paywalled evidence source. */
 export interface EvidencePayment {
-  /** Price in wei (18dp BOT). */
+  /** Price in USDC atomic units (6dp). */
   priceUnits: string;
   /** On-chain transfer hash proving the payment. */
   txHash: string;
@@ -63,7 +63,7 @@ export interface EvidenceSnapshot {
   fetchedAt: number;
   /** Which path produced this snapshot. Callers can use this to gate trust. */
   fetcher: EvidenceFetcherKind;
-  /** Set when the source was paywalled and the agent paid in BOT. */
+  /** Set when the source was paywalled and the agent paid in USDC. */
   payment?: EvidencePayment;
 }
 
@@ -85,7 +85,7 @@ export interface FetchEvidenceOptions {
   disableJinaFallback?: boolean;
   /**
    * When set, a 402 Payment Required from the source is paid via this budgeted
-   * fetch (native BOT payment) instead of failing. The caller owns the budget cap
+   * fetch (x402 USDC payment) instead of failing. The caller owns the budget cap
    * and the paying wallet — see lib/x402/buyer.ts fetchWithBudget. Absent → 402 behaves
    * like any other error (falls through to Jina / failure).
    */
@@ -130,7 +130,7 @@ async function fetchGenericSnapshot(
 
   const direct = await tryDirectFetch(url, { timeoutMs, userAgent });
 
-  // Paywalled source: the agent pays the HTTP 402 BOT nanopayment and re-fetches.
+  // Paywalled source: the agent pays the x402 USDC nanopayment and re-fetches.
   if (direct.statusCode === 402 && opts.paidFetch) {
     const paid = await fetchViaHttp402(url, opts.paidFetch, { maxChars });
     if (paid) return paid;

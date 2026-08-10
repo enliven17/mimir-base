@@ -1627,7 +1627,7 @@ export default function CreatePage() {
                         className="shrink-0 font-display text-[10px] font-bold leading-none tracking-tight text-inherit sm:text-[11px]"
                         aria-hidden
                       >
-                        BOT
+                        USDC
                       </span>
                     )}
                   </div>

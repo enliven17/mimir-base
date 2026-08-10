@@ -357,7 +357,7 @@ export default async function AgentsPage({
             <div className="mt-4 grid grid-cols-3 gap-3 text-sm">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-emerald/80">Balance</div>
-                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToEth(agentInfo.oracleBal).toFixed(2)} <span className="text-xs text-pv-muted">BOT</span></div>
+                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToEth(agentInfo.oracleBal).toFixed(2)} <span className="text-xs text-pv-muted">ETH</span></div>
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-emerald/80">Settled</div>
@@ -389,7 +389,7 @@ export default async function AgentsPage({
             <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-text/60">Balance</div>
-                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToEth(agentInfo.ownerBal).toFixed(2)} <span className="text-xs text-pv-muted">BOT</span></div>
+                <div className="mt-0.5 font-display text-base font-bold tabular-nums text-pv-text">{weiToEth(agentInfo.ownerBal).toFixed(2)} <span className="text-xs text-pv-muted">ETH</span></div>
               </div>
               <div>
                 <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-pv-text/60">Markets opened</div>

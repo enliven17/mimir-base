@@ -4,7 +4,7 @@
  * Claim fields (question, positions, settlement rule, resolution URL …) come
  * straight from permissionless on-chain `createClaim` calldata, and web
  * evidence comes from an attacker-chosen URL. All of it is UNTRUSTED DATA that
- * must never be able to steer an LLM whose output moves real BOT.
+ * must never be able to steer an LLM whose output moves real USDC.
  *
  * Two layers:
  *  1. `fenceUntrusted` wraps content in a delimited block and strips any

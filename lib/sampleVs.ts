@@ -3,7 +3,7 @@ import type { VSData } from "@/lib/contract";
 /**
  * Demo VS data was used to seed the UI before real on-chain markets existed.
  * Now empty — the homepage, explorer, and detail pages render only real claims
- * read from the BOT Chain contract / Neon read-index.
+ * read from the Mimir contract on Base / Neon read-index.
  *
  * The negative-id branches scattered through vs/[id]/page.tsx are dead at
  * runtime (no negative ids ever match) but kept in place to avoid a noisy

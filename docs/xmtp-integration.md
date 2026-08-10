@@ -55,7 +55,7 @@ Base URL: `https://docs.xmtp.org`
 | File | Role |
 |------|------|
 | [`app/layout.tsx`](../app/layout.tsx) | `WalletProvider` wraps `{children}` + Toaster; the entire app tree has wallet context. |
-| [`lib/wallet.tsx`](../lib/wallet.tsx) | Context: `address`, `isConnected`, `connect`, `disconnect`, `error`; wagmi v3 on BOT Chain (connector picker + switchChain). |
+| [`lib/wallet.tsx`](../lib/wallet.tsx) | Context: `address`, `isConnected`, `connect`, `disconnect`, `error`; wagmi v3 on Base Sepolia (connector picker + switchChain). |
 
 **XMTP implication:** The `Signer` EOA must use the same EIP-1193 provider and address exposed by `useWallet()`. The XMTP signature is implemented in `lib/xmtp/` and imported only from client components.
 

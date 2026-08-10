@@ -7,6 +7,7 @@ import {
   isContractConfigured,
   paginatedGetLogs,
   weiToEth,
+  BASE_EXPLORER_URL,
   getExplorerAddressUrl,
   getExplorerTxUrl,
 } from "@/lib/base";
@@ -595,9 +596,9 @@ export default async function StatsPage() {
         <h3 className="mb-4 font-display text-lg font-bold tracking-tight text-pv-text">Get testnet ETH</h3>
         <div className="grid gap-3 sm:grid-cols-3">
           {[
-            { label: "BOT Faucet",      href: "https://faucet.botchain.ai/basic",  desc: "Testnet ETH on ETH Chain (10 tBOT / day)" },
-            { label: "BOT Explorer",    href: "https://scan.bohr.life",            desc: "Inspect contract activity" },
-            { label: "BOT Chain Docs",  href: "https://dev-docs.botchain.ai",      desc: "Network, RPC and developer guides" },
+            { label: "Base Faucet",     href: "https://portal.cdp.coinbase.com/products/faucet", desc: "Base Sepolia ETH for gas + test USDC" },
+            { label: "BaseScan",        href: BASE_EXPLORER_URL,                   desc: "Inspect contract activity" },
+            { label: "Base Docs",       href: "https://docs.base.org",             desc: "Network, RPC and developer guides" },
           ].map(({ label, href, desc }) => {
             const isExternal = href.startsWith("http");
             const linkProps = isExternal

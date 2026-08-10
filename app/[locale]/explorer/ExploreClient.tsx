@@ -1201,7 +1201,7 @@ export default function ExploreClient() {
                               : filterPillInactive
                           }`}
                         >
-                          {value === 0 ? t("any") : `${value}+ BOT`}
+                          {value === 0 ? t("any") : `${value}+ USDC`}
                         </button>
                       ))}
                     </div>
