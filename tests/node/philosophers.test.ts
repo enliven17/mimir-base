@@ -9,7 +9,7 @@ import {
   philosopherAddressEnv,
   philosopherPrivateKeyEnv,
 } from "../../agents/council/philosophers";
-import { COUNCIL_PERSONAS } from "../../agents/council/personas";
+import { COUNCIL_PERSONAS, personaPrivateKeyEnv } from "../../agents/council/personas";
 
 test("the philosopher jury is non-empty and every member is tagged", () => {
   assert.ok(PHILOSOPHER_PERSONAS.length >= 6);
@@ -169,4 +169,35 @@ test("activePhilosophers narrows to a csv subset and ignores unknown slugs", () 
     subset.map((p) => p.slug),
     ["socrates", "lao-tzu"],
   );
+});
+
+// ── Wallet env namespacing ────────────────────────────────────────────────────
+
+test("no philosopher shares a slug with a classic persona", () => {
+  // Both tracks derive COUNCIL_<SLUG>_PRIVATE_KEY from the slug, so a collision
+  // would silently hand two personas the same wallet — and the same money.
+  const classic = new Set(COUNCIL_PERSONAS.map((p) => p.slug));
+  for (const philosopher of PHILOSOPHER_PERSONAS) {
+    assert.equal(
+      classic.has(philosopher.slug),
+      false,
+      `${philosopher.slug} collides with a classic persona`,
+    );
+  }
+});
+
+test("every persona across both tracks maps to a distinct key env", () => {
+  const envs = [
+    ...COUNCIL_PERSONAS.map((p) => personaPrivateKeyEnv(p)),
+    ...PHILOSOPHER_PERSONAS.map((p) => philosopherPrivateKeyEnv(p.slug)),
+  ];
+  assert.equal(new Set(envs).size, envs.length);
+});
+
+test("a hyphenated slug becomes a valid env name", () => {
+  // lao-tzu must not produce COUNCIL_LAO-TZU_PRIVATE_KEY, which no shell exports.
+  assert.equal(philosopherPrivateKeyEnv("lao-tzu"), "COUNCIL_LAO_TZU_PRIVATE_KEY");
+  for (const persona of PHILOSOPHER_PERSONAS) {
+    assert.match(philosopherPrivateKeyEnv(persona.slug), /^COUNCIL_[A-Z0-9_]+_PRIVATE_KEY$/);
+  }
 });

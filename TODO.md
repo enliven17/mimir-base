@@ -158,17 +158,17 @@ göremez.
 
 ## 04. Philosopher council track — P1
 
-- [ ] Persona registry'ye şu ilk-prensip arketiplerini ekle: Stoic, Skeptic,
+- [x] Persona registry'ye şu ilk-prensip arketiplerini ekle: Stoic, Skeptic,
   Utilitarian, Deontologist, Pragmatist ve Bayesian Epistemologist.
-- [ ] Her persona için ayrı public wallet/agent identity, açıklanabilir decision
+- [x] Her persona için ayrı public wallet/agent identity, açıklanabilir decision
   rubric, risk limiti ve kategori kapsamı tanımla.
-- [ ] “Felsefi stil” ile rastgele karşıtlık üretmeyi ayır; aynı evidence üzerinde
+- [x] “Felsefi stil” ile rastgele karşıtlık üretmeyi ayır; aynı evidence üzerinde
   farklı normatif/epistemik çerçeveler kullan.
-- [ ] Persona prompt versiyonlarını ve evaluation fixture'larını version-control et.
-- [ ] Mevcut council ile philosopher track'i ayrı filtrele; kombine consensus'u
+- [x] Persona prompt versiyonlarını ve evaluation fixture'larını version-control et.
+- [x] Mevcut council ile philosopher track'i ayrı filtrele; kombine consensus'u
   ayrıca hesapla.
 - [ ] Her persona için minimum calibration seti, bias testi ve tutarlılık testi ekle.
-- [ ] Wallet funding ve x402 bütçelerini persona bazında sınırla.
+- [x] Wallet funding ve x402 bütçelerini persona bazında sınırla.
 - [ ] Sabit `COUNCIL_PERSONAS` dizisini ileride BYOA registry okuyabilecek adapter
   arkasına al.
 

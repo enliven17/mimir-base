@@ -1,6 +1,8 @@
 /**
- * Generate the twelve Mimir agent wallets in one pass:
- *   ORACLE_PRIVATE_KEY, CREATOR_PRIVATE_KEY, COUNCIL_<SLUG>_PRIVATE_KEY ×10
+ * Generate every Mimir agent wallet in one pass:
+ *   ORACLE_PRIVATE_KEY, CREATOR_PRIVATE_KEY,
+ *   COUNCIL_<SLUG>_PRIVATE_KEY ×10 (classic jury)
+ *   COUNCIL_<SLUG>_PRIVATE_KEY ×10 (philosopher jury)
  *
  *   npx tsx scripts/create-agent-wallets.ts           # print the env block
  *   npx tsx scripts/create-agent-wallets.ts --write   # upsert into .env.local
@@ -20,6 +22,11 @@ import {
   personaPrivateKeyEnv,
   personaAddressEnv,
 } from "../agents/council/personas";
+import {
+  PHILOSOPHER_PERSONAS,
+  philosopherAddressEnv,
+  philosopherPrivateKeyEnv,
+} from "../agents/council/philosophers";
 
 const ENV_PATH = ".env.local";
 const WRITE = process.argv.includes("--write");
@@ -60,6 +67,15 @@ function main(): void {
   make("CREATOR_PRIVATE_KEY", "market-creator");
   for (const persona of COUNCIL_PERSONAS) {
     make(personaPrivateKeyEnv(persona), `council:${persona.slug}`, personaAddressEnv(persona));
+  }
+  // The philosopher jury gets its own wallets, so a philosopher's budget and its
+  // record are separable from a classic persona's rather than pooled.
+  for (const persona of PHILOSOPHER_PERSONAS) {
+    make(
+      philosopherPrivateKeyEnv(persona.slug),
+      `philosopher:${persona.slug}`,
+      philosopherAddressEnv(persona.slug),
+    );
   }
 
   // Address block for the web server: default payment recipient = oracle.

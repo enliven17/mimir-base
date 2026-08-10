@@ -24,11 +24,19 @@ import {
   COUNCIL_PERSONAS,
   personaPrivateKeyEnv,
 } from "../agents/council/personas";
+import {
+  PHILOSOPHER_PERSONAS,
+  philosopherPrivateKeyEnv,
+} from "../agents/council/philosophers";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
 
 const GAS_ETH = parseEther(process.env.FUND_GAS_ETH ?? "1");
 const USDC_CORE = usdcToUnits(Number(process.env.FUND_AMOUNT_USDC ?? "20"));
 const USDC_COUNCIL = usdcToUnits(Number(process.env.FUND_COUNCIL_AMOUNT_USDC ?? "10"));
+
+function bigintMin(a: bigint, b: bigint): bigint {
+  return a < b ? a : b;
+}
 
 async function main(): Promise<void> {
   const funderKey = process.env.FUNDER_PRIVATE_KEY ?? process.env.DEPLOYER_PRIVATE_KEY;
@@ -66,6 +74,21 @@ async function main(): Promise<void> {
   addTarget("market-creator", "CREATOR_PRIVATE_KEY", USDC_CORE);
   for (const persona of COUNCIL_PERSONAS) {
     addTarget(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDC_COUNCIL);
+  }
+  // Each philosopher is funded to its own declared stake limit rather than the
+  // shared council figure: a persona whose rubric routinely abstains does not need
+  // the same float as one that stakes on every claim.
+  for (const persona of PHILOSOPHER_PERSONAS) {
+    addTarget(
+      `philosopher:${persona.slug}`,
+      philosopherPrivateKeyEnv(persona.slug),
+      // Atomic units on both sides of the min: mixing USDC and units here would
+      // fund a persona a millionth of what it needs.
+      bigintMin(
+        USDC_COUNCIL,
+        usdcToUnits(persona.limits.maxStakeUsdc * persona.limits.maxClaimsPerCycle),
+      ),
+    );
   }
 
   const funderEth = await publicClient.getBalance({ address: funder.address });

@@ -7,6 +7,11 @@
 import { privateKeyToAccount } from "viem/accounts";
 import { createBasePublicClient, weiToEth, getExplorerAddressUrl } from "../lib/base";
 import { COUNCIL_PERSONAS, personaPrivateKeyEnv, personaAddressEnv } from "../agents/council/personas";
+import {
+  PHILOSOPHER_PERSONAS,
+  philosopherAddressEnv,
+  philosopherPrivateKeyEnv,
+} from "../agents/council/philosophers";
 import { ERC20_ABI, USDC_ADDRESS, unitsToUsdc } from "../lib/usdc";
 
 function addressFromKeyEnv(keyEnv: string): `0x${string}` | null {
@@ -28,6 +33,12 @@ async function main(): Promise<void> {
       addressFromKeyEnv(personaPrivateKeyEnv(persona)) ??
       (process.env[personaAddressEnv(persona)] as `0x${string}` | undefined);
     if (addr) rows.push({ label: `council:${persona.slug}`, address: addr });
+  }
+  for (const persona of PHILOSOPHER_PERSONAS) {
+    const addr =
+      addressFromKeyEnv(philosopherPrivateKeyEnv(persona.slug)) ??
+      (process.env[philosopherAddressEnv(persona.slug)] as `0x${string}` | undefined);
+    if (addr) rows.push({ label: `philosopher:${persona.slug}`, address: addr });
   }
 
   if (rows.length === 0) {
