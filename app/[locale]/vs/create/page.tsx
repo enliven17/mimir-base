@@ -23,6 +23,7 @@ import {
 } from "@/lib/contract";
 import { removePendingVS, savePendingVS, type PendingVS } from "@/lib/pending-vs";
 import { acquireTxLock } from "@/lib/tx-lock";
+import { rematchReadiness, type RematchReadiness } from "@/lib/series";
 import {
   CATEGORIES,
   CATEGORY_GUIDANCE,
@@ -264,6 +265,45 @@ export default function CreatePage() {
     settlementRule.trim() === recommendedSettlementTemplate.trim();
   const ticketSettlementPreview =
     settlementRule.trim() || recommendedSettlementTemplate;
+  /**
+   * What the user must revisit before re-running a market.
+   *
+   * Read from the LIVE form fields, not from the parent: the point is to clear the
+   * warning by fixing it here, and checking the parent would leave the banner up
+   * however good the correction was. Deadline and stake are always re-chosen, so
+   * they are dropped — listing them as problems would cry wolf on every rematch.
+   */
+  const rematchNeedsReview = useMemo(() => {
+    if (!rematchId || !rematchSource) return [];
+    return rematchReadiness({
+      question,
+      creatorPosition: creatorPos,
+      counterPosition: opponentPos,
+      resolutionUrl: url,
+      category,
+      marketType,
+      oddsMode: "pool",
+      challengerPayoutBps: 0,
+      handicapLine: "",
+      settlementRule,
+      maxChallengers: 1,
+      isPrivate: visibility === "private",
+    }).needsReview.filter(
+      (field): field is RematchReadiness["needsReview"][number] =>
+        field !== "deadline" && field !== "stake",
+    );
+  }, [
+    rematchId,
+    rematchSource,
+    question,
+    creatorPos,
+    opponentPos,
+    url,
+    category,
+    marketType,
+    settlementRule,
+    visibility,
+  ]);
   const ticketDraftId = useMemo(() => {
     const s = `${question}|${creatorPos}|${stake}|${marketType}|pool`;
     let h = 2166136261;
@@ -1163,6 +1203,16 @@ export default function CreatePage() {
                       ? t("rematchHint")
                       : t("rematchPending")}
                   </p>
+                  {/* A vague settlement rule or a missing source is what made the
+                      first round contentious; inheriting it silently reproduces the
+                      argument. Named explicitly so the user fixes it here. */}
+                  {rematchNeedsReview.length > 0 && (
+                    <ul className="mt-3 space-y-1 text-sm text-amber-200">
+                      {rematchNeedsReview.map((field) => (
+                        <li key={field}>{t(`rematchReview_${field}`)}</li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
               </div>
             </GlassCard>

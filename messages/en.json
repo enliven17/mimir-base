@@ -271,6 +271,8 @@
     "rematchEyebrow": "Rivalry Mode",
     "rematchFrom": "Rematch of claim #{id}",
     "rematchHint": "The original terms have been prefilled. Adjust anything before publishing the rematch.",
+    "rematchReview_settlementRule": "Write a settlement rule before re-running this — the inherited one is too vague to settle cleanly.",
+    "rematchReview_resolutionUrl": "Add a resolution source URL. The inherited market has none to check against.",
     "rematchLoading": "Loading the original market terms...",
     "rematchPending": "We will reuse the prior market terms once the original claim loads.",
     "rematchNotFound": "Original claim not found",

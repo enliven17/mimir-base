@@ -281,9 +281,9 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 - [x] Settled VS sayfasında tüm parent/child zincirini görünür yap.
 - [x] Read-index'te cycle guard ile rivalry root, round number ve seri skorunu
   hesapla.
-- [ ] `Run it back`, Best of 3, Best of 5 akışlarında question/source/rule
+- [x] `Run it back`, Best of 3, Best of 5 akışlarında question/source/rule
   metadata'sını devral; stake ve deadline'ı yeniden seçtir.
-- [ ] Zayıf settlement rule'u otomatik kopyalamadan önce kullanıcıya düzeltme
+- [x] Zayıf settlement rule'u otomatik kopyalamadan önce kullanıcıya düzeltme
   adımı göster.
 - [ ] Aynı parent'tan paralel rematch oluşması için branch/series policy belirle.
 
