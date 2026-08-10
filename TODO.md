@@ -26,9 +26,11 @@ ajanların market açabildiği, araştırabildiği, pozisyon alabildiği ve geli
   kesme.
 - [ ] “Underdog” etiketini kazanma olasılığı iddiası olarak değil, yalnızca payout
   asimetrisi olarak göster.
-- [ ] USYC'yi Base üzerinde varmış veya herkese açıkmış gibi tasarlama. Güncel
-  Circle dokümanına göre USYC Base'de desteklenmiyor ve yatırımcı uygunluk
-  kısıtları var; agent baskets MVP'sinde idle bakiye USDC kalacak.
+- [x] **KARAR (2026-08-10): Tek değer birimi Base üzerindeki USDC.** USYC ve
+  benzeri tokenize yield/RWA ürünleri kapsam dışıdır — araştırma kapısı da dahil
+  tamamen kaldırıldı. USDC'yi Circle ihraç ediyor, fakat Mimir Circle ile ticari
+  bir entegrasyon veya ortaklık kurmaz: yalnızca standart ERC-20 USDC kontratını
+  okur. Idle bakiye USDC olarak durur; hiçbir yüzeyde yield vaat edilmez.
 
 ## 1. Önce veri modelini düzelt: üç ayrı eksen
 
@@ -421,6 +423,7 @@ sonra execution yapılamaz; copy loop veya fee loop oluşamaz.
 
 ## 09. Agent baskets — P2, en son
 
+- [ ] Idle sermaye USDC olarak durur; yield/RWA katmanı yok (bkz. §0 kararı).
 - [ ] Önce salt okunur “virtual basket” prototipi kur: seçili agent ağırlıkları,
   backtest, drawdown, category/mode exposure ve simulated NAV.
 - [ ] Gerçek para MVP'si için non-custodial vault mimarisini değerlendir; ERC-4626
@@ -433,14 +436,6 @@ sonra execution yapılamaz; copy loop veya fee loop oluşamaz.
 - [ ] Emergency withdrawal'ın agent executor ve oracle'dan bağımsız çalışmasını sağla.
 - [ ] Audit, legal/custody, sanctions/eligibility ve mainnet launch review tamamlanmadan
   gerçek fon kabul etme.
-
-### USYC araştırma kapısı
-
-- [ ] USYC'yi Base roadmap varsayımından çıkar; güncel resmi chain support tekrar
-  doğrulanmadan entegrasyon kodu yazma.
-- [ ] Yatırımcı uygunluğu, minimum subscription, redemption, transfer allowlist,
-  smart-contract composability ve Base bridge riskleri için hukuk/ürün kararı al.
-- [ ] Bu kapı geçilmezse idle capital = USDC; UI'da yield sözü verme.
 
 **Kabul kriteri:** Basket fonları ve getirileri her an yeniden hesaplanabilir;
 kullanıcı riskleri görür ve exit yolu tek bir ajanın çalışmasına bağlı değildir.
@@ -631,7 +626,6 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 - [ ] Gerçek Squad vs Squad kontratı.
 - [ ] Agent baskets virtual prototype.
 - [ ] Non-custodial basket vault ve yasal/security review.
-- [ ] USYC yalnız chain support + eligibility kapısı geçerse yeniden değerlendirilir.
 
 ## 14. Launch gates
 
@@ -674,7 +668,5 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
   <https://docs.x402.org/getting-started/quickstart-for-sellers>
 - x402 buyer discovery ve payment schemes:
   <https://docs.x402.org/getting-started/quickstart-for-buyers>
-- Circle USYC eligibility:
-  <https://developers.circle.com/tokenized/usyc/overview>
-- Circle supported chains/tokens (USYC Base desteği kontrolü):
-  <https://developers.circle.com/cctp/concepts/supported-chains-and-domains>
+- Circle USDC contract addresses (yalnızca adres doğrulaması için):
+  <https://developers.circle.com/stablecoins/usdc-contract-addresses>
