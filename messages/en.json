@@ -831,6 +831,8 @@
     "ifCreatorWins": "If creator wins",
     "netProfit": "Net profit",
     "totalReturn": "Total return",
+    "fixedOddsCapacity": "Creator liquidity left: {available}. This market can still take a stake of up to {max} at the posted total return.",
+    "fixedOddsOverCapacity": "Too large for the remaining creator liquidity — the most this market can accept right now is {max}.",
     "returnedPrincipal": "Your stake back",
     "totalReturnMultipleHint": "total return",
     "lowUpsideWarning": "Low upside: you risk {stake} to win {profit}. This side already holds most of the money, so the remaining payout is thin.",

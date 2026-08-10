@@ -32,7 +32,12 @@ import { getExplorerTxUrl, createBasePublicClient } from "@/lib/base";
 import { getPendingVS } from "@/lib/pending-vs";
 import { openPeepsAvatar } from "@/lib/avatars";
 import { formatUsdc } from "@/lib/money";
-import { previewChallengerPayout } from "@/lib/payout";
+import {
+  availableCreatorLiquidityUnits,
+  maxFixedOddsStakeUnits,
+  previewChallengerPayout,
+} from "@/lib/payout";
+import { unitsToUsdc, usdcToUnits } from "@/lib/usdc";
 import { toCanonicalMode } from "@/lib/market-modes";
 import { MarketAnalytics } from "@/components/MarketAnalytics";
 import { acquireTxLock } from "@/lib/tx-lock";
@@ -1125,6 +1130,31 @@ export default function VSDetailPage() {
     : pool;
   const isPoolPreview = canonicalMode.settlementMode === "pool";
   const totalChallengerStakeAfterJoin = challengerStake + (hasValidChallengeStake ? challengeStakeValue : 0);
+
+  // Fixed odds: capacity is bounded by the creator's UNRESERVED liquidity, not by
+  // a slot count, and it shrinks as each challenger reserves their profit. Read
+  // it from chain state through the same atomic helpers the contract mirrors, so
+  // the number shown is the number the escrow will enforce.
+  const isFixedOdds = canonicalMode.settlementMode === "fixed_odds";
+  const availableLiquidity = isFixedOdds
+    ? unitsToUsdc(
+        availableCreatorLiquidityUnits({
+          creatorStakeUnits: usdcToUnits(creatorStake),
+          reservedLiabilityUnits: usdcToUnits(display.reserved_creator_liability ?? 0),
+        }),
+      )
+    : 0;
+  const maxFixedStake = isFixedOdds
+    ? unitsToUsdc(
+        maxFixedOddsStakeUnits({
+          availableLiquidityUnits: usdcToUnits(availableLiquidity),
+          challengerPayoutBps: display.challenger_payout_bps ?? 0,
+        }),
+      )
+    : 0;
+  // Block an over-capacity stake before submit rather than letting it revert.
+  const exceedsFixedCapacity =
+    isFixedOdds && hasValidChallengeStake && challengeStakeValue > maxFixedStake;
   const showRivalrySection =
     rivalryChain.length > 1 || display.state === "resolved";
   const shareUrl = getShareUrl(vsId, inviteKey);
@@ -1847,6 +1877,24 @@ export default function VSDetailPage() {
                             </div>
                           </div>
                         </div>
+                        {isFixedOdds && (
+                          <p
+                            className={`border-t px-3.5 py-3 text-xs leading-relaxed ${
+                              exceedsFixedCapacity
+                                ? "border-red-500/30 bg-red-500/[0.07] text-red-300"
+                                : "border-white/[0.07] text-pv-muted"
+                            }`}
+                          >
+                            {exceedsFixedCapacity
+                              ? t("fixedOddsOverCapacity", {
+                                  max: formatUsdc(maxFixedStake),
+                                })
+                              : t("fixedOddsCapacity", {
+                                  available: formatUsdc(availableLiquidity),
+                                  max: formatUsdc(maxFixedStake),
+                                })}
+                          </p>
+                        )}
                         {stakePreview.isLowUpside && (
                           <p className="border-t border-pv-gold/25 bg-pv-gold/[0.07] px-3.5 py-3 text-xs leading-relaxed text-pv-gold">
                             {t("lowUpsideWarning", {
