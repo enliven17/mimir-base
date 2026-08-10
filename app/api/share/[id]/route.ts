@@ -15,6 +15,8 @@ import { NextResponse, type NextRequest } from "next/server";
 import { readClaimRaw } from "@/lib/contract";
 import { toCanonicalMode } from "@/lib/market-modes";
 import { buildShareCard, isCardSize, type ShareCard } from "@/lib/share-card";
+import { capture } from "@/lib/analytics/server";
+import { idempotencyKey } from "@/lib/analytics/events";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +115,12 @@ export async function GET(
     return NextResponse.json({ error: `claim ${claimId} not found` }, { status: 404 });
   }
 
+  const mode = toCanonicalMode({
+    marketType: claim.market_type,
+    oddsMode: claim.odds_mode,
+    maxChallengers: claim.max_challengers,
+  });
+
   const card = buildShareCard(
     {
       claimId,
@@ -121,11 +129,7 @@ export async function GET(
       counterPosition: claim.counter_position,
       resolutionUrl: claim.resolution_url,
       totalPot: claim.total_pot,
-      mode: toCanonicalMode({
-        marketType: claim.market_type,
-        oddsMode: claim.odds_mode,
-        maxChallengers: claim.max_challengers,
-      }),
+      mode,
       deadline: claim.deadline,
       state: claim.state,
       // The single guard that keeps a private claim off a public card.
@@ -134,6 +138,26 @@ export async function GET(
     },
     size,
   );
+
+  // Awaited: the function freezes as soon as the response returns. The
+  // idempotency key is per (claim, size, kind), so a scraper refetching the same
+  // card does not inflate the count — the metric is "a card exists for this
+  // market", and share_card_clicked measures actual traffic.
+  await capture({
+    event: "share_card_generated",
+    envelope: {
+      actor_type: "anonymous",
+      source_surface: "share_card",
+      claim_id: claimId,
+      // Mode is not secret — the locked card shows it too — so a private claim's
+      // card still reports which product generated it.
+      subject_type: mode.subjectType,
+      settlement_mode: mode.settlementMode,
+    },
+    properties: { card_kind: card.kind, card_size: size, locked: card.locked },
+    idempotencyKey: idempotencyKey(["share_card_generated", claimId, size, card.kind]),
+    consented: true,
+  });
 
   return new Response(renderSvg(card, claimId), {
     headers: {
