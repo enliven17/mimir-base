@@ -1,11 +1,11 @@
 /**
- * Mimir contract deployment script for BOT Chain Testnet (USDC stakes)
+ * Mimir contract deployment script for Base Sepolia (USDC stakes)
  *
  * Usage:
  *   DEPLOYER_PRIVATE_KEY=0x... ORACLE_ADDRESS=0x... npx tsx deploy/deploy.ts
  *
  * Optional:
- *   USDC_ADDRESS=0x...  (defaults to BOT Chain Testnet USDC)
+ *   USDC_ADDRESS=0x...  (defaults to the official Base Sepolia USDC)
  *
  * Compiles contracts/Mimir.sol with solc, deploys, and prints env lines to paste.
  */
@@ -22,7 +22,7 @@ import { privateKeyToAccount } from "viem/accounts";
 import { readFileSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import * as path from "path";
 import solc from "solc";
-import { baseSepolia, getBaseRpcUrl } from "../lib/base";
+import { baseSepolia, getBaseRpcUrl, getExplorerAddressUrl } from "../lib/base";
 import { USDC_ADDRESS } from "../lib/usdc";
 
 const DEPLOY_ABI = parseAbi([
@@ -138,7 +138,7 @@ async function main() {
   console.log("");
   console.log("═══════════════════════════════════════");
   console.log("  Mimir Contract Deployment (USDC stakes)");
-  console.log(`  Network  : BOT Chain Testnet (${baseSepolia.id})`);
+  console.log(`  Network  : Base Sepolia (${baseSepolia.id})`);
   console.log(`  RPC      : ${rpc}`);
   console.log(`  Deployer : ${account.address}`);
   console.log(`  Oracle   : ${oracleAddr}`);
@@ -175,13 +175,14 @@ async function main() {
   console.log("✓ Mimir deployed successfully!");
   console.log(`  Contract : ${contractAddress}`);
   console.log(`  Block    : ${receipt.blockNumber}`);
-  console.log(`  Explorer : https://scan.bohr.life/address/${contractAddress}`);
+  console.log(`  Explorer : ${getExplorerAddressUrl(contractAddress!)}`);
   console.log("");
   console.log("Add to .env.local:");
   console.log(`  NEXT_PUBLIC_CONTRACT_ADDRESS=${contractAddress}`);
   console.log(`  NEXT_PUBLIC_DEPLOY_BLOCK=${receipt.blockNumber}`);
   console.log(`  NEXT_PUBLIC_USDC_ADDRESS=${usdcAddr}`);
   console.log("");
+  console.log("Verify   : npx hardhat verify / basescan UI — record the deploy block above.");
   console.log("Then: npm run agents:fund  (USDC + gas) and npm run workers");
   void deployData; // keep encode for debugging if needed
 }

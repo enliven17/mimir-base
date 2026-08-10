@@ -11,11 +11,11 @@ interface IERC20 {
 }
 
 /**
- * Mimir — AI-settled prediction market on BOT Chain
+ * Mimir — AI-settled prediction market on Base
  *
- * Stakes are held in testnet USDC (ERC-20, 6 decimals). Users/agents must
- * approve this contract before createClaim / challengeClaim / createRematch.
- * Gas is still paid in native BOT.
+ * Stakes are held in USDC (ERC-20, 6 decimals). Users/agents must approve this
+ * contract before createClaim / challengeClaim / createRematch.
+ * Gas is paid in native ETH.
  *
  * Resolution is performed by an authorized off-chain AI oracle agent that:
  *   1. Fetches web evidence from the claim's resolution_url
@@ -106,6 +106,18 @@ contract Mimir {
     event WithdrawalPending(address indexed to, uint256 amount);
     event Withdrawal(address indexed to, uint256 amount);
 
+    // ── Reentrancy guard ──────────────────────────────────────────────────────
+    // ponytail: 10 lines instead of an OpenZeppelin dependency — USDC is not a
+    // callback token, this is belt-and-braces on the value-moving entrypoints.
+    uint256 private _entered = 1;
+
+    modifier nonReentrant() {
+        require(_entered == 1, "Mimir: reentrant call");
+        _entered = 2;
+        _;
+        _entered = 1;
+    }
+
     // ── Modifiers ─────────────────────────────────────────────────────────────
     modifier onlyOwner() {
         require(msg.sender == owner, "Mimir: not owner");
@@ -149,9 +161,15 @@ contract Mimir {
 
     function _transfer(address to, uint256 amount) internal {
         if (amount == 0) return;
-        // Prefer push; if the token returns false, park for pull-withdrawal so
-        // one bad recipient cannot freeze the whole settlement.
-        bool ok = usdc.transfer(to, amount);
+        // Prefer push; park for pull-withdrawal on any failure so one bad
+        // recipient cannot freeze the whole settlement. USDC does not just
+        // return false — a blacklisted recipient makes transfer REVERT, which
+        // would otherwise strand every other payout in the same resolveClaim.
+        // Hence the low-level call rather than usdc.transfer / SafeERC20.
+        (bool called, bytes memory ret) = address(usdc).call(
+            abi.encodeWithSelector(IERC20.transfer.selector, to, amount)
+        );
+        bool ok = called && (ret.length == 0 || abi.decode(ret, (bool)));
         if (!ok) {
             pendingWithdrawals[to] += amount;
             emit WithdrawalPending(to, amount);
@@ -159,7 +177,7 @@ contract Mimir {
     }
 
     // ── Withdraw: pull a parked payout ──────────────────────────────────────────
-    function withdraw() external {
+    function withdraw() external nonReentrant {
         uint256 amount = pendingWithdrawals[msg.sender];
         require(amount > 0, "Mimir: nothing to withdraw");
         pendingWithdrawals[msg.sender] = 0; // effects before interaction
@@ -190,7 +208,33 @@ contract Mimir {
         uint256          maxChallengers,
         bool             isPrivate,
         string  calldata inviteKey
-    ) external returns (uint256 id) {
+    ) external nonReentrant returns (uint256 id) {
+        return _createClaim(
+            question, creatorPosition, counterPosition, resolutionUrl, deadline,
+            stakeAmount, category, parentId, marketType, oddsMode,
+            challengerPayoutBps, handicapLine, settlementRule, maxChallengers,
+            isPrivate, inviteKey
+        );
+    }
+
+    function _createClaim(
+        string  memory question,
+        string  memory creatorPosition,
+        string  memory counterPosition,
+        string  memory resolutionUrl,
+        uint256        deadline,
+        uint256        stakeAmount,
+        string  memory category,
+        uint256        parentId,
+        string  memory marketType,
+        string  memory oddsMode,
+        uint256        challengerPayoutBps,
+        string  memory handicapLine,
+        string  memory settlementRule,
+        uint256        maxChallengers,
+        bool           isPrivate,
+        string  memory inviteKey
+    ) internal returns (uint256 id) {
         require(stakeAmount >= MIN_STAKE, "Mimir: stake too small");
         require(deadline > block.timestamp, "Mimir: deadline in past");
         require(bytes(question).length > 0, "Mimir: empty question");
@@ -244,17 +288,20 @@ contract Mimir {
         emit ClaimCreated(id, msg.sender, category);
     }
 
-    // Rematch: create a new claim inheriting fields from a parent
+    // Rematch: create a new claim inheriting fields from a parent.
+    // Calls _createClaim internally — an external `this.createClaim(...)` would
+    // make msg.sender the contract itself, pulling the stake from Mimir's own
+    // balance and recording the contract as the claim's creator.
     function createRematch(
         uint256 parentId,
         uint256 deadline,
         uint256 stakeAmount,
         string  calldata inviteKey
-    ) external returns (uint256 id) {
+    ) external nonReentrant returns (uint256 id) {
         Claim storage parent = claims[parentId];
         require(parent.creator != address(0), "Mimir: parent not found");
 
-        return this.createClaim(
+        return _createClaim(
             parent.question,
             parent.creatorPosition,
             parent.counterPosition,
@@ -279,7 +326,7 @@ contract Mimir {
         uint256 claimId,
         uint256 stakeAmount,
         string  calldata inviteKey
-    ) external {
+    ) external nonReentrant {
         Claim storage claim = claims[claimId];
         require(claim.creator != address(0), "Mimir: claim not found");
         require(claim.state == ST_OPEN || claim.state == ST_ACTIVE, "Mimir: not open");
@@ -332,7 +379,7 @@ contract Mimir {
         string  calldata summary,
         uint8   confidence,
         bytes32 evidenceHash  // keccak256 of evidence text — verifiable on-chain
-    ) external onlyOracle {
+    ) external onlyOracle nonReentrant {
         Claim storage claim = claims[claimId];
         require(claim.creator != address(0), "Mimir: claim not found");
         require(claim.state == ST_ACTIVE, "Mimir: not active");
@@ -401,7 +448,7 @@ contract Mimir {
     }
 
     // ── Write: cancel ─────────────────────────────────────────────────────────
-    function cancelClaim(uint256 claimId) external {
+    function cancelClaim(uint256 claimId) external nonReentrant {
         Claim storage claim = claims[claimId];
         require(claim.creator != address(0), "Mimir: claim not found");
         require(msg.sender == claim.creator, "Mimir: not creator");
@@ -503,7 +550,7 @@ contract Mimir {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 
-    // Fallback: reject accidental native BOT sends
+    // Fallback: reject accidental native ETH sends
     receive() external payable {
         revert("Mimir: stakes are USDC - approve + createClaim/challengeClaim");
     }

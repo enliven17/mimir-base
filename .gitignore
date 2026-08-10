@@ -99,3 +99,4 @@ artifacts/
 
 # graphify knowledge-graph output (local tooling artifact)
 graphify-out/
+artifacts/
