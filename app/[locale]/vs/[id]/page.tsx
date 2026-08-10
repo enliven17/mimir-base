@@ -32,6 +32,8 @@ import { getExplorerTxUrl, createBasePublicClient } from "@/lib/base";
 import { getPendingVS } from "@/lib/pending-vs";
 import { openPeepsAvatar } from "@/lib/avatars";
 import { formatUsdc } from "@/lib/money";
+import { previewChallengerPayout } from "@/lib/payout";
+import { toCanonicalMode } from "@/lib/market-modes";
 import { acquireTxLock } from "@/lib/tx-lock";
 import {
   MIN_STAKE,
@@ -1093,38 +1095,35 @@ export default function VSDetailPage() {
   const challengeStakeValue = Number(challengeStake);
   const hasValidChallengeStake =
     Number.isFinite(challengeStakeValue) && challengeStakeValue >= MIN_STAKE;
-  const fixedPayoutPreview =
-    oddsMode === "fixed" &&
-    hasValidChallengeStake &&
-    typeof display.challenger_payout_bps === "number" &&
-    display.challenger_payout_bps > 0
-      ? Math.floor((challengeStakeValue * display.challenger_payout_bps) / 10000)
-      : null;
   const creatorStake = display.creator_stake ?? display.stake_amount;
   const challengerStake = display.total_challenger_stake ?? 0;
-  const poolPreview =
-    oddsMode === "pool" && hasValidChallengeStake
-      ? {
-          challengerPayout:
-            challengeStakeValue +
-            (creatorStake > 0
-              ? (challengeStakeValue * creatorStake) /
-                (challengerStake + challengeStakeValue)
-              : 0),
-          creatorPayout: pool + challengeStakeValue,
-          totalChallengerStake: challengerStake + challengeStakeValue,
-        }
-      : null;
-  const challengePayoutPreview =
-    fixedPayoutPreview ??
-    (poolPreview ? poolPreview.challengerPayout : null);
-  const challengeProfitPreview =
-    challengePayoutPreview !== null
-      ? Math.max(0, challengePayoutPreview - challengeStakeValue)
-      : null;
+
+  // Canonical mode drives the preview: a one-slot pool market is a duel, and a
+  // duel pays winner-takes-pot rather than a proportional share.
+  const canonicalMode = toCanonicalMode({
+    marketType: display.market_type ?? "binary",
+    oddsMode: display.odds_mode ?? "pool",
+    maxChallengers: getVSConfiguredMaxChallengers(display),
+  });
+
+  // Previewed in atomic USDC units by lib/payout.ts, so the number shown matches
+  // what the contract will actually transfer (integer truncation included).
+  const stakePreview = hasValidChallengeStake
+    ? previewChallengerPayout({
+        settlementMode: canonicalMode.settlementMode,
+        stake: challengeStakeValue,
+        creatorStake,
+        challengerPoolBefore: challengerStake,
+        challengerPayoutBps: display.challenger_payout_bps,
+      })
+    : null;
+  const challengePayoutPreview = stakePreview?.totalReturn ?? null;
+  const challengeProfitPreview = stakePreview?.netProfit ?? null;
   const creatorPayoutPreview = hasValidChallengeStake
     ? pool + challengeStakeValue
     : pool;
+  const isPoolPreview = canonicalMode.settlementMode === "pool";
+  const totalChallengerStakeAfterJoin = challengerStake + (hasValidChallengeStake ? challengeStakeValue : 0);
   const showRivalrySection =
     rivalryChain.length > 1 || display.state === "resolved";
   const shareUrl = getShareUrl(vsId, inviteKey);
@@ -1784,15 +1783,28 @@ export default function VSDetailPage() {
                             })}
                       </Button>
                     </div>
-                    {challengePayoutPreview !== null && challengeProfitPreview !== null && (
+                    {stakePreview && (
                       <div className="mt-4 overflow-hidden rounded-xl border border-white/[0.1] bg-pv-bg/35">
-                        <div className="grid grid-cols-1 gap-px bg-white/[0.07] p-px sm:grid-cols-3">
+                        {/* Total return, returned principal and net profit are shown
+                            separately — a single "payout" number reads as profit. */}
+                        <div className="grid grid-cols-1 gap-px bg-white/[0.07] p-px sm:grid-cols-2">
                           <div className="min-w-0 bg-pv-bg/70 px-3.5 py-3">
                             <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
-                              {t("ifChallengersWin")}
+                              {t("totalReturn")}
                             </div>
                             <div className="mt-1.5 font-mono text-sm font-bold tabular-nums text-pv-emerald sm:text-base">
-                              {formatUsdc(challengePayoutPreview)}
+                              {formatUsdc(stakePreview.totalReturn)}
+                            </div>
+                            <div className="mt-1 font-mono text-[10px] tabular-nums text-pv-muted">
+                              {stakePreview.totalReturnMultiple.toFixed(2)}× {t("totalReturnMultipleHint")}
+                            </div>
+                          </div>
+                          <div className="min-w-0 bg-pv-bg/70 px-3.5 py-3">
+                            <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
+                              {t("returnedPrincipal")}
+                            </div>
+                            <div className="mt-1.5 font-mono text-sm font-bold tabular-nums text-pv-text sm:text-base">
+                              {formatUsdc(stakePreview.returnedPrincipal)}
                             </div>
                           </div>
                           <div className="min-w-0 bg-pv-bg/70 px-3.5 py-3">
@@ -1800,7 +1812,7 @@ export default function VSDetailPage() {
                               {t("netProfit")}
                             </div>
                             <div className="mt-1.5 font-mono text-sm font-bold tabular-nums text-pv-fuch sm:text-base">
-                              +{formatUsdc(challengeProfitPreview)}
+                              +{formatUsdc(stakePreview.netProfit)}
                             </div>
                           </div>
                           <div className="min-w-0 bg-pv-bg/70 px-3.5 py-3">
@@ -1808,24 +1820,35 @@ export default function VSDetailPage() {
                               {t("ifCreatorWins")}
                             </div>
                             <div className="mt-1.5 font-mono text-sm font-bold tabular-nums text-pv-cyan sm:text-base">
-                              {formatUsdc(poolPreview?.creatorPayout ?? creatorPayoutPreview)}
+                              {formatUsdc(creatorPayoutPreview)}
                             </div>
                           </div>
                         </div>
-                        {poolPreview ? (
+                        {stakePreview.isLowUpside && (
+                          <p className="border-t border-pv-gold/25 bg-pv-gold/[0.07] px-3.5 py-3 text-xs leading-relaxed text-pv-gold">
+                            {t("lowUpsideWarning", {
+                              stake: formatUsdc(stakePreview.returnedPrincipal),
+                              profit: formatUsdc(stakePreview.netProfit),
+                            })}
+                          </p>
+                        )}
+                        {isPoolPreview ? (
                           <p className="px-3.5 py-3 text-xs leading-relaxed text-pv-muted">
                             {t("poolPayoutFormula", {
                               stake: formatUsdc(challengeStakeValue),
                               creatorStake: formatUsdc(creatorStake),
-                              challengerStake: formatUsdc(poolPreview.totalChallengerStake),
+                              challengerStake: formatUsdc(totalChallengerStakeAfterJoin),
                             })}
                           </p>
                         ) : null}
+                        <p className="border-t border-white/[0.07] px-3.5 py-3 text-xs leading-relaxed text-pv-muted">
+                          {t("profitComesFromLosingSide")}
+                        </p>
                       </div>
                     )}
                     <p className="text-xs text-pv-muted mt-3">
-                      {fixedPayoutPreview !== null
-                        ? t("challengeStakeHintFixed", { payout: fixedPayoutPreview })
+                      {canonicalMode.settlementMode === "fixed_odds" && stakePreview
+                        ? t("challengeStakeHintFixed", { payout: stakePreview.totalReturn })
                         : t("challengeStakeHintPool")}
                     </p>
                     <p className="text-xs text-pv-muted mt-2">
