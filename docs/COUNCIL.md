@@ -1,8 +1,8 @@
 # The Mimir Council
 
-**Ten AI personas. Ten local EOA wallets. One prediction market on BOT Chain.**
+**Ten AI personas. Ten local EOA wallets. One prediction market on Base.**
 
-The Mimir Council is a group of ten autonomous AI personas that read the same on-chain claims and place real **BOT** stakes on BOT Chain — each through its own locally held private key. Together with the oracle (settler) and the market-creator, they bring Mimir's economic actor count to twelve.
+The Mimir Council is a group of ten autonomous AI personas that read the same on-chain claims and place real **USDC** stakes on Base Sepolia — each through its own locally held private key. Together with the oracle (settler) and the market-creator, they bring Mimir's economic actor count to twelve.
 
 The point isn't to find a single "best" trader. It's the opposite: by giving ten personas distinct worldviews, evaluation styles, and category filters, the council surfaces real disagreement on every market. Where one persona stakes, another abstains. Where the contrarian fights the crowd, the whale-watcher copies it.
 
@@ -27,7 +27,7 @@ The point isn't to find a single "best" trader. It's the opposite: by giving ten
 
 A single oracle that decides everything is a single point of failure — and a single voice. Real prediction markets get their information density from heterogenous opinions. The Mimir Council is the in-protocol version of that: a deliberate spread of strategies so the market always has multiple AI views to react to.
 
-Each persona is, by design, *wrong sometimes*. The Optimist over-weights positive outcomes. The Contrarian ignores evidence entirely and only fights pool imbalance. The Doomer assumes worst-case. None of them is a settlement oracle (that's still the dedicated oracle agent's job) — they're **bettors**, putting BOT on the line with their own bias.
+Each persona is, by design, *wrong sometimes*. The Optimist over-weights positive outcomes. The Contrarian ignores evidence entirely and only fights pool imbalance. The Doomer assumes worst-case. None of them is a settlement oracle (that's still the dedicated oracle agent's job) — they're **bettors**, putting USDC on the line with their own bias.
 
 ---
 
@@ -44,7 +44,7 @@ Each persona is, by design, *wrong sometimes*. The Optimist over-weights positiv
 | 7 | 🏈 Sports Pundit | Specialist | Only `sports`/`soccer`/`nba`/`nfl`/`tennis`/`f1`. Reads form, head-to-head, injuries. | Sports |
 | 8 | 🌤️ The Weatherman | Specialist | Only `weather`/`climate`. Trusts numbers over narratives. | Weather |
 | 9 | 💀 The Doomer | LLM-biased | "Worst case is the base case." +7% confidence on disaster scenarios. | All |
-| 10 | 🗣️ The Yapper | Micro-stakes | Low threshold (60%), tiny stake (0.5 BOT), maximum coverage. | All |
+| 10 | 🗣️ The Yapper | Micro-stakes | Low threshold (60%), tiny stake (0.5 USDC), maximum coverage. | All |
 
 **Two of the ten — Contrarian and Whale-Watcher — never call the LLM.** They derive bets entirely from on-chain pool state, which keeps them deterministic, free of rate-limit pressure, and easy to explain in a demo.
 
@@ -65,7 +65,7 @@ flowchart LR
         TH[LLM throttle<br/>8s between calls]
     end
 
-    subgraph chain[BOT Chain Testnet]
+    subgraph chain[Base Sepolia]
         CT[Mimir.sol]
     end
 
@@ -79,7 +79,7 @@ flowchart LR
     GAP --> TH
     TH -->|biased prompt| GEM
     TH -->|stake decision| EOAs
-    EOAs -->|challengeClaim + msg.value BOT| CT
+    EOAs -->|approve USDC + challengeClaim| CT
 
     classDef no-llm stroke-dasharray: 4 4
     LOOP -.->|"Contrarian + Whale-Watcher<br/>(rule-based, no LLM)"| EOAs
@@ -127,14 +127,14 @@ flowchart LR
     end
     JN --> REF["Oracle terminal report qT<br/>independent evidence + full history"]
     REF -->|"settles claim"| CHAIN["resolveClaim()<br/>evidenceHash ⊃ {q-chain, qT, scores}"]
-    REF -->|"CE score vs qT"| BONUS["bonus pool split<br/>native BOT transfer → positive scorers"]
+    REF -->|"CE score vs qT"| BONUS["bonus pool split<br/>USDC transfer → positive scorers"]
 ```
 
 1. **Sequential reports with visible history.** Jurors are shuffled, then vote one at a time through the paid `GET /api/council/vote` endpoint.
 2. **Probability, not just a verdict.** Each `verdict + confidence` maps to `q = P(challengers win)`.
 3. **Random termination.** Once `COUNCIL_QUORUM` decisive reports exist, each further vote happens only with probability `1 − COUNCIL_ALPHA`.
 4. **Terminal reference.** The oracle makes the final assessment from its own independently fetched evidence *plus* the full juror history.
-5. **Cross-entropy payouts.** Positive scorers split the `COUNCIL_BONUS_USDC` pool via native BOT transfers into their own wallets after settlement. The flat ~0.001 BOT vote fee stays as the participation floor.
+5. **Cross-entropy payouts.** Positive scorers split the `COUNCIL_BONUS_USDC` pool via USDC transfers into their own wallets after settlement. The flat $0.001 vote fee stays as the participation floor.
 6. **Auditability.** The q-chain, `qT`, and per-juror scores are serialized into the payload committed as the on-chain `evidenceHash`.
 
 The mechanism lives in `agents/oracle/council-vote.ts` (pure scoring math is unit-tested in `tests/node/self-resolving.test.ts`); the oracle wiring is in `agents/oracle/index.ts` (`settle()`).
@@ -173,8 +173,9 @@ When `COUNCIL_PEER_READS=1`, each buyer persona pays selected seller personas th
 # 1. Provision all agent wallets (oracle + creator + 10 personas). Idempotent.
 npm run agents:create-wallets
 
-# 2. Fund from a master wallet (faucet tops up the master).
-#    https://faucet.botchain.ai/basic
+# 2. Fund from a master wallet (the faucet tops up the master).
+#    Base Sepolia ETH for gas + test USDC for stakes:
+#    https://portal.cdp.coinbase.com/products/faucet
 FUNDER_PRIVATE_KEY=0x... npm run agents:fund
 
 # 3. Run the council worker.
@@ -232,7 +233,7 @@ LLM credentials (`GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / etc.) are shared with 
 |---|---|
 | `/council` | Full roster — persona card per member with bio, archetype badge, balance, total staked, and last four bets. |
 | `/agents` | Council members appear as agent events with their persona pill in the live feed. |
-| `/stats` | "Unique stakers" KPI splits human / council / other. Agent vault shows oracle + creator BOT balances. |
+| `/stats` | "Unique stakers" KPI splits human / council / other. Agent vault shows oracle + creator ETH gas balances. |
 | `/vs/[id]` | A `Council verdict` card under the settlement explanation. Data from `/api/vs/[id]/council` (pure on-chain read). |
 
 The widget on `/vs/[id]` only reflects what's already on chain — it doesn't ask personas to evaluate on demand.
