@@ -276,6 +276,25 @@
     "rematchNotFound": "Original claim not found",
     "advancedToggle": "Advanced market terms",
     "advancedHint": "Use this for market type, category, and explicit settlement rules when the challenge needs tighter resolution terms.",
+    "settlementMode": "Settlement mode",
+    "poolSlots": "Challenger slots",
+    "settlementModes": {
+      "pool": {
+        "label": "Pool Market",
+        "hint": "Many challengers, proportional payout",
+        "detail": "Challengers share your stake in proportion to their own. The more join one side, the thinner each winner's profit — and your profit comes from the losing side, not from Mimir."
+      },
+      "duel": {
+        "label": "Duel",
+        "hint": "One rival, equal stakes",
+        "detail": "Exactly one rival must match your stake, and the winner takes the two-person pot. A draw or an unresolvable outcome refunds both sides in full."
+      },
+      "fixed_odds": {
+        "label": "Fixed Odds",
+        "hint": "You guarantee a total return",
+        "detail": "You guarantee challengers a fixed total-return multiple, backed by your own stake. Capacity is bounded by your unreserved liquidity, not by a slot count."
+      }
+    },
     "marketType": "Market type",
     "oddsMode": "Odds mode",
     "category": "Category",

@@ -34,6 +34,13 @@ import {
   normalizeCategoryId,
   normalizeResolutionSource,
 } from "@/lib/constants";
+import {
+  SETTLEMENT_MODE_POLICY,
+  selectableSettlementModes,
+  settlementModeToOddsMode,
+  validateMode,
+  type SettlementMode,
+} from "@/lib/market-modes";
 import type {
   SourceClaimDraftCandidate,
   SourceClaimDraftResponse,
@@ -196,6 +203,10 @@ export default function CreatePage() {
   const [customStakeFocused, setCustomStakeFocused] = useState(false);
   const [category, setCategory] = useState("custom");
   const [marketType, setMarketType] = useState<string>("binary");
+  // Settlement mode is a real choice now. Duel is the default because it is the
+  // shape the app has actually been creating (one slot), just unlabelled.
+  const [settlementMode, setSettlementMode] = useState<SettlementMode>("duel");
+  const [poolSlots, setPoolSlots] = useState(10);
   const [settlementRule, setSettlementRule] = useState("");
   const [, setMaxChallengers] = useState(1);
   /** Texto del 4º slot (custom); vacío cuando el valor coincide con preset 1/2/5 para mostrar placeholder "–". */
@@ -913,7 +924,9 @@ export default function CreatePage() {
     }
 
     const normalizedMarketType = normalizeSupportedMarketType(marketType);
-    const normalizedOddsMode = "pool";
+    // The chain stores the loose strings; the canonical mode decides what they
+    // are. A duel is escrowed as a one-slot pool — see lib/market-modes.ts.
+    const normalizedOddsMode = settlementModeToOddsMode(settlementMode);
 
     if (!normalizedSourceUrl) {
       toast.error(t("sourceRequired"));
@@ -925,7 +938,21 @@ export default function CreatePage() {
       return;
     }
 
-    const normalizedMaxChallengers = 1;
+    const normalizedMaxChallengers =
+      SETTLEMENT_MODE_POLICY[settlementMode].maxChallengers ?? Math.max(2, Math.floor(poolSlots));
+
+    // Reject impossible combinations with the same policy the detail page and the
+    // market-creator use, before spending gas on a revert.
+    const modeCheck = validateMode({
+      subjectType: normalizedMarketType,
+      settlementMode,
+      maxChallengers: normalizedMaxChallengers,
+      creatorStake: stake,
+    });
+    if (!modeCheck.ok) {
+      toast.error(modeCheck.errors[0]);
+      return;
+    }
     const inviteKey = isPrivate ? generatePrivateInviteKey() : "";
     const params: CreateClaimParams = {
       question,
@@ -1839,6 +1866,67 @@ export default function CreatePage() {
               aria-hidden={!advancedOpen}
             >
               <div className="space-y-8 border-t border-white/[0.08] px-6 pb-6 pt-6 sm:px-8 sm:pb-8">
+                {/* Settlement mode — how the money moves. Options and copy come
+                    from the registry so this screen, the detail page and the
+                    market-creator cannot disagree about a mode's rules. */}
+                <div className="space-y-3">
+                  <span className="block text-[10px] font-bold uppercase tracking-[0.16em] text-pv-muted">
+                    {t("settlementMode")}
+                  </span>
+                  <div
+                    role="radiogroup"
+                    aria-label={t("settlementMode") ?? "Settlement mode"}
+                    className="grid grid-cols-1 gap-2 sm:grid-cols-3"
+                  >
+                    {selectableSettlementModes().map((policy) => {
+                      const active = settlementMode === policy.mode;
+                      return (
+                        <button
+                          key={policy.mode}
+                          type="button"
+                          role="radio"
+                          aria-checked={active}
+                          onClick={() => setSettlementMode(policy.mode)}
+                          className={`rounded-xl border px-4 py-3 text-left transition ${
+                            active
+                              ? "border-pv-emerald/60 bg-pv-emerald/[0.08]"
+                              : "border-pv-border/40 bg-pv-surface2/40 hover:border-pv-emerald/40"
+                          }`}
+                        >
+                          <span className="block font-display text-sm font-bold text-pv-text">
+                            {t(`settlementModes.${policy.mode}.label`)}
+                          </span>
+                          <span className="mt-1 block text-[11px] leading-relaxed text-pv-muted">
+                            {t(`settlementModes.${policy.mode}.hint`)}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] leading-relaxed text-pv-muted">
+                    {t(`settlementModes.${settlementMode}.detail`)}
+                  </p>
+
+                  {/* Slot count only exists for pool: duel is one by definition
+                      and fixed odds is bounded by liquidity, not by a count. */}
+                  {settlementMode === "pool" && (
+                    <div className="pt-1">
+                      <Input
+                        id="create-pool-slots"
+                        type="number"
+                        min={2}
+                        max={SETTLEMENT_MODE_POLICY.pool.maxChallengers ?? 100}
+                        value={String(poolSlots)}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          setPoolSlots(Number.isFinite(next) ? next : 2);
+                        }}
+                        label={t("poolSlots")}
+                      />
+                    </div>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-8">
                   <ListboxField
                     id="create-market-type"
