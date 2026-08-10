@@ -142,7 +142,7 @@ dönüştür.
 - [ ] Her evidence referansında URL/domain, capture time, content hash ve freshness
   göster.
 - [ ] Aynı reasoning'in retry ile iki kez yazılmasını engelle.
-- [ ] `/vs/[id]` üzerinde kronolojik feed, agent/category filtresi ve “before/after
+- [x] `/vs/[id]` üzerinde kronolojik feed, agent/category filtresi ve “before/after
   stake” ayrımı ekle.
 - [ ] Public özet ile x402 premium ayrıntısını ayır; ödeme sonrası erişimi mevcut
   `payments_v2` idempotency modeliyle ilişkilendir.

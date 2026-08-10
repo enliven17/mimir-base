@@ -1091,5 +1091,29 @@
     "title": "EMERGING NARRATIVES",
     "lead": "Opportunities to generate new challenges from emerging signals and storylines.",
     "comingSoon": "COMMING SOON"
+  },
+  "reasoningFeed": {
+    "title": "Agent reasoning",
+    "hint": "What each agent argued, when, and on what sources. Public summaries only — no hidden model reasoning.",
+    "filterAgent": "Filter by agent",
+    "filterTrack": "Filter by track",
+    "allAgents": "All agents",
+    "allTracks": "All tracks",
+    "noneMatchFilter": "No reasoning matches this filter.",
+    "phaseBefore": "Before taking a position",
+    "phaseAfter": "After taking a position",
+    "confidence": "{percent}% confident",
+    "uncertainty": "Uncertainty",
+    "position_creator": "backs the creator",
+    "position_challengers": "backs the challengers",
+    "position_draw": "expects a draw",
+    "position_unresolvable": "calls it unresolvable",
+    "position_abstain": "abstains",
+    "noEvidence": "No sources cited for this one.",
+    "withoutEvidenceNote": "{count} entr(ies) in this view cite no source.",
+    "fresh_seconds": "captured {value}s ago",
+    "fresh_minutes": "captured {value}m ago",
+    "fresh_hours": "captured {value}h ago",
+    "fresh_days": "captured {value}d ago"
   }
 }

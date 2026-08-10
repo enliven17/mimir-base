@@ -41,6 +41,7 @@ import {
 import { unitsToUsdc, usdcToUnits } from "@/lib/usdc";
 import { toCanonicalMode } from "@/lib/market-modes";
 import { MarketAnalytics } from "@/components/MarketAnalytics";
+import ReasoningFeed from "@/components/vs/ReasoningFeed";
 import { acquireTxLock } from "@/lib/tx-lock";
 import {
   MIN_STAKE,
@@ -2249,6 +2250,14 @@ export default function VSDetailPage() {
                   maxChallengers={maxChallengers}
                   showLoadMore={isSampleVS && designLifecycleStep !== null}
                 />
+                {/* Sample markets have no chain history, so there is no reasoning to
+                    fetch — the component would render nothing anyway, but skipping it
+                    avoids a pointless request on every design preview. */}
+                {!isSampleVS && vs.id > 0 && (
+                  <AnimatedItem>
+                    <ReasoningFeed claimId={vs.id} />
+                  </AnimatedItem>
+                )}
                 {showRivalrySection && (
                   <AnimatedItem>
                     <GlassCard
