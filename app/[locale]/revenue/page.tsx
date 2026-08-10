@@ -3,12 +3,12 @@
 /**
  * /revenue — live payment earnings dashboard.
  *
- * Shows BOT flowing into Mimir's paid endpoints in real time: total calls,
+ * Shows USDC flowing into Mimir's paid endpoints in real time: total calls,
  * total earned, unique paying agents, per-endpoint breakdown, recent payments.
  *
  * Reads the durable Neon ledger via /api/payments/revenue (falls back to
- * in-memory when no DB is configured). Every payment links to its on-chain
- * transfer on BOTScan — the chain is the ultimate source of truth.
+ * in-memory when no DB is configured). Every payment links to its x402
+ * settlement on BaseScan — the chain is the ultimate source of truth.
  */
 
 import { useEffect, useState } from "react";
@@ -18,10 +18,12 @@ import { getExplorerTxUrl } from "@/lib/base";
 
 interface PaymentEvent {
   resource: string;
+  network: string;
+  assetSymbol: string;
   amountUsdc: number;
   payer: string | null;
   seller: string | null;
-  txHash: string | null;
+  transactionHash: string | null;
   at: number;
 }
 
@@ -32,8 +34,8 @@ interface RevenueSummary {
   baselineUsdc: number;
   uniquePayers: number;
   uniqueSellers: number;
-  byResource: Array<{ resource: string; calls: number; bot: number }>;
-  bySeller: Array<{ seller: string; calls: number; bot: number }>;
+  byResource: Array<{ resource: string; calls: number; usdc: number }>;
+  bySeller: Array<{ seller: string; calls: number; usdc: number }>;
   recent: PaymentEvent[];
 }
 
@@ -90,9 +92,9 @@ export default function RevenuePage() {
     <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-10">
       <BlueprintHeading>Agent revenue</BlueprintHeading>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-pv-muted">
-        BOT paid to Mimir&apos;s paid endpoints — premium price oracle,
-        oracle-as-a-service, and council reasoning — settled as native BOT
-        transfers on BOT Chain and verified on-chain per request.
+        USDC paid to Mimir&apos;s paid endpoints — premium price oracle,
+        oracle-as-a-service, and council reasoning — settled per request over
+        x402 on Base Sepolia and verified on-chain.
       </p>
 
       {err && (
@@ -108,7 +110,7 @@ export default function RevenuePage() {
         <>
           <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <Stat label="Paid calls" value={String(data.totalCalls)} />
-            <Stat label="BOT earned" value={`${data.totalUsdc.toFixed(6)} BOT`} accent />
+            <Stat label="USDC earned" value={`${data.totalUsdc.toFixed(6)} USDC`} accent />
             <Stat
               label="Paying agents"
               value={`${data.uniquePayers} → ${data.uniqueSellers} sellers`}
@@ -116,8 +118,8 @@ export default function RevenuePage() {
           </section>
           {(data.baselineCalls > 0 || data.baselineUsdc > 0) && (
             <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-pv-muted">
-              includes {data.baselineCalls} calls / {data.baselineUsdc.toFixed(6)} BOT carried over
-              from an earlier deployment
+              includes {data.baselineCalls} calls / {data.baselineUsdc.toFixed(6)} USDC carried
+              over from an earlier deployment
             </p>
           )}
 
@@ -131,7 +133,7 @@ export default function RevenuePage() {
                 <div key={r.resource} className="flex items-center justify-between px-4 py-3.5">
                   <code className="font-mono text-sm text-pv-text">{r.resource}</code>
                   <span className="font-mono text-sm text-pv-muted">
-                    {r.calls} calls · {r.bot.toFixed(6)} BOT
+                    {r.calls} calls · {r.usdc.toFixed(6)} USDC
                   </span>
                 </div>
               ))}
@@ -148,7 +150,7 @@ export default function RevenuePage() {
                 <div key={s.seller} className="flex items-center justify-between px-4 py-3.5">
                   <code className="font-mono text-sm text-pv-text">{short(s.seller)}</code>
                   <span className="font-mono text-sm text-pv-muted">
-                    {s.calls} calls · {s.bot.toFixed(6)} BOT
+                    {s.calls} calls · {s.usdc.toFixed(6)} USDC
                   </span>
                 </div>
               ))}
@@ -164,7 +166,7 @@ export default function RevenuePage() {
                 </p>
               )}
               {data.recent.map((e, i) => (
-                <PaymentCard key={`${e.txHash ?? e.at}-${i}`} event={e} />
+                <PaymentCard key={`${e.transactionHash ?? e.at}-${i}`} event={e} />
               ))}
             </div>
           </section>
@@ -188,7 +190,7 @@ function PaymentCard({ event }: { event: PaymentEvent }) {
           </code>
         </div>
         <span className="shrink-0 font-mono text-sm font-semibold text-pv-text">
-          {event.amountUsdc.toFixed(6)} BOT
+          {event.amountUsdc.toFixed(6)} {event.assetSymbol || "USDC"}
         </span>
       </div>
       <div className="mt-3 grid grid-cols-1 gap-1 font-mono text-xs text-pv-muted">
@@ -196,7 +198,7 @@ function PaymentCard({ event }: { event: PaymentEvent }) {
         <span className="min-w-0 truncate">seller {short(event.seller)}</span>
       </div>
       <div className="mt-3 flex items-center justify-end gap-3 font-mono text-xs">
-        <ReceiptLink txHash={event.txHash} />
+        <ReceiptLink txHash={event.transactionHash} />
       </div>
     </div>
   );

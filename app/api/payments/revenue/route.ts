@@ -2,9 +2,9 @@
  * GET /api/payments/revenue — live payment earnings across Mimir's paid
  * endpoints (premium price oracle, oracle-as-a-service, council reasoning).
  *
- * Powers the /revenue dashboard. Durable: reads the Neon payments ledger
- * (falls back to an in-memory buffer when no DB is configured). The on-chain
- * BOT transfers remain the ultimate record.
+ * Powers the /revenue dashboard. Durable: reads the Neon payments_v2 ledger
+ * (falls back to an in-memory buffer when no DB is configured). The x402
+ * settlements on Base remain the ultimate record.
  */
 
 import { getRevenueSummary } from "@/lib/paid-revenue";
@@ -18,7 +18,7 @@ export async function GET(): Promise<Response> {
       "content-type": "application/json",
       // Served from the edge between refreshes: the dashboard polls this every few
       // seconds and every uncached hit was a function invocation running four
-      // aggregates over payments. 10s of staleness on a counter is invisible.
+      // aggregates over payments_v2. 10s of staleness on a counter is invisible.
       "cache-control": "s-maxage=10, stale-while-revalidate=30",
     },
   });

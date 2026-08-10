@@ -369,7 +369,7 @@ export default function HomePage() {
         </section>
       </AnimatedItem>
 
-      {/* Differentiator — stats strip (total / resolved / BOT staked); mismo patrón que THE PROTOCOL / LIVE ARENA */}
+      {/* Differentiator — stats strip (total / resolved / USDC staked); mismo patrón que THE PROTOCOL / LIVE ARENA */}
       <AnimatedItem>
         <div className="relative">
           <BlueprintHeading>{t("statsSectionTitle")}</BlueprintHeading>
@@ -411,7 +411,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* HTTP 402 BOT nanopayment strip — live agent-to-agent earnings */}
+          {/* x402 USDC nanopayment strip — live agent-to-agent earnings */}
           {rev && (
             <div className="grid grid-cols-1 gap-px border-x border-t border-pv-border/25 bg-pv-border/25 sm:grid-cols-3">
               <div className="p-5 sm:p-6 text-center bg-pv-bg">
@@ -433,7 +433,7 @@ export default function HomePage() {
                   labelPosition="below"
                   size="lg"
                   color="gold"
-                  suffix="BOT"
+                  suffix="USDC"
                   labelClassName="text-[12px]"
                   className="items-center"
                 />
@@ -776,7 +776,7 @@ export default function HomePage() {
                     </div>
                     <div className="flex shrink-0 items-center gap-3">
                       <span className="font-mono text-[13px] font-bold text-pv-gold">
-                        {payout === null ? `${getVSTotalPot(vs)} BOT` : `+${payout} BOT`}
+                        {payout === null ? `${getVSTotalPot(vs)} USDC` : `+${payout} USDC`}
                       </span>
                       <span className="font-mono text-pv-muted/50 transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-pv-emerald">
                         →
