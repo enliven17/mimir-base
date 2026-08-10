@@ -34,6 +34,7 @@ import { openPeepsAvatar } from "@/lib/avatars";
 import { formatUsdc } from "@/lib/money";
 import { previewChallengerPayout } from "@/lib/payout";
 import { toCanonicalMode } from "@/lib/market-modes";
+import { MarketAnalytics } from "@/components/MarketAnalytics";
 import { acquireTxLock } from "@/lib/tx-lock";
 import {
   MIN_STAKE,
@@ -1294,6 +1295,28 @@ export default function VSDetailPage() {
 
   return (
     <>
+      {/* Funnel instrumentation. Lives in a child so the hooks stay
+          unconditional despite this component's early returns; the hooks
+          themselves own de-duplication, so typing a stake does not emit an
+          event per keystroke. */}
+      <MarketAnalytics
+        claimId={vsId}
+        mode={canonicalMode}
+        address={address}
+        surface="vs_detail"
+        preview={
+          stakePreview
+            ? {
+                stake: challengeStakeValue,
+                totalReturn: stakePreview.totalReturn,
+                netProfit: stakePreview.netProfit,
+                upsideBps: stakePreview.upsideBps,
+                isLowUpside: stakePreview.isLowUpside,
+              }
+            : null
+        }
+      />
+
       {/* Verdict Reveal Overlay — finality moment */}
       <AnimatePresence>
         {showVerdict && (

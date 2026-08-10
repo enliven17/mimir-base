@@ -1,0 +1,38 @@
+"use client";
+
+/**
+ * Renders nothing; exists only to hold the market funnel hooks.
+ *
+ * The VS page returns early while loading and when a claim is missing, so the
+ * hooks cannot live in that component — they would be called conditionally and
+ * React would throw "rendered more hooks than during the previous render" on the
+ * transition from loading to loaded. Inside a child that mounts only in the
+ * loaded branch, the same hooks are unconditional.
+ */
+
+import {
+  useMarketViewed,
+  useStakePreviewTracking,
+  type StakePreviewSignal,
+} from "@/lib/analytics/useMarketAnalytics";
+import type { CanonicalMode } from "@/lib/market-modes";
+import type { SourceSurface } from "@/lib/analytics/events";
+
+export function MarketAnalytics({
+  claimId,
+  mode,
+  address,
+  surface,
+  preview,
+}: {
+  claimId: number;
+  mode: CanonicalMode;
+  address?: string | null;
+  surface?: SourceSurface;
+  preview: StakePreviewSignal | null;
+}) {
+  const context = { claimId, mode, address, surface };
+  useMarketViewed(context);
+  useStakePreviewTracking(context, preview);
+  return null;
+}
