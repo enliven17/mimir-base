@@ -96,3 +96,6 @@ artifacts/
 # Local agent skill packs (not product code)
 .agents/
 
+
+# graphify knowledge-graph output (local tooling artifact)
+graphify-out/
