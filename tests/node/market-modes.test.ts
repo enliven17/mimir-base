@@ -4,6 +4,7 @@ import test from "node:test";
 import {
   CONTRACT_VERSION,
   SETTLEMENT_MODE_POLICY,
+  guardChallenge,
   isUnsupportedMode,
   selectableSettlementModes,
   settlementModeToOddsMode,
@@ -197,4 +198,121 @@ test("squad_pool becomes valid once a v2 contract is deployed", () => {
     validateMode({ subjectType: "binary", settlementMode: "squad_pool", contractVersion: 2 }).ok,
     true,
   );
+});
+
+// ── Write guard: the enforcement the v1 contract cannot do ────────────────────
+
+test("a duel rejects a second rival", () => {
+  const result = guardChallenge({
+    settlementMode: "duel",
+    creatorStake: 10,
+    challengerStake: 10,
+    existingChallengers: 1,
+    maxChallengers: 1,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "duel_taken");
+});
+
+test("a duel rejects an unequal stake — the rule the contract cannot enforce in v1", () => {
+  for (const stake of [9, 11, 2]) {
+    const result = guardChallenge({
+      settlementMode: "duel",
+      creatorStake: 10,
+      challengerStake: stake,
+      existingChallengers: 0,
+      maxChallengers: 1,
+    });
+    assert.equal(result.ok, false, `stake ${stake} should be rejected`);
+    assert.equal(result.code, "duel_stake_mismatch");
+  }
+});
+
+test("a duel accepts the first rival at an equal stake", () => {
+  assert.equal(
+    guardChallenge({
+      settlementMode: "duel",
+      creatorStake: 10,
+      challengerStake: 10,
+      existingChallengers: 0,
+      maxChallengers: 1,
+    }).ok,
+    true,
+  );
+});
+
+test("a pool market accepts unequal stakes but not an overfull book", () => {
+  assert.equal(
+    guardChallenge({
+      settlementMode: "pool",
+      creatorStake: 10,
+      challengerStake: 3,
+      existingChallengers: 4,
+      maxChallengers: 10,
+    }).ok,
+    true,
+  );
+  const full = guardChallenge({
+    settlementMode: "pool",
+    creatorStake: 10,
+    challengerStake: 3,
+    existingChallengers: 10,
+    maxChallengers: 10,
+  });
+  assert.equal(full.ok, false);
+  assert.equal(full.code, "market_full");
+});
+
+test("fixed odds rejects a stake the creator's remaining liquidity cannot back", () => {
+  // 2x on 10 owes 10 of profit; only 6 is unreserved.
+  const short = guardChallenge({
+    settlementMode: "fixed_odds",
+    creatorStake: 20,
+    challengerStake: 10,
+    existingChallengers: 1,
+    maxChallengers: 100,
+    challengerPayoutBps: 20_000,
+    availableCreatorLiquidity: 6,
+  });
+  assert.equal(short.ok, false);
+  assert.equal(short.code, "insufficient_creator_liquidity");
+
+  assert.equal(
+    guardChallenge({
+      settlementMode: "fixed_odds",
+      creatorStake: 20,
+      challengerStake: 10,
+      existingChallengers: 1,
+      maxChallengers: 100,
+      challengerPayoutBps: 20_000,
+      availableCreatorLiquidity: 10,
+    }).ok,
+    true,
+  );
+});
+
+test("fixed odds with no multiple is refused rather than treated as 1x", () => {
+  const result = guardChallenge({
+    settlementMode: "fixed_odds",
+    creatorStake: 20,
+    challengerStake: 10,
+    existingChallengers: 0,
+    maxChallengers: 100,
+    challengerPayoutBps: 0,
+    availableCreatorLiquidity: 100,
+  });
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "insufficient_creator_liquidity");
+});
+
+test("guard failures carry a machine-readable code for localisation", () => {
+  const result = guardChallenge({
+    settlementMode: "duel",
+    creatorStake: 10,
+    challengerStake: 5,
+    existingChallengers: 0,
+    maxChallengers: 1,
+  });
+  assert.ok(result.code, "the UI must not have to parse an English message");
+  assert.ok(result.message);
 });

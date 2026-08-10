@@ -33,6 +33,8 @@ import {
 import { MIMIR_ABI, STATE, WINNER_SIDE, BPS_DIVISOR } from "./mimir-abi";
 import { normalizeCategoryId, ZERO_ADDRESS } from "./constants";
 import { decodeClaimTuple } from "./claim-codec";
+import { guardChallenge, toCanonicalMode } from "./market-modes";
+import { availableCreatorLiquidityUnits } from "./payout";
 import type { VSCacheFreshness } from "./vs-freshness";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -719,6 +721,49 @@ export async function createClaim(
   return { ...result, claimId: count };
 }
 
+/**
+ * Mode-aware pre-flight for a challenge, run against FRESH chain state.
+ *
+ * The v1 contract enforces the challenger slot count but accepts any stake above
+ * MIN_STAKE, so a duel's equal-stake rule has no on-chain enforcement yet. This
+ * guard is therefore run here — on every write path — rather than in the create
+ * form. It re-reads the claim instead of trusting UI state, because the pool and
+ * the free slots can change between render and submit.
+ *
+ * Throws with the guard's message so the caller surfaces a real reason instead of
+ * an opaque revert.
+ */
+export async function assertChallengeAllowed(
+  claimId: number,
+  stakeAmount: number,
+): Promise<void> {
+  const claim = await readClaimRaw(claimId);
+  if (!claim) throw new Error(`Claim ${claimId} not found`);
+
+  const mode = toCanonicalMode({
+    marketType: claim.market_type,
+    oddsMode: claim.odds_mode,
+    maxChallengers: claim.max_challengers,
+  });
+
+  const result = guardChallenge({
+    settlementMode: mode.settlementMode,
+    creatorStake: claim.creator_stake,
+    challengerStake: stakeAmount,
+    existingChallengers: claim.challenger_count,
+    maxChallengers: claim.max_challengers,
+    challengerPayoutBps: claim.challenger_payout_bps,
+    availableCreatorLiquidity: unitsToUsdc(
+      availableCreatorLiquidityUnits({
+        creatorStakeUnits: usdcToUnits(claim.creator_stake),
+        reservedLiabilityUnits: usdcToUnits(claim.reserved_creator_liability),
+      }),
+    ),
+  });
+
+  if (!result.ok) throw new Error(result.message ?? "challenge not allowed");
+}
+
 export async function challengeClaim(
   wallet: string,
   claimId: number,
@@ -728,6 +773,7 @@ export async function challengeClaim(
   if (isDemoMode()) {
     return sendDemoTx("challenge_claim", { claimId, stakeAmount, inviteKey });
   }
+  await assertChallengeAllowed(claimId, stakeAmount);
   const result = await sendBrowserTx(
     "challengeClaim",
     [BigInt(claimId), usdcToUnits(stakeAmount), inviteKey],
@@ -796,6 +842,9 @@ export async function executeDemoWrite(
 
   if (action === "challenge_claim") {
     const { claimId, stakeAmount, inviteKey = "" } = params as any;
+    // Same guard on the server signer path — a relay must not be able to bypass
+    // the mode rules a browser caller is held to.
+    await assertChallengeAllowed(Number(claimId), Number(stakeAmount));
     const result = await sendServerTx(
       privateKey, "challengeClaim",
       [BigInt(claimId), usdcToUnits(stakeAmount), inviteKey],

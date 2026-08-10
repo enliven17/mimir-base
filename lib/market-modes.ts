@@ -311,6 +311,87 @@ export function validateMode(input: ModeValidationInput): ModeValidationResult {
   return { ok: errors.length === 0, errors };
 }
 
+// ── Write guard ───────────────────────────────────────────────────────────────
+
+export interface ChallengeGuardInput {
+  settlementMode: SettlementMode;
+  /** Display USDC. */
+  creatorStake: number;
+  challengerStake: number;
+  /** Challengers already in, before this one. */
+  existingChallengers: number;
+  maxChallengers: number;
+  challengerPayoutBps?: number;
+  /** Unreserved creator liquidity, display USDC. Fixed odds only. */
+  availableCreatorLiquidity?: number;
+}
+
+export interface GuardResult {
+  ok: boolean;
+  /** Machine-readable so the UI can localise instead of printing English. */
+  code?:
+    | "duel_taken"
+    | "duel_stake_mismatch"
+    | "market_full"
+    | "insufficient_creator_liquidity"
+    | "mode_unavailable";
+  message?: string;
+}
+
+/**
+ * Mode-aware guard that every challenge write must pass.
+ *
+ * This exists because the v1 contract cannot express Duel. It enforces
+ * `maxChallengers` on-chain — so a second rival IS blocked by the escrow — but
+ * `challengeClaim` accepts any stake above MIN_STAKE, so the equal-stake rule is
+ * only enforceable off-chain in v1.
+ *
+ * Therefore this guard runs in the contract client, on the browser path AND the
+ * agent path, rather than in the create form: a form-only check is not a check.
+ * Moving equal-stake enforcement into the escrow is a v2 contract requirement.
+ */
+export function guardChallenge(input: ChallengeGuardInput): GuardResult {
+  const policy = SETTLEMENT_MODE_POLICY[input.settlementMode];
+  if (!policy) {
+    return { ok: false, code: "mode_unavailable", message: "unknown settlement mode" };
+  }
+
+  const slots = policy.maxChallengers ?? input.maxChallengers;
+  if (input.existingChallengers >= slots) {
+    return {
+      ok: false,
+      code: input.settlementMode === "duel" ? "duel_taken" : "market_full",
+      message:
+        input.settlementMode === "duel"
+          ? "this duel already has a rival"
+          : `market is full (${slots} challengers)`,
+    };
+  }
+
+  if (policy.stakeMatching === "equal_to_creator" && input.challengerStake !== input.creatorStake) {
+    return {
+      ok: false,
+      code: "duel_stake_mismatch",
+      message: `a duel requires an equal stake of ${input.creatorStake} USDC`,
+    };
+  }
+
+  if (input.settlementMode === "fixed_odds") {
+    const bps = input.challengerPayoutBps ?? 0;
+    const profit = (input.challengerStake * Math.max(0, bps - 10_000)) / 10_000;
+    const available = input.availableCreatorLiquidity ?? 0;
+    if (bps <= 10_000 || profit > available) {
+      return {
+        ok: false,
+        code: "insufficient_creator_liquidity",
+        message: `stake needs ${profit} USDC of creator liquidity, ${available} available`,
+      };
+    }
+  }
+
+  return { ok: true };
+}
+
 /** Settlement modes a user may pick right now, in rollout order. */
 export function selectableSettlementModes(
   contractVersion = CONTRACT_VERSION,
