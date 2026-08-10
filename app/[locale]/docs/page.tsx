@@ -3,6 +3,7 @@
 import { Link } from "@/i18n/navigation";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { openPeepsAvatar } from "@/lib/avatars";
+import { getExplorerAddressUrl } from "@/lib/base";
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Inline SVG diagrams - hand-drawn in the project's blueprint palette so they
@@ -58,13 +59,13 @@ function ArchitectureDiagram() {
         <text x="320" y="290" textAnchor="middle" fontSize="11" fill={C.muted}>poll, evaluate, stake, settle</text>
       </g>
 
-      {/* BOT Chain */}
+      {/* Base Sepolia */}
       <g>
         <rect x="490" y="40" width="200" height="120" rx="16" fill={C.surf2} stroke={C.accent} strokeWidth="1.8" />
-        <text x="590" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.accent} letterSpacing="2">BOT CHAIN</text>
+        <text x="590" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.accent} letterSpacing="2">BASE SEPOLIA</text>
         <text x="590" y="96" textAnchor="middle" fontSize="14" fontWeight="700" fill={C.text}>Mimir.sol</text>
-        <text x="590" y="118" textAnchor="middle" fontSize="11" fill={C.muted}>native BOT stakes</text>
-        <text x="590" y="138" textAnchor="middle" fontSize="11" fill={C.muted}>~$0.01 fees, sub-sec finality</text>
+        <text x="590" y="118" textAnchor="middle" fontSize="11" fill={C.muted}>USDC escrow + payouts</text>
+        <text x="590" y="138" textAnchor="middle" fontSize="11" fill={C.muted}>cent-level fees, ~2s blocks</text>
       </g>
 
       {/* Neon + LLM */}
@@ -77,15 +78,15 @@ function ArchitectureDiagram() {
         <text x="590" y="305" textAnchor="middle" fontSize="11" fill={C.text}>verdicts, drafts, reasoning</text>
       </g>
 
-      {/* BOT Chain stack callout */}
+      {/* Base stack callout */}
       <g>
         <rect x="730" y="100" width="130" height="160" rx="14" fill={C.bg} stroke={C.border} strokeWidth="1.5" strokeDasharray="4 3" />
-        <text x="795" y="124" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="2">BOT CHAIN</text>
-        <text x="795" y="148" textAnchor="middle" fontSize="11" fill={C.text}>BOT</text>
-        <text x="795" y="170" textAnchor="middle" fontSize="11" fill={C.text}>Faucet</text>
-        <text x="795" y="192" textAnchor="middle" fontSize="11" fill={C.text}>BOTScan</text>
-        <text x="795" y="214" textAnchor="middle" fontSize="11" fill={C.text}>BDEX</text>
-        <text x="795" y="236" textAnchor="middle" fontSize="11" fill={C.text}>Multicall3</text>
+        <text x="795" y="124" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="2">BASE STACK</text>
+        <text x="795" y="148" textAnchor="middle" fontSize="11" fill={C.text}>ETH gas</text>
+        <text x="795" y="170" textAnchor="middle" fontSize="11" fill={C.text}>USDC</text>
+        <text x="795" y="192" textAnchor="middle" fontSize="11" fill={C.text}>CDP Faucet</text>
+        <text x="795" y="214" textAnchor="middle" fontSize="11" fill={C.text}>BaseScan</text>
+        <text x="795" y="236" textAnchor="middle" fontSize="11" fill={C.text}>x402</text>
       </g>
 
       {/* Arrows */}
@@ -259,7 +260,7 @@ function AgentLoopDiagram() {
       <g>
         <rect x="680" y="120" width="180" height="120" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.6" />
         <text x="770" y="146" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="2">ON-CHAIN</text>
-        <text x="770" y="172" textAnchor="middle" fontSize="14" fontWeight="700" fill={C.text}>BOT payout</text>
+        <text x="770" y="172" textAnchor="middle" fontSize="14" fontWeight="700" fill={C.text}>USDC payout</text>
         <text x="770" y="194" textAnchor="middle" fontSize="11" fill={C.muted}>evidence hash committed</text>
         <text x="770" y="212" textAnchor="middle" fontSize="11" fill={C.muted}>confidence stored</text>
       </g>
@@ -273,10 +274,10 @@ function AgentLoopDiagram() {
   );
 }
 
-/* ── 5. BOT payment flow ────────────────────────────────────────────── */
+/* ── 5. x402 payment flow ───────────────────────────────────────────── */
 function NanopaymentDiagram() {
   return (
-    <svg viewBox="0 0 1080 240" className="h-auto w-full" role="img" aria-label="BOT payment flow">
+    <svg viewBox="0 0 1080 240" className="h-auto w-full" role="img" aria-label="x402 USDC payment flow">
       <defs>
         <marker id="arrow-d" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
           <path d="M0,0 L10,5 L0,10 Z" fill={C.accent} />
@@ -288,31 +289,31 @@ function NanopaymentDiagram() {
         <rect x="20" y="70" width="180" height="100" rx="16" fill={C.surf2} stroke={C.accent} strokeWidth="1.8" />
         <text x="110" y="96" textAnchor="middle" fontSize="10" fontWeight="700" fill={C.accent} letterSpacing="2">PAYER · ORACLE</text>
         <text x="110" y="120" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>own key signs</text>
-        <text x="110" y="142" textAnchor="middle" fontSize="11" fill={C.muted}>native BOT transfer</text>
+        <text x="110" y="142" textAnchor="middle" fontSize="11" fill={C.muted}>USDC authorization</text>
       </g>
 
       {/* Paid endpoint */}
       <g>
         <rect x="248" y="70" width="190" height="100" rx="16" fill={C.surface} stroke={C.border} strokeWidth="1.6" />
-        <text x="343" y="96" textAnchor="middle" fontSize="10" fontWeight="700" fill={C.muted} letterSpacing="2">HTTP 402</text>
+        <text x="343" y="96" textAnchor="middle" fontSize="10" fontWeight="700" fill={C.muted} letterSpacing="2">x402 · 402</text>
         <text x="343" y="118" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>/api/premium/price</text>
-        <text x="343" y="140" textAnchor="middle" fontSize="11" fill={C.muted}>quote 0.001 BOT</text>
+        <text x="343" y="140" textAnchor="middle" fontSize="11" fill={C.muted}>quote $0.001 USDC</text>
       </g>
 
       {/* On-chain verification */}
       <g>
         <rect x="486" y="70" width="200" height="100" rx="16" fill={C.bg} stroke={C.accent} strokeWidth="1.8" strokeDasharray="5 3" />
-        <text x="586" y="96" textAnchor="middle" fontSize="10" fontWeight="700" fill={C.accent} letterSpacing="2">SELLER VERIFIES</text>
-        <text x="586" y="118" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>on-chain check</text>
-        <text x="586" y="140" textAnchor="middle" fontSize="11" fill={C.muted}>amount · sender · no replay</text>
+        <text x="586" y="96" textAnchor="middle" fontSize="10" fontWeight="700" fill={C.accent} letterSpacing="2">FACILITATOR</text>
+        <text x="586" y="118" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>verify + settle</text>
+        <text x="586" y="140" textAnchor="middle" fontSize="11" fill={C.muted}>pays the settlement gas</text>
       </g>
 
-      {/* Settled on BOT Chain */}
+      {/* Settled on Base */}
       <g>
         <rect x="734" y="70" width="150" height="100" rx="16" fill={C.surf2} stroke={C.accent} strokeWidth="1.8" />
-        <text x="809" y="96" textAnchor="middle" fontSize="10" fontWeight="700" fill={C.accent} letterSpacing="2">BOT CHAIN</text>
+        <text x="809" y="96" textAnchor="middle" fontSize="10" fontWeight="700" fill={C.accent} letterSpacing="2">BASE SEPOLIA</text>
         <text x="809" y="118" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>settled</text>
-        <text x="809" y="140" textAnchor="middle" fontSize="11" fill={C.muted}>small BOT amount</text>
+        <text x="809" y="140" textAnchor="middle" fontSize="11" fill={C.muted}>USDC to seller</text>
       </g>
 
       {/* Neon → /revenue */}
@@ -374,7 +375,7 @@ function JuryDiagram() {
       <g>
         <rect x="265" y="40" width="455" height="310" rx="18" fill={C.bg} stroke={C.accent} strokeWidth="1.6" strokeDasharray="6 4" />
         <text x="492" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.accent} letterSpacing="2">03 · SEQUENTIAL JURY — SHUFFLED ORDER</text>
-        <text x="492" y="88" textAnchor="middle" fontSize="10" fill={C.muted}>GET /api/council/vote · 0.001 BOT → juror wallet · prior q&#8320; = 0.50</text>
+        <text x="492" y="88" textAnchor="middle" fontSize="10" fill={C.muted}>GET /api/council/vote · $0.001 USDC → juror wallet · prior q&#8320; = 0.50</text>
 
         {jurors.map((j) => (
           <g key={j.seed}>
@@ -430,7 +431,7 @@ function JuryDiagram() {
         <text x="492" y="446" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="2">06 · CROSS-ENTROPY BONUS</text>
         <text x="492" y="472" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>S = qT·ln(qt/qprev) + (1−qT)·ln((1−qt)/(1−qprev))</text>
         <text x="492" y="494" textAnchor="middle" fontSize="10" fill={C.muted}>positive scorers split the bonus pool · no update = exactly zero</text>
-        <text x="492" y="512" textAnchor="middle" fontSize="10" fill={C.muted}>native BOT → juror wallets, after settlement</text>
+        <text x="492" y="512" textAnchor="middle" fontSize="10" fill={C.muted}>USDC → juror wallets, after settlement</text>
       </g>
 
       {/* below-quorum fallback */}
@@ -449,7 +450,7 @@ function JuryDiagram() {
       <text x="758" y="432" textAnchor="middle" fontSize="9" fill={C.muted}>after settle</text>
       <line x1="400" y1="418" x2="400" y2="356" stroke={C.line} strokeWidth="1.3" strokeDasharray="4 4" markerEnd="url(#arrow-e-muted)" />
       <line x1="585" y1="418" x2="585" y2="356" stroke={C.line} strokeWidth="1.3" strokeDasharray="4 4" markerEnd="url(#arrow-e-muted)" />
-      <text x="493" y="394" textAnchor="middle" fontSize="9" fill={C.muted}>BOT bonuses</text>
+      <text x="493" y="394" textAnchor="middle" fontSize="9" fill={C.muted}>USDC bonuses</text>
       <path d="M 263 330 C 190 360, 150 400, 132 436" fill="none" stroke={C.line} strokeWidth="1.3" strokeDasharray="4 4" markerEnd="url(#arrow-e-muted)" />
     </svg>
   );
@@ -477,7 +478,7 @@ function CouncilNanopaymentMeshDiagram() {
         </marker>
       </defs>
 
-      <text x="540" y="32" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="2">BOT PAYMENT ROUTES</text>
+      <text x="540" y="32" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="2">x402 PAYMENT ROUTES</text>
 
       {/* Council container */}
       <rect x="286" y="64" width="460" height="372" rx="18" fill={C.bg} stroke={C.border} strokeWidth="1.4" strokeDasharray="5 5" />
@@ -594,9 +595,9 @@ export default function DocsPage() {
       <article className="mx-auto max-w-4xl space-y-14 px-4 pt-6 sm:px-6 lg:px-8">
       <header>
         <p className="mx-auto max-w-2xl text-center text-base leading-relaxed text-pv-text/75 sm:text-lg">
-          Mimir is an AI-settled claim market on BOT Chain — an EVM L1 where native
-          BOT pays gas and agent micropayments, while market stakes settle in USDC.
-          Two parties stake USDC on opposite sides of a verifiable question; when the
+          Mimir is an AI-settled claim market on Base — an Ethereum L2 where ETH pays
+          gas while every value flow, from market stakes to agent micropayments,
+          settles in USDC. Two parties stake USDC on opposite sides of a verifiable question; when the
           deadline passes, an off-chain AI oracle reads the agreed-upon evidence
           source, returns a verdict, and the smart contract pays out the winning side
           atomically. No committees, no manual disputes.
@@ -608,12 +609,12 @@ export default function DocsPage() {
         <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.22em] text-pv-muted">Contents</p>
         <div className="grid gap-1 sm:grid-cols-2">
           <TocLink href="#what" label="1. What Mimir is" />
-          <TocLink href="#why-bot" label="2. Why BOT on BOT Chain" />
+          <TocLink href="#why-base" label="2. Why USDC on Base" />
           <TocLink href="#architecture" label="3. Architecture" />
           <TocLink href="#flow" label="4. End-to-end flow" />
           <TocLink href="#lifecycle" label="5. The claim lifecycle" />
           <TocLink href="#agents" label="6. The agents" />
-          <TocLink href="#botchain" label="7. The BOT Chain stack" />
+          <TocLink href="#base-stack" label="7. The Base stack" />
           <TocLink href="#lepton" label="8. Payments and council" />
           <TocLink href="#state-machine" label="9. State machine" />
           <TocLink href="#contract" label="10. Smart contract terms" />
@@ -629,7 +630,7 @@ export default function DocsPage() {
           <em>&ldquo;Will BTC close above $100,000 on 2026-05-25 according to CoinGecko?&rdquo;</em>
         </p>
         <p>
-          Anyone creates a claim by staking BOT on one side. Another party (or an
+          Anyone creates a claim by staking USDC on one side. Another party (or an
           autonomous agent) challenges by staking the other side. At the deadline the
           oracle fetches the evidence URL, asks an LLM to evaluate the outcome against
           the settlement rule, and submits the verdict on chain. The contract pays out
@@ -644,29 +645,33 @@ export default function DocsPage() {
         </p>
       </Section>
 
-      <Section id="why-bot" eyebrow="02" title="Why BOT on BOT Chain">
+      <Section id="why-base" eyebrow="02" title="Why USDC on Base">
         <p>
-          BOT Chain is an EVM L1 whose native BOT token is both the gas token and
-          the stake currency. That property changes the economics of a
-          stake-and-settle market enough to be worth calling out:
+          Base is an Ethereum L2 where ETH pays gas and USDC — Circle&apos;s
+          dollar stablecoin, native to the chain — carries value. Splitting those
+          two jobs changes the economics of a stake-and-settle market enough to be
+          worth calling out:
         </p>
         <div className="grid gap-3 sm:grid-cols-2">
-          <Card title="No ERC-20 approval dance">
-            Stakes use <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">msg.value</code>.
-            One signature opens or accepts a claim — no separate <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">approve()</code> tx,
-            no allowance to manage.
+          <Card title="Stakes hold their value">
+            A market open for a week is denominated in dollars, not in a token that
+            can move 30% before settlement. The payout means what it meant when the
+            claim was created.
           </Card>
-          <Card title="Ultra-low fees">
-            Average transaction fees sit around $0.06, far below most EVM chains
-            during congestion — a settlement tx never eats the pot.
+          <Card title="One confirmation, not two">
+            USDC is an ERC-20, so stakes need an allowance. Base Account batches{" "}
+            <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">approve()</code>{" "}
+            and the stake into a single atomic confirmation via EIP-5792; plain EOAs
+            fall back to the classic two transactions.
           </Card>
-          <Card title="Sub-second blocks, fast finality">
-            ≈0.75 second block times with fast deterministic finality: the oracle
-            can settle and pay out inside a single user-visible moment.
+          <Card title="Cent-level fees, ~2s blocks">
+            An L2 settlement transaction never eats the pot, and the oracle can
+            settle and pay out inside a single user-visible moment.
           </Card>
-          <Card title="Single-token semantics">
-            Gas and stakes share one unit. Treasury operations &mdash; agent funding,
-            payouts, balance reads &mdash; all happen in the same unit users see in the UI.
+          <Card title="Agents pay without holding gas">
+            x402&apos;s exact scheme uses USDC EIP-3009 authorizations: an agent
+            signs, the facilitator submits and pays the gas. Buying data needs no
+            approval and no ETH in the buyer&apos;s wallet.
           </Card>
         </div>
       </Section>
@@ -675,13 +680,13 @@ export default function DocsPage() {
         <p>
           Three independent tiers, each running where it fits best:
         </p>
-        <DiagramFrame caption="Top to bottom: user wallets → Next.js frontend (Vercel) and worker agents (Railway) → BOT Chain contract + ancillary services (Neon read-index, LLM layer).">
+        <DiagramFrame caption="Top to bottom: user wallets → Next.js frontend (Vercel) and worker agents (Railway) → the Mimir contract on Base Sepolia + ancillary services (Neon read-index, LLM layer).">
           <ArchitectureDiagram />
         </DiagramFrame>
         <ul className="list-disc space-y-2 pl-5 text-pv-text/85">
           <li>
             <strong className="text-pv-text">Frontend (Vercel).</strong> Next.js App
-            Router with serverless API routes. Reads come straight from the BOT Chain
+            Router with serverless API routes. Reads come straight from the Base
             RPC; writes are user-signed via wagmi/viem.
           </li>
           <li>
@@ -712,8 +717,8 @@ export default function DocsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Card title="What users control">
             Users choose whether to create, challenge, or inspect a market. Their
-            wallet signs stake-bearing transactions directly against the BOT Chain
-            contract; the app never holds custody of user funds.
+            wallet signs stake-bearing transactions directly against the Mimir
+            contract on Base; the app never holds custody of user funds.
           </Card>
           <Card title="What agents control">
             Agents draft markets, challenge open claims, buy paid evidence or
@@ -803,30 +808,40 @@ export default function DocsPage() {
         </div>
       </Section>
 
-      <Section id="botchain" eyebrow="07" title="The BOT Chain stack">
+      <Section id="base-stack" eyebrow="07" title="The Base stack">
         <p>
-          Mimir runs entirely on BOT Chain. Each piece of the network earns its
-          keep:
+          Mimir runs entirely on Base Sepolia (chain 84532). Each piece of the
+          network earns its keep:
         </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Card title="BOT (native)">
-            BOT Chain&apos;s gas token. Stakes use <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">msg.value</code>,
-            settlement pays BOT directly, no wrapper contracts.
+          <Card title="USDC (stakes and payouts)">
+            Circle&apos;s official Base Sepolia USDC, 6 decimals. Every stake,
+            payout, refund and agent payment is denominated in it — no wrapper
+            contracts, no synthetic token.
+          </Card>
+          <Card title="ETH (gas only)">
+            Native ETH pays transaction fees and nothing else. Agents need a small
+            ETH balance for their own contract writes; buying data over x402 needs
+            none, because the facilitator pays that settlement gas.
           </Card>
           <Card title="Local agent wallets">
             The oracle, market-creator, and council personas each sign with their
             own private key, held only in the worker process env. The web server
             never sees an agent key — only their public addresses.
           </Card>
-          <Card title="BOT faucet">
-            Testnet BOT (tBOT) is free from{" "}
-            <a href="https://faucet.botchain.ai/basic" target="_blank" rel="noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">faucet.botchain.ai</a>{" "}
-            — 10 tBOT per address per day, enough to stake and settle the same minute.
+          <Card title="Faucet">
+            Base Sepolia ETH and test USDC are free from the{" "}
+            <a href="https://portal.cdp.coinbase.com/products/faucet" target="_blank" rel="noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">CDP faucet</a>{" "}
+            — enough to stake and settle the same minute.
           </Card>
-          <Card title="BOTScan + BDEX infra">
-            <a href="https://scan.bohr.life" target="_blank" rel="noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">scan.bohr.life</a>{" "}
-            indexes every stake and settlement; Multicall3 and the BDEX V2/V3
-            contracts live on-chain for batch reads and future liquidity.
+          <Card title="BaseScan">
+            <a href="https://sepolia.basescan.org" target="_blank" rel="noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">sepolia.basescan.org</a>{" "}
+            indexes every stake, settlement and x402 payment, so any number on this
+            site can be checked against the chain.
+          </Card>
+          <Card title="Base Account">
+            An EIP-5792 smart wallet: it batches the USDC approval and the stake
+            into one confirmation. Plain EOAs still work, they just sign twice.
           </Card>
         </div>
       </Section>
@@ -835,26 +850,27 @@ export default function DocsPage() {
         <p>
           Mimir grew an economic layer of its own. Agents stopped being purely
           operational and became market participants — they pay each other small
-          BOT amounts for data and verdicts, sell their own outputs, and every
-          payment is recorded and shown live. The mechanism is simple: HTTP 402
-          price quotes, settled as plain native BOT transfers and verified
-          on-chain per request.
+          USDC amounts for data and verdicts, sell their own outputs, and every
+          payment is recorded and shown live. The mechanism is the x402 protocol:
+          a 402 carries the price, the buyer signs a USDC authorization, and a
+          facilitator verifies and settles it on chain.
         </p>
 
-        <Card title="Agents as paying + selling economic actors (HTTP 402 + BOT)">
-          Agents pay-per-request over the HTTP <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">402 Payment Required</code>{" "}
-          status in small BOT amounts: the buyer sends a native BOT transfer, then
-          retries with the tx hash — the seller verifies recipient, amount, sender,
-          and freshness on-chain before serving. Paid endpoints today:{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">GET /api/premium/price</code> (0.001 BOT),{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/oracle</code> (0.005 BOT),{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/council/preflight</code> (0.001 BOT), and{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">GET /api/council/reasoning</code> (0.001 BOT, paid
+        <Card title="Agents as paying + selling economic actors (x402 + USDC)">
+          Agents pay-per-request over x402 v2. An unpaid call gets{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">402 Payment Required</code>{" "}
+          with the price; the buyer signs a USDC authorization and retries, and the
+          facilitator verifies and settles it — the buyer never sends a transaction
+          and needs no ETH. Paid endpoints today:{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">GET /api/premium/price</code> ($0.001),{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/oracle</code> ($0.005),{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/council/preflight</code> ($0.001), and{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">GET /api/council/reasoning</code> ($0.001, paid
           directly to each persona&apos;s own wallet). The same agent can sit on both
           sides — buying a price quote, selling its reasoning.
         </Card>
 
-        <DiagramFrame caption="BOT payment flow. The payer (oracle) sends a native BOT transfer from its own wallet; the paid endpoint quotes a price, verifies the transfer on-chain (no facilitator, no batching contract), and the receipt is recorded to Neon and shown live at /revenue.">
+        <DiagramFrame caption="x402 payment flow. The payer (oracle) signs a USDC authorization with its own key; the paid endpoint quotes a price, the facilitator verifies and settles on Base — paying the settlement gas — and the receipt is recorded to Neon and shown live at /revenue.">
           <NanopaymentDiagram />
         </DiagramFrame>
 
@@ -868,7 +884,7 @@ export default function DocsPage() {
           peer reads per market.
         </Card>
 
-        <DiagramFrame caption="Council payment mesh. Creator and oracle buy persona intelligence, while budgeted peer reads let personas purchase each other's reasoning, each signing with its own key. Every read is a small BOT payment, every receipt lands in the revenue ledger — and after a self-resolving settlement the oracle routes cross-entropy bonuses back into the wallets of jurors who actually moved the market's belief.">
+        <DiagramFrame caption="Council payment mesh. Creator and oracle buy persona intelligence, while budgeted peer reads let personas purchase each other's reasoning, each signing with its own key. Every read is a small USDC payment, every receipt lands in the revenue ledger — and after a self-resolving settlement the oracle routes cross-entropy bonuses back into the wallets of jurors who actually moved the market's belief.">
           <CouncilNanopaymentMeshDiagram />
         </DiagramFrame>
 
@@ -877,7 +893,7 @@ export default function DocsPage() {
           <em>self-resolving prediction market</em> over the council (adapted from{" "}
           <a href="https://arxiv.org/abs/2306.04305" target="_blank" rel="noopener noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">arXiv:2306.04305</a>).
           Jurors vote <em>sequentially in shuffled order</em>, each buying costs{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">0.001 BOT</code> straight into that
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">$0.001</code> in USDC straight into that
           persona&apos;s wallet, and each juror sees the prior reports in its prompt.
           Once a quorum of decisive reports exists, every further vote flips an
           α-coin — the market may stop, so nobody knows who reports last. The
@@ -885,14 +901,14 @@ export default function DocsPage() {
           independently fetched evidence plus the full history: that belief
           settles the claim and grades the jury. Every report is scored with a
           cross-entropy market scoring rule against the reference — parroting the
-          prior earns exactly zero, informative updates split a BOT bonus pool
+          prior earns exactly zero, informative updates split a USDC bonus pool
           paid into juror wallets after settlement. The q-chain and scores are
           committed inside{" "}
           <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">evidenceHash</code>, so the whole scored
           market is auditable on-chain.
         </Card>
 
-        <DiagramFrame caption="Self-resolving jury settlement. Jurors report sequentially in shuffled order (each seeing the prior reports), an α-coin bounds the market length, and the oracle's terminal report — built from evidence the jurors cannot touch — both settles the claim and grades every juror with a cross-entropy score. Positive scorers split a BOT bonus pool; below quorum the oracle resolves solo.">
+        <DiagramFrame caption="Self-resolving jury settlement. Jurors report sequentially in shuffled order (each seeing the prior reports), an α-coin bounds the market length, and the oracle's terminal report — built from evidence the jurors cannot touch — both settles the claim and grades every juror with a cross-entropy score. Positive scorers split a USDC bonus pool; below quorum the oracle resolves solo.">
           <JuryDiagram />
         </DiagramFrame>
 
@@ -900,21 +916,23 @@ export default function DocsPage() {
           <Card title="Subscription pass">
             One{" "}
             <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/council/subscribe</code>{" "}
-            payment (0.01 BOT) returns an HMAC-signed pass that unlocks a time-boxed
-            window of free council reads — the recurring-access tier on top of the
-            per-read payment model.
+            payment ($0.01 in USDC) returns an HMAC-signed pass that unlocks a
+            time-boxed window of free council reads — a bundled-access tier on top
+            of the per-read payment model.
           </Card>
           <Card title="Durable revenue ledger">
-            Every verified payment is recorded to Neon (the{" "}
-            <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">payments</code> table) and shown live
-            at <Link href="/revenue" className="text-pv-emerald underline-offset-2 hover:underline">/revenue</Link>.
-            Each receipt links to the paying agent&apos;s on-chain account and to its
-            BOT transfer on BOTScan.
+            Every settled payment is recorded to Neon (the{" "}
+            <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">payments_v2</code> table, amounts held
+            as atomic integers) and shown live at{" "}
+            <Link href="/revenue" className="text-pv-emerald underline-offset-2 hover:underline">/revenue</Link>.
+            Each receipt links to the paying agent&apos;s account and to its USDC
+            settlement on BaseScan.
           </Card>
-          <Card title="Replay-proof verification">
-            A payment tx unlocks exactly one read: the server checks the transfer
-            on-chain (recipient, amount, sender, freshness) and rejects reused
-            hashes against the durable ledger — no facilitator contract in the loop.
+          <Card title="Replay-proof by construction">
+            One signed authorization unlocks exactly one read. Authorizations are
+            single-use at the facilitator, and the ledger holds a unique index on{" "}
+            <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">(network, payment_identifier)</code>,
+            so a retried settlement can never be counted twice.
           </Card>
           <Card title="Pull-payment safety (contract v2)">
             <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">resolveClaim</code> payouts are pushed, but
@@ -939,11 +957,11 @@ export default function DocsPage() {
           <h3 className="mb-2 font-bold tracking-tight text-pv-text">Contract</h3>
           <ul className="space-y-2 text-sm leading-relaxed text-pv-text/80">
             <li>
-              <strong className="text-pv-text">Mimir (live on BOT Chain Testnet, chain 968).</strong>{" "}
+              <strong className="text-pv-text">Mimir (live on Base Sepolia, chain 84532).</strong>{" "}
               {process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ? (
                 <a
                   className="break-all font-mono text-xs text-pv-emerald underline-offset-2 hover:underline"
-                  href={`https://scan.bohr.life/address/${process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}`}
+                  href={getExplorerAddressUrl(process.env.NEXT_PUBLIC_CONTRACT_ADDRESS)}
                   target="_blank"
                   rel="noreferrer"
                 >
@@ -996,14 +1014,15 @@ export default function DocsPage() {
       <Section id="play" eyebrow="11" title="How to play">
         <ol className="list-decimal space-y-3 pl-5 text-pv-text/85">
           <li>
-            <strong className="text-pv-text">Get testnet BOT.</strong>{" "}
-            <a className="text-pv-emerald underline" href="https://faucet.botchain.ai/basic" target="_blank" rel="noreferrer">faucet.botchain.ai</a>{" "}
-            on BOT Chain Testnet — 10 tBOT per address per day, free.
+            <strong className="text-pv-text">Get test USDC and a little ETH.</strong>{" "}
+            The <a className="text-pv-emerald underline" href="https://portal.cdp.coinbase.com/products/faucet" target="_blank" rel="noreferrer">CDP faucet</a>{" "}
+            hands out both on Base Sepolia, free. USDC covers your stake, ETH covers gas.
           </li>
           <li>
             <strong className="text-pv-text">Connect your wallet.</strong>{" "}
-            The site auto-switches you to BOT Chain Testnet on connect and adds the
-            chain if your wallet doesn&apos;t know it.
+            The site auto-switches you to Base Sepolia on connect and adds the
+            chain if your wallet doesn&apos;t know it. Pick Base Account to approve
+            and stake in a single confirmation.
           </li>
           <li>
             <strong className="text-pv-text">Either create a claim or challenge one.</strong>{" "}
@@ -1052,10 +1071,10 @@ export default function DocsPage() {
             both creator and challenger of the same claim.
           </Card>
           <Card title="Mainnet?">
-            Mimir runs on BOT Chain Testnet (chain 968) as of writing. The codebase
-            is chain-config driven (see <code className="rounded bg-pv-surface2 px-1 text-xs">lib/base.ts</code>) —
-            a mainnet (chain 677) redeploy is mostly a chain definition swap plus a
-            logs-capable RPC endpoint.
+            Mimir runs on Base Sepolia (chain 84532) as of writing. The codebase is
+            chain-config driven (see <code className="rounded bg-pv-surface2 px-1 text-xs">lib/base.ts</code>) —
+            a Base mainnet redeploy is mostly swapping the chain definition and the
+            USDC address, plus a production RPC endpoint and a CDP facilitator.
           </Card>
         </div>
       </Section>
