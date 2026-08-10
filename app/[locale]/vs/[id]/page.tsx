@@ -29,6 +29,7 @@ import {
   type VSData,
 } from "@/lib/contract";
 import { getExplorerTxUrl, createBasePublicClient } from "@/lib/base";
+import { buildSeriesView } from "@/lib/series-view";
 import { getPendingVS } from "@/lib/pending-vs";
 import { openPeepsAvatar } from "@/lib/avatars";
 import { formatUsdc } from "@/lib/money";
@@ -961,11 +962,18 @@ export default function VSDetailPage() {
     setIsRivalryExpanded(false);
   }, [vs?.id, rivalryChain.length, designLifecycleStep, designResolvedOutcome]);
 
-  const visibleRivalryChain =
-    rivalryChain.length > 2 && !isRivalryExpanded
-      ? rivalryChain.slice(0, 2)
-      : rivalryChain;
-  const canLoadMoreRivalry = rivalryChain.length > 2 && !isRivalryExpanded;
+  // The series is derived from the parent chain, not from the fetch order: the
+  // round number and the running score have to survive a chain that arrives out
+  // of order or with an ancestor outside the read-index window.
+  const seriesView = useMemo(
+    () => buildSeriesView(vs?.id ?? 0, rivalryChain),
+    [vs?.id, rivalryChain],
+  );
+  const visibleSeriesRows =
+    seriesView.rows.length > 2 && !isRivalryExpanded
+      ? seriesView.rows.slice(0, 2)
+      : seriesView.rows;
+  const canLoadMoreRivalry = seriesView.rows.length > 2 && !isRivalryExpanded;
   const isRivalryDataReady =
     isSampleVS || (rivalryLoadedForVsId !== null && rivalryLoadedForVsId === vs?.id);
 
@@ -2255,6 +2263,13 @@ export default function VSDetailPage() {
                               <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-pv-emerald/85">
                                 {t("rivalry")}
                               </h2>
+                              {/* Only shown once a round has actually been decided: a
+                                  0-0 badge reads as a played draw. */}
+                              {seriesView.scoreLabel && (
+                                <span className="rounded-md border border-white/[0.12] bg-white/[0.03] px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums text-pv-text">
+                                  {seriesView.scoreLabel}
+                                </span>
+                              )}
                             </div>
                             <p className="mt-2 text-sm leading-relaxed text-pv-muted sm:mt-3">
                               {t("rivalryHint")}
@@ -2281,14 +2296,15 @@ export default function VSDetailPage() {
                           <div className="rounded-xl border border-white/[0.08] bg-pv-bg/30 p-4 sm:p-5">
                             <p className="text-sm text-pv-muted">{tc("loading")}</p>
                           </div>
-                        ) : rivalryChain.length > 1 ? (
+                        ) : seriesView.rows.length > 1 ? (
                           <div className="rounded-xl border border-white/[0.08] bg-pv-bg/30 p-4 sm:p-5">
                             <div className="space-y-3">
-                              {visibleRivalryChain.map((entry, index) => {
+                              {visibleSeriesRows.map((row) => {
+                                const entry = row.claim;
                                 const inner = (
                                   <div
                                     className={`${RIVALRY_ITEM_BASE_CLASS} ${
-                                      entry.id === vs.id
+                                      row.isCurrent
                                         ? RIVALRY_ITEM_ACTIVE_CLASS
                                         : "border-white/[0.1]"
                                     }`}
@@ -2296,17 +2312,32 @@ export default function VSDetailPage() {
                                     <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                                       <div className="flex items-center gap-2 text-pv-muted text-[10px] font-bold uppercase tracking-[0.14em]">
                                         <GitBranch size={12} />
-                                        {t("roundLabel", {
-                                          round: index + 1,
-                                        })}
+                                        {/* From the parent chain, not the array index —
+                                            a missing ancestor must not renumber rounds. */}
+                                        {t("roundLabel", { round: row.round })}
                                       </div>
                                       <Badge status={entry.state} compact />
                                     </div>
                                     <div className="font-semibold text-[14px] leading-snug sm:text-[15px]">
                                       {entry.question}
                                     </div>
-                                    <div className="text-xs text-pv-muted mt-1">
-                                      {t("pool")}: {formatUsdc(getVSTotalPot(entry))}
+                                    <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-pv-muted">
+                                      <span>
+                                        {t("pool")}: {formatUsdc(getVSTotalPot(entry))}
+                                      </span>
+                                      {/* A refund is shown as a refund. Calling it a draw
+                                          would imply a result the escrow never paid. */}
+                                      {row.refunded ? (
+                                        <span className="font-semibold uppercase tracking-[0.12em] text-pv-muted/80">
+                                          {t("seriesRefunded")}
+                                        </span>
+                                      ) : row.winner !== "none" ? (
+                                        <span className="font-semibold uppercase tracking-[0.12em] text-pv-emerald/85">
+                                          {row.winner === "creator"
+                                            ? t("seriesCreatorWon")
+                                            : t("seriesChallengersWon")}
+                                        </span>
+                                      ) : null}
                                     </div>
                                   </div>
                                 );
@@ -2326,6 +2357,12 @@ export default function VSDetailPage() {
                                 );
                               })}
                             </div>
+
+                            {seriesView.refundedRounds > 0 && (
+                              <p className="pt-3 text-[11px] leading-relaxed text-pv-muted/80">
+                                {t("seriesRefundNote", { count: seriesView.refundedRounds })}
+                              </p>
+                            )}
 
                             {canLoadMoreRivalry ? (
                               <div className="pt-3 text-center">

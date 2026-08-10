@@ -278,8 +278,8 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 6.5 Rematch Ladder — P1 mevcut `parentId` üzerine
 
-- [ ] Settled VS sayfasında tüm parent/child zincirini görünür yap.
-- [ ] Read-index'te cycle guard ile rivalry root, round number ve seri skorunu
+- [x] Settled VS sayfasında tüm parent/child zincirini görünür yap.
+- [x] Read-index'te cycle guard ile rivalry root, round number ve seri skorunu
   hesapla.
 - [ ] `Run it back`, Best of 3, Best of 5 akışlarında question/source/rule
   metadata'sını devral; stake ve deadline'ı yeniden seçtir.
