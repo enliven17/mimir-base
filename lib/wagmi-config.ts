@@ -9,7 +9,13 @@
  */
 import { createConfig, http } from "wagmi";
 // Import from wagmi's own re-export so connector types match createConfig (wagmi v3).
-import { coinbaseWallet, injected, metaMask, walletConnect } from "wagmi/connectors";
+import {
+  baseAccount,
+  coinbaseWallet,
+  injected,
+  metaMask,
+  walletConnect,
+} from "wagmi/connectors";
 import { baseSepolia, getBaseRpcUrl } from "./base";
 
 // WalletConnect Cloud project id — get one free at https://cloud.walletconnect.com.
@@ -27,6 +33,9 @@ const APP_METADATA = {
 export const wagmiConfig = createConfig({
   chains: [baseSepolia],
   connectors: [
+    // Base Account first: it is the only connector that can batch
+    // approve(USDC) + createClaim into one confirmation (EIP-5792).
+    baseAccount({ appName: APP_METADATA.name, appLogoUrl: APP_METADATA.icons[0] }),
     metaMask(),
     coinbaseWallet({
       appName:    APP_METADATA.name,

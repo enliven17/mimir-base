@@ -511,21 +511,11 @@ export async function getVSFull(
 }
 
 // ── USDC allowance ────────────────────────────────────────────────────────────
-async function ensureUsdcAllowance(
+/** Approve the Mimir contract for USDC. Callers check the allowance first. */
+async function approveUsdc(
   walletClient: WalletClient,
   owner: `0x${string}`,
-  amountUnits: bigint
 ): Promise<void> {
-  if (amountUnits <= 0n) return;
-  const client = getPublicClient();
-  const current = (await client.readContract({
-    address: USDC_ADDRESS,
-    abi: ERC20_ABI,
-    functionName: "allowance",
-    args: [owner, CONTRACT_ADDRESS],
-  })) as bigint;
-  if (current >= amountUnits) return;
-
   const hash = await walletClient.writeContract({
     address: USDC_ADDRESS,
     abi: ERC20_ABI,
@@ -534,8 +524,72 @@ async function ensureUsdcAllowance(
     account: owner,
     chain: baseSepolia,
   });
-  const receipt = await client.waitForTransactionReceipt({ hash });
+  const receipt = await getPublicClient().waitForTransactionReceipt({ hash });
   if (receipt.status === "reverted") throw new Error("USDC approve reverted");
+}
+
+/** True when the allowance already covers this stake. */
+async function hasUsdcAllowance(owner: `0x${string}`, amountUnits: bigint): Promise<boolean> {
+  if (amountUnits <= 0n) return true;
+  const current = (await getPublicClient().readContract({
+    address: USDC_ADDRESS,
+    abi: ERC20_ABI,
+    functionName: "allowance",
+    args: [owner, CONTRACT_ADDRESS],
+  })) as bigint;
+  return current >= amountUnits;
+}
+
+/**
+ * Base Account (and any EIP-5792 wallet) can run approve + create/challenge as
+ * one atomic batch, so the user signs once instead of twice. Returns null when
+ * the wallet cannot batch atomically, and the caller falls back to two txs.
+ */
+async function trySendAtomicBatch(
+  wc: WalletClient,
+  account: `0x${string}`,
+  functionName: string,
+  args: unknown[],
+): Promise<ContractWriteResult | null> {
+  try {
+    const capabilities = await wc.getCapabilities({ account, chainId: baseSepolia.id });
+    // "supported" means atomic — "ready"/undefined wallets would split the batch
+    // into separate confirmations, which is exactly what we are avoiding.
+    if (capabilities?.atomic?.status !== "supported") return null;
+  } catch {
+    return null; // wallet_getCapabilities unsupported → classic EOA
+  }
+
+  const { id } = await wc.sendCalls({
+    account,
+    chain: baseSepolia,
+    calls: [
+      {
+        to: USDC_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: "approve",
+        args: [CONTRACT_ADDRESS, maxUint256],
+      },
+      {
+        to: CONTRACT_ADDRESS,
+        abi: MIMIR_ABI,
+        functionName: functionName as never,
+        args: args as never,
+      },
+    ],
+  });
+
+  const status = await wc.waitForCallsStatus({ id, timeout: 60_000 });
+  if (status.status !== "success") {
+    throw new Error(`Batched approve + ${functionName} failed (${status.status})`);
+  }
+  // Atomic batch = one transaction on chain; the contract call is the last receipt.
+  const receipt = status.receipts?.[status.receipts.length - 1];
+  const txHash = receipt?.transactionHash;
+  if (!txHash) throw new Error("Batched call returned no transaction hash");
+
+  const explorerUrl = getExplorerTxUrl(txHash);
+  return { txHash, explorerUrl, explorerTxHash: explorerUrl, receipt, pending: false };
 }
 
 // ── Write: browser (wagmi / injected wallet) ──────────────────────────────────
@@ -560,8 +614,15 @@ async function sendBrowserTx(
     account,
   });
 
-  if (stakeUsdc > 0) {
-    await ensureUsdcAllowance(wc, account, usdcToUnits(stakeUsdc));
+  const stakeUnits = stakeUsdc > 0 ? usdcToUnits(stakeUsdc) : 0n;
+  const needsApprove = stakeUnits > 0n && !(await hasUsdcAllowance(account, stakeUnits));
+
+  if (needsApprove) {
+    // One-confirmation path when the wallet can batch atomically (Base Account).
+    const batched = await trySendAtomicBatch(wc, account, functionName, args);
+    if (batched) return batched;
+    // Classic EOA: approve, then write.
+    await approveUsdc(wc, account);
   }
 
   const txHash = await wc.writeContract({
@@ -603,8 +664,8 @@ async function sendServerTx(
     account,
   });
 
-  if (stakeUsdc > 0) {
-    await ensureUsdcAllowance(walletClient, account.address, usdcToUnits(stakeUsdc));
+  if (stakeUsdc > 0 && !(await hasUsdcAllowance(account.address, usdcToUnits(stakeUsdc)))) {
+    await approveUsdc(walletClient, account.address);
   }
 
   const txHash = await walletClient.writeContract({

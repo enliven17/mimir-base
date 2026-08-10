@@ -29,6 +29,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.52.0",
+    "@base-org/account": "^2.5.9",
     "@fontsource/maple-mono": "^5.2.6",
     "@neondatabase/serverless": "^1.1.0",
     "@tanstack/react-query": "^5.100.10",
