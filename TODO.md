@@ -498,7 +498,7 @@ altyapısı sunmaktır.
 
 ### 10.4 Otomatik market-creator mode matrix
 
-- [ ] Market-creator output schema'sına canonical `subjectType`, `settlementMode`,
+- [x] Market-creator output schema'sına canonical `subjectType`, `settlementMode`,
   `productModifiers`, `contextPack`, `stakePolicy` ve `modeRationale` ekle.
 - [x] Pool: public, çok katılımcılı konular için varsayılan otomatik mode.
 - [x] Duel: yalnız belirli target agent/user varsa private duel üret; targetsızsa

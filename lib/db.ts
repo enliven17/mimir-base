@@ -255,6 +255,42 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_resource ON payments_v2(resource)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_seller ON payments_v2(seller)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_tx ON payments_v2(network, transaction_hash, resource)" },
+  /**
+   * Market-creator proposals, in the canonical mode schema (§10.4).
+   *
+   * Off-chain metadata, not a read-index projection: a proposal is a record of what
+   * the creator DECIDED, including the ones it chose not to publish, which by
+   * definition never reach the chain and so cannot be rebuilt from it. Keeping them
+   * is the only way to measure shadow-mode precision against human review before
+   * autonomous publishing is switched on.
+   */
+  { sql: `CREATE TABLE IF NOT EXISTS market_proposals (
+    proposal_id TEXT PRIMARY KEY,
+    created_at BIGINT NOT NULL,
+    question TEXT NOT NULL,
+    creator_position TEXT NOT NULL,
+    counter_position TEXT NOT NULL,
+    category TEXT NOT NULL,
+    subject_type TEXT NOT NULL,
+    settlement_mode TEXT NOT NULL,
+    product_modifiers TEXT NOT NULL DEFAULT '[]',
+    mode_rationale TEXT NOT NULL DEFAULT '',
+    stake_policy TEXT NOT NULL DEFAULT '{}',
+    context_pack_hash TEXT,
+    resolution_url TEXT NOT NULL DEFAULT '',
+    settlement_rule TEXT NOT NULL DEFAULT '',
+    deadline BIGINT NOT NULL DEFAULT 0,
+    quality_score INTEGER NOT NULL DEFAULT 0,
+    preflight_verdict TEXT NOT NULL DEFAULT '{}',
+    disposition TEXT NOT NULL,
+    blocked_by TEXT,
+    /** Set when the proposal was actually published. */
+    claim_id BIGINT,
+    /** Human review outcome, filled in later: agree | disagree | unreviewed. */
+    review TEXT NOT NULL DEFAULT 'unreviewed'
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_market_proposals_created ON market_proposals(created_at DESC)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_market_proposals_disposition ON market_proposals(disposition)" },
   {
     sql: "INSERT INTO sync_meta(key, value) VALUES($1, $2) ON CONFLICT(key) DO NOTHING",
     args: ["last_claim_count", "0"],
@@ -958,6 +994,112 @@ function getBigInt(value: unknown): bigint {
   if (typeof value === "number") return BigInt(Math.trunc(value));
   if (typeof value === "string" && value.trim().length > 0) return BigInt(value.trim());
   return 0n;
+}
+
+export interface MarketProposalRow {
+  proposal_id: string;
+  created_at: number;
+  question: string;
+  creator_position: string;
+  counter_position: string;
+  category: string;
+  subject_type: string;
+  settlement_mode: string;
+  product_modifiers: string[];
+  mode_rationale: string;
+  stake_policy: Record<string, unknown>;
+  context_pack_hash: string | null;
+  resolution_url: string;
+  settlement_rule: string;
+  deadline: number;
+  quality_score: number;
+  preflight_verdict: Record<string, unknown>;
+  disposition: string;
+  blocked_by: string | null;
+  claim_id: number | null;
+}
+
+/**
+ * Record a market-creator proposal.
+ *
+ * Idempotent on proposal_id: a worker retrying a run must not create a second
+ * record of the same decision, or shadow-mode precision would be measured against
+ * inflated counts.
+ */
+export async function insertMarketProposal(row: MarketProposalRow): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO market_proposals (
+      proposal_id, created_at, question, creator_position, counter_position, category,
+      subject_type, settlement_mode, product_modifiers, mode_rationale, stake_policy,
+      context_pack_hash, resolution_url, settlement_rule, deadline, quality_score,
+      preflight_verdict, disposition, blocked_by, claim_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT (proposal_id) DO NOTHING`,
+    args: [
+      row.proposal_id,
+      row.created_at,
+      row.question,
+      row.creator_position,
+      row.counter_position,
+      row.category,
+      row.subject_type,
+      row.settlement_mode,
+      JSON.stringify(row.product_modifiers),
+      row.mode_rationale,
+      JSON.stringify(row.stake_policy),
+      row.context_pack_hash,
+      row.resolution_url,
+      row.settlement_rule,
+      row.deadline,
+      row.quality_score,
+      JSON.stringify(row.preflight_verdict),
+      row.disposition,
+      row.blocked_by,
+      row.claim_id,
+    ],
+  });
+}
+
+/** Link a published claim back to the proposal that produced it. */
+export async function attachProposalClaimId(proposalId: string, claimId: number): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: "UPDATE market_proposals SET claim_id = ? WHERE proposal_id = ?",
+    args: [claimId, proposalId],
+  });
+}
+
+/**
+ * Shadow-mode precision: of the proposals a human reviewed, how many did they
+ * agree with? This is the number the roadmap gates autonomous publishing on, so it
+ * deliberately reports the reviewed count too — 100% of two reviews is not
+ * evidence.
+ */
+export async function getProposalPrecision(): Promise<{
+  total: number;
+  reviewed: number;
+  agreed: number;
+  precisionBps: number | null;
+}> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT
+      COUNT(*) AS total,
+      COUNT(*) FILTER (WHERE review <> 'unreviewed') AS reviewed,
+      COUNT(*) FILTER (WHERE review = 'agree') AS agreed
+    FROM market_proposals`,
+  });
+  const row = (result.rows[0] ?? {}) as Record<string, unknown>;
+  const total = Number(row.total ?? 0);
+  const reviewed = Number(row.reviewed ?? 0);
+  const agreed = Number(row.agreed ?? 0);
+  return {
+    total,
+    reviewed,
+    agreed,
+    precisionBps: reviewed > 0 ? Math.round((agreed * 10_000) / reviewed) : null,
+  };
 }
 
 export async function insertPayment(e: PaymentRow): Promise<void> {

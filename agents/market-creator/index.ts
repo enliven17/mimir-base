@@ -27,7 +27,7 @@
 // rationale.
 applyWorkerGeminiKey("CREATOR_GEMINI_API_KEY");
 
-import { formatEther } from "viem";
+import { formatEther, keccak256, toBytes } from "viem";
 import { requireEnv, requireAnyLLMKey, applyWorkerGeminiKey } from "../../lib/agent-bootstrap";
 import { callLLM, activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint, pickGeminiModel, extractJson } from "../../lib/llm";
 import {
@@ -46,6 +46,8 @@ import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
 import { reportingPoll } from "../../lib/ops/heartbeat";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../lib/usdc";
 import { gatherCouncilPreflight } from "./council-preflight";
+import { insertMarketProposal } from "../../lib/db";
+import { toCanonicalMode } from "../../lib/market-modes";
 import { dimensionsReported } from "../../lib/market-creator/preflight-score";
 
 // ── Config ────────────────────────────────────────────────────────────────────
@@ -57,6 +59,12 @@ const MAX_CLAIMS_PER_RUN  = Number(process.env.MAX_CLAIMS_PER_RUN ?? "5");
 const MAX_ACTIVE_CLAIMS   = Number(process.env.MAX_ACTIVE_CLAIMS ?? "30");
 const RUN_INTERVAL_HOURS  = Number(process.env.RUN_INTERVAL_HOURS ?? "6");
 const MIN_QUALITY_SCORE   = 70; // 0-100
+// Proposal-only until shadow precision has been measured against human review.
+// Opt-in rather than opt-out: the default has to be the safe one.
+const SHADOW_MODE         = process.env.MARKET_CREATOR_AUTONOMOUS !== "1";
+const DEFAULT_MAX_CHALLENGERS = Number(process.env.MARKET_CREATOR_MAX_CHALLENGERS ?? "10");
+/** U+001F, so a proposal id cannot be forged by a question containing the joiner. */
+const UNIT_SEPARATOR = String.fromCharCode(0x1f);
 const CRYPTO_MIN_THRESHOLD_RATIO = Number(process.env.CRYPTO_MIN_THRESHOLD_RATIO ?? "0.65");
 const CRYPTO_MAX_THRESHOLD_RATIO = Number(process.env.CRYPTO_MAX_THRESHOLD_RATIO ?? "1.35");
 const CREATE_DELAY_MS = Number(process.env.MARKET_CREATE_DELAY_MS ?? "600000");
@@ -792,6 +800,73 @@ async function sweepAndCount(): Promise<{ cancelled: number; joinable: number; j
   return { cancelled, joinable, joinableClaims };
 }
 
+/**
+ * Persist one proposal in the canonical mode schema.
+ *
+ * Never throws: a worker must not stop creating markets because the proposal log is
+ * unreachable. A missing proposal costs precision measurement; a crashed worker
+ * costs the whole run.
+ */
+async function recordProposal(
+  candidate: ClaimCandidate,
+  disposition: "create" | "shadow",
+): Promise<string | null> {
+  const deadline = Math.floor(Date.now() / 1000) + Math.round(candidate.deadlineHours * 3600);
+  const mode = toCanonicalMode({
+    marketType: candidate.marketType,
+    oddsMode: "pool",
+    maxChallengers: DEFAULT_MAX_CHALLENGERS,
+  });
+  // Deterministic id from the market's identity, so a retried run inserts nothing
+  // new — shadow precision must not be measured against duplicates.
+  const proposalId = keccak256(
+    toBytes(
+      [candidate.question, candidate.resolutionUrl, String(deadline), candidate.category].join(
+        UNIT_SEPARATOR,
+      ),
+    ),
+  );
+
+  try {
+    await insertMarketProposal({
+      proposal_id: proposalId,
+      created_at: Date.now(),
+      question: candidate.question,
+      creator_position: candidate.creatorPosition,
+      counter_position: candidate.counterPosition,
+      category: candidate.category,
+      subject_type: mode.subjectType,
+      settlement_mode: mode.settlementMode,
+      product_modifiers: mode.productModifiers,
+      mode_rationale:
+        mode.unsupported !== undefined
+          ? `unsupported stored rules: ${JSON.stringify(mode.unsupported)}`
+          : `public multi-participant topic drafted from ${candidate.sourceType}`,
+      stake_policy: {
+        creatorStakeUsdc: CREATOR_STAKE_USDC,
+        maxChallengers: DEFAULT_MAX_CHALLENGERS,
+        challengerPayoutBps: 0,
+      },
+      context_pack_hash: null,
+      resolution_url: candidate.resolutionUrl,
+      settlement_rule: candidate.settlementRule,
+      deadline,
+      quality_score: candidate.qualityScore,
+      preflight_verdict: {},
+      disposition,
+      blocked_by: null,
+      claim_id: null,
+    });
+    return proposalId;
+  } catch (err) {
+    console.warn(
+      "[market-creator] Proposal log unavailable; continuing without it:",
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
 // ── Main run ──────────────────────────────────────────────────────────────────
 
 async function run(): Promise<void> {
@@ -865,6 +940,21 @@ async function run(): Promise<void> {
   const selected = approvedCandidates.slice(0, toCreate);
   for (let i = 0; i < selected.length; i++) {
     const candidate = selected[i];
+
+    // Record the decision in the canonical schema BEFORE acting on it (§10.4), so
+    // a run that dies mid-create still leaves the proposal it was acting on.
+    const proposalId = await recordProposal(candidate, SHADOW_MODE ? "shadow" : "create");
+
+    if (SHADOW_MODE) {
+      // The roadmap's gate: proposal-only until shadow precision is measured
+      // against human review. Nothing is published, and the proposal says why.
+      console.log(
+        `[market-creator] SHADOW — proposed only, not published: "${candidate.question.slice(0, 60)}..." ` +
+          `(proposal ${proposalId ?? "unrecorded"})`,
+      );
+      continue;
+    }
+
     console.log(`\n[market-creator] Creating: "${candidate.question.slice(0, 60)}..."`);
     const txHash = await createClaim(candidate);
     if (txHash) {
@@ -877,7 +967,14 @@ async function run(): Promise<void> {
     }
   }
 
-  console.log(`\n[market-creator] Created ${created}/${approvedCandidates.length} approved markets this run.`);
+  if (SHADOW_MODE) {
+    console.log(
+      `[market-creator] SHADOW MODE — ${selected.length} proposal(s) recorded, 0 published. ` +
+        `Set MARKET_CREATOR_AUTONOMOUS=1 once review precision has been measured.`,
+    );
+  } else {
+    console.log(`\n[market-creator] Created ${created}/${approvedCandidates.length} approved markets this run.`);
+  }
 }
 
 // ── Entry point ───────────────────────────────────────────────────────────────
