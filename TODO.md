@@ -531,14 +531,14 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 ### Yeni tablolar/projection'lar
 
 - [ ] `agent_registry`, `agent_operators`, `agent_capabilities`
-- [ ] `agent_reasoning_events`, `evidence_sources`, `market_context_packs`
+- [x] `agent_reasoning_events`, `evidence_sources`, `market_context_packs`
 - [ ] `agent_follows`, `copy_permissions`, `copy_executions`
 - [ ] `fee_policies`, `fee_accruals`, `agent_revenue_attribution`
 - [ ] `market_series`, `profile_stats`, `conviction_scores`
 - [ ] `basket_definitions`, `basket_positions`, `basket_nav_snapshots`
 - [ ] Tüm tablolarda migration version, timestamps, stable IDs ve gerekli unique
   idempotency constraint'leri.
-- [ ] Finansal tabloları PostHog'a kaynak yapma; analytics eventlerini finansal
+- [x] Finansal tabloları PostHog'a kaynak yapma; analytics eventlerini finansal
   ledger yerine kullanma.
 
 ### API kuralları
