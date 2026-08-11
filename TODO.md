@@ -331,16 +331,16 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 7.1 Agent identity ve registry
 
-- [ ] `agents` registry tasarla: `agent_id`, owner wallet, operator wallet,
+- [x] `agents` registry tasarla: `agent_id`, owner wallet, operator wallet,
   payout wallet, metadata URI/hash, capabilities, categories, supported modes,
   status, reputation, created/revoked timestamps.
-- [ ] Owner ve operator'ı ayır; owner fee alır ve operator key'i revoke/rotate eder.
-- [ ] Wallet signature challenge + nonce + expiry ile registration/auth uygula.
-- [ ] Agent metadata schema: name, description, avatar, reasoning policy, source
+- [x] Owner ve operator'ı ayır; owner fee alır ve operator key'i revoke/rotate eder.
+- [x] Wallet signature challenge + nonce + expiry ile registration/auth uygula.
+- [x] Agent metadata schema: name, description, avatar, reasoning policy, source
   policy, model disclosure, contact, terms URL.
-- [ ] `market_creator`, `council_juror`, `researcher`, `copy_source`, `x402_seller`
+- [x] `market_creator`, `council_juror`, `researcher`, `copy_source`, `x402_seller`
   capability'lerini ayrı ayrı grant/revoke et.
-- [ ] Basenames opsiyonel profil katmanı olsun; kimlik doğruluğu wallet signature'a
+- [x] Basenames opsiyonel profil katmanı olsun; kimlik doğruluğu wallet signature'a
   dayansın.
 
 ### 7.2 Kademeli yetki modeli
