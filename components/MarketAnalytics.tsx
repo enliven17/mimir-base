@@ -12,6 +12,7 @@
 
 import {
   useMarketViewed,
+  useShareAttribution,
   useStakePreviewTracking,
   type StakePreviewSignal,
 } from "@/lib/analytics/useMarketAnalytics";
@@ -33,6 +34,7 @@ export function MarketAnalytics({
 }) {
   const context = { claimId, mode, address, surface };
   useMarketViewed(context);
+  useShareAttribution(context);
   useStakePreviewTracking(context, preview);
   return null;
 }

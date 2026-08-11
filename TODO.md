@@ -39,26 +39,26 @@ anlatıyor. Yeni oyun modlarını bu alanlara rastgele string ekleyerek modellem
 
 ### 1.1 Canonical sınıflandırma
 
-- [ ] `subjectType` tanımla: `binary`, `moneyline`, `spread`, `total`, `prop`,
+- [x] `subjectType` tanımla: `binary`, `moneyline`, `spread`, `total`, `prop`,
   `custom`.
-- [ ] `settlementMode` tanımla: `pool`, `duel`, `fixed_odds`; kontrat v2 sonrası
+- [x] `settlementMode` tanımla: `pool`, `duel`, `fixed_odds`; kontrat v2 sonrası
   `squad_pool`.
-- [ ] `productModifiers[]` tanımla: `underdog_boost`, `streak`,
+- [x] `productModifiers[]` tanımla: `underdog_boost`, `streak`,
   `rematch_ladder`, `conviction`.
-- [ ] Geçiş süresinde mevcut onchain `marketType` ve `oddsMode` alanlarını codec
+- [x] Geçiş süresinde mevcut onchain `marketType` ve `oddsMode` alanlarını codec
   katmanında canonical modele map et.
-- [ ] Bilinmeyen enum değerlerini sessizce `pool` yapma; read-index'te
+- [x] Bilinmeyen enum değerlerini sessizce `pool` yapma; read-index'te
   `unsupported` olarak işaretle ve telemetry üret.
-- [ ] Market kuralları için version ekle: `rulesVersion`, `contractVersion`,
+- [x] Market kuralları için version ekle: `rulesVersion`, `contractVersion`,
   `contextSchemaVersion`.
 
 ### 1.2 Market mode registry
 
-- [ ] Tek bir `lib/market-modes.ts` registry oluştur; create UI, detail UI,
+- [x] Tek bir `lib/market-modes.ts` registry oluştur; create UI, detail UI,
   market-creator ve testler aynı policy kaynağını kullansın.
-- [ ] Her mode için `maxChallengers`, stake eşleme kuralı, odds policy, CTA metni,
+- [x] Her mode için `maxChallengers`, stake eşleme kuralı, odds policy, CTA metni,
   görünürlük, rematch desteği ve kontrat gereksinimini tanımla.
-- [ ] Registry'nin yanlış kombinasyonları reddetmesini test et; örneğin
+- [x] Registry'nin yanlış kombinasyonları reddetmesini test et; örneğin
   `duel + maxChallengers > 1`, yetersiz teminatlı fixed odds veya parent olmadan
   `rematch_ladder`.
 
@@ -74,34 +74,34 @@ Amaç: Sonraki tüm ürün kararlarını ölçebilecek tam funnel ve güvenilir 
 
 ### İşler
 
-- [ ] PostHog client/server entegrasyonunu environment flag ile ekle.
-- [ ] Wallet adresini raw PII olarak göndermek yerine kararlı, salt'lı actor ID
+- [x] PostHog client/server entegrasyonunu environment flag ile ekle.
+- [x] Wallet adresini raw PII olarak göndermek yerine kararlı, salt'lı actor ID
   üret; agent ve human actor tipini ayrı property olarak taşı.
-- [ ] Consent, opt-out, DNT ve production/test ayrımını uygula.
-- [ ] Ortak event envelope tanımla: `event_version`, `chain_id`, `contract`,
+- [x] Consent, opt-out, DNT ve production/test ayrımını uygula.
+- [x] Ortak event envelope tanımla: `event_version`, `chain_id`, `contract`,
   `claim_id`, `subject_type`, `settlement_mode`, `modifiers`, `actor_type`,
   `agent_id`, `source_surface`, `locale`, `tx_status`.
 - [ ] Şu funnel event'lerini instrument et:
-  - [ ] `market_viewed`
-  - [ ] `create_started`, `create_mode_selected`, `create_submitted`, `create_confirmed`
-  - [ ] `stake_previewed`, `stake_started`, `stake_confirmed`, `stake_failed`
-  - [ ] `payout_preview_seen`, `low_upside_warning_seen`
-  - [ ] `agent_viewed`, `agent_followed`, `agent_unfollowed`
-  - [ ] `reasoning_opened`, `reasoning_x402_purchased`
-  - [ ] `share_card_generated`, `share_card_clicked`
-  - [ ] `rematch_started`, `rematch_confirmed`
-  - [ ] `copy_permission_created`, `copy_executed`, `copy_skipped`, `copy_revoked`
-- [ ] Server event'leri için idempotency key kullan; retry çift sayım yapmasın.
+  - [x] `market_viewed`
+  - [x] `create_started`, `create_mode_selected`, `create_submitted`, `create_confirmed`
+  - [x] `stake_previewed`, `stake_started`, `stake_confirmed`, `stake_failed`
+  - [x] `payout_preview_seen`, `low_upside_warning_seen`
+  - [x] `agent_viewed`, `agent_followed`, `agent_unfollowed`
+  - [x] `reasoning_opened`, `reasoning_x402_purchased`
+  - [x] `share_card_generated`, `share_card_clicked`
+  - [x] `rematch_started`, `rematch_confirmed`
+  - [x] `copy_permission_created`, `copy_executed`, `copy_skipped`, `copy_revoked`
+- [x] Server event'leri için idempotency key kullan; retry çift sayım yapmasın.
 - [ ] PostHog'da create, stake, settlement-return, follow-to-copy ve share-to-market
   funnel'larını oluştur.
 - [ ] Mode/category/cohort bazlı retention ve conversion dashboard'ları oluştur.
-- [ ] Test wallet'larını internal cohort ile ayır.
+- [x] Test wallet'larını internal cohort ile ayır.
 
 ### KPI ve kabul kriteri
 
 - [ ] Create → confirmed ve view → stake conversion güvenilir ölçülüyor.
 - [ ] Eventlerin %99'unda `event_version`, chain ve mode alanları dolu.
-- [ ] Event payload'larında private key, signature, invite key, raw prompt veya
+- [x] Event payload'larında private key, signature, invite key, raw prompt veya
   kullanıcıya özel evidence bulunmadığı otomatik testle doğrulanıyor.
 
 Bağımlılık: yok. Diğer milestone'lar bundan sonra feature flag ve event planıyla çıkar.
@@ -110,16 +110,16 @@ Bağımlılık: yok. Diğer milestone'lar bundan sonra feature flag ve event pla
 
 ## 02. Social share cards — P1
 
-- [ ] Her market için dinamik OG/share card üret: claim, iki taraf, toplam pot,
+- [x] Her market için dinamik OG/share card üret: claim, iki taraf, toplam pot,
   mode, deadline ve kaynak alan adı.
-- [ ] Settlement kartı üret: verdict, kazanan taraf, payout ve seri skoru.
-- [ ] Duel kartında iki actor/agent kimliğini ve “winner takes pot” dilini kullan.
-- [ ] Rematch kartında round ve Best-of-N skorunu göster.
-- [ ] Kart URL'sine yalnızca public market ID koy; private invite key'i görsele,
+- [x] Settlement kartı üret: verdict, kazanan taraf, payout ve seri skoru.
+- [x] Duel kartında iki actor/agent kimliğini ve “winner takes pot” dilini kullan.
+- [x] Rematch kartında round ve Best-of-N skorunu göster.
+- [x] Kart URL'sine yalnızca public market ID koy; private invite key'i görsele,
   analytics'e veya cache key'e yazma.
-- [ ] X, Farcaster ve standart Open Graph boyutlarında render testi ekle.
+- [x] X, Farcaster ve standart Open Graph boyutlarında render testi ekle.
 - [ ] Lokalizasyon, uzun claim kırpma, emoji ve missing avatar fallback'lerini test et.
-- [ ] Share click → market view attribution'ını PostHog'a bağla.
+- [x] Share click → market view attribution'ını PostHog'a bağla.
 
 **Kabul kriteri:** Her public aktif/settled market deterministik bir kart üretir;
 private market kartı yetkisiz kişiye claim detayını sızdırmaz.

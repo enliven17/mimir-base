@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { SHARE_REF_VALUE, getShareUrl } from "../../lib/constants";
 import {
   CARD_SIZES,
   MAX_CLAIM_CHARS,
@@ -185,4 +186,32 @@ test("pot formatting is compact and never shows six decimals", () => {
 test("the same claim state always produces the same card", () => {
   // Required for CDN caching and so two viewers see the same thing.
   assert.deepEqual(buildShareCard(input()), buildShareCard(input()));
+});
+
+// ── Share attribution (§02) ───────────────────────────────────────────────────
+
+test("a shared link carries the attribution marker", () => {
+  // share_card_generated fires when a card is scraped; this is what lets
+  // share_card_clicked fire when the traffic actually arrives.
+  const url = getShareUrl(42);
+  assert.match(url, /[?&]ref=share(&|$)/);
+});
+
+test("the marker is a fixed literal, not a per-share token", () => {
+  // A unique id per share would tie a visit back to whoever shared it. The
+  // question is "did shares bring traffic", not "who did".
+  assert.equal(getShareUrl(1), getShareUrl(1));
+  assert.equal(SHARE_REF_VALUE, "share");
+});
+
+test("an invite key survives alongside the marker", () => {
+  const url = getShareUrl(42, "secret key");
+  assert.match(url, /invite=secret\+key/);
+  assert.match(url, /ref=share/);
+});
+
+test("the invite key is still not in the CARD url", () => {
+  // The card is public and scraped without a session; the marker must not have
+  // dragged an invite key into it.
+  assert.equal(shareUrlLeaksInviteKey(shareCardPath(42)), false);
 });

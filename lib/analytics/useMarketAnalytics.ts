@@ -19,6 +19,7 @@ import { track } from "./client";
 import { idempotencyKey } from "./events";
 import type { SourceSurface } from "./events";
 import type { CanonicalMode } from "../market-modes";
+import { SHARE_REF_PARAM, SHARE_REF_VALUE } from "../constants";
 
 interface MarketContext {
   claimId: number;
@@ -52,6 +53,36 @@ export function useMarketViewed(ctx: MarketContext): void {
     });
     // Deliberately keyed on the claim only: re-firing on address or mode changes
     // would inflate view counts for the same market.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ctx.claimId]);
+}
+
+/**
+ * Fires `share_card_clicked` once when a visit arrived from a shared link.
+ *
+ * Reads the marker from the URL rather than the Referer header: a scraper's proxy
+ * rewrites the referrer, and most social apps strip it entirely, so the header
+ * would under-count exactly the traffic this is meant to measure.
+ *
+ * The marker is a fixed literal, so this measures "shares brought traffic" and
+ * cannot identify who shared it.
+ */
+export function useShareAttribution(ctx: MarketContext): void {
+  const fired = useRef<number | null>(null);
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (fired.current === ctx.claimId) return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get(SHARE_REF_PARAM) !== SHARE_REF_VALUE) return;
+    fired.current = ctx.claimId;
+    track({
+      event: "share_card_clicked",
+      envelope: envelopeFor(ctx),
+      address: ctx.address,
+      // Keyed on the claim alone, so a reload of the same shared link is one click
+      // rather than one per visit — the funnel step is "this share worked".
+      idempotencyKey: idempotencyKey(["share_card_clicked", ctx.claimId]),
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ctx.claimId]);
 }

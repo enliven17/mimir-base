@@ -187,8 +187,25 @@ export function getTimeRemaining(deadline: number, locale: "es" | "en" = "es") {
   };
 }
 
+/**
+ * Attribution marker on a shared link.
+ *
+ * Closes the funnel: `share_card_generated` fires when a card is scraped, and this
+ * is what lets `share_card_clicked` fire when the traffic actually arrives. It is a
+ * fixed literal rather than a per-share token — a unique id per share would tie a
+ * visit back to whoever shared it, and the question being asked is "did shares
+ * bring traffic", not "who did".
+ */
+export const SHARE_REF_PARAM = "ref";
+export const SHARE_REF_VALUE = "share";
+
 export function getShareUrl(vsId: number, inviteKey = ""): string {
-  const path = inviteKey ? `/vs/${vsId}?invite=${encodeURIComponent(inviteKey)}` : `/vs/${vsId}`;
+  const params = new URLSearchParams();
+  // Invite key first so the visible part of a pasted link still reads as an
+  // invite rather than as tracking.
+  if (inviteKey) params.set("invite", inviteKey);
+  params.set(SHARE_REF_PARAM, SHARE_REF_VALUE);
+  const path = `/vs/${vsId}?${params.toString()}`;
   if (typeof window !== "undefined") return `${window.location.origin}${path}`;
   return path;
 }
