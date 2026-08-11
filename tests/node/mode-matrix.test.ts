@@ -11,6 +11,7 @@ import {
   isDuplicate,
   signatureKey,
   type CandidateInput,
+  type RunSlot,
   type CreatorPolicy,
 } from "../../lib/market-creator/mode-matrix";
 
@@ -24,6 +25,8 @@ function policy(overrides: Partial<CreatorPolicy> = {}): CreatorPolicy {
     minQualityScore: 60,
     shadowMode: false,
     maxPerCategoryPerRun: 2,
+    maxPerModePerRun: 3,
+    maxPerCreatorPerRun: 3,
     ...overrides,
   };
 }
@@ -284,4 +287,88 @@ test("admission only ever refuses — quotas are not a mandate to pad", () => {
   // A run that finds two good markets should publish two, not manufacture five.
   const result = admitToRun(slot("crypto", 9), [], policy());
   assert.deepEqual(result, { admitted: true });
+});
+
+// ── Per-mode and per-creator run caps (§10.4) ─────────────────────────────────
+
+let slotSeq = 0;
+
+/** A unique slot: every one must be a distinct market or the duplicate check fires first. */
+function quotaSlot(overrides: Partial<RunSlot> = {}): RunSlot {
+  slotSeq += 1;
+  return {
+    category: "crypto",
+    signature: duplicateSignature({
+      entities: [`entity-${slotSeq}`],
+      event: "price",
+      threshold: 1,
+      deadline: DEADLINE,
+    }),
+    ...overrides,
+  };
+}
+
+test("a run caps how many markets one settlement mode may take", () => {
+  // Five fixed-odds markets is five bets against the creator's own wallet however
+  // many topics they span, which is why this is separate from the category cap.
+  const accepted = [
+    quotaSlot({ mode: "fixed_odds", category: "crypto" }),
+    quotaSlot({ mode: "fixed_odds", category: "sports" }),
+    quotaSlot({ mode: "fixed_odds", category: "tech" }),
+  ];
+  const result = admitToRun(quotaSlot({ mode: "fixed_odds", category: "macro" }), accepted, policy(), 10);
+  assert.equal(result.admitted, false);
+  assert.equal(result.reason, "mode_quota");
+});
+
+test("a different mode is unaffected by another mode's quota", () => {
+  const accepted = [
+    quotaSlot({ mode: "fixed_odds", category: "crypto" }),
+    quotaSlot({ mode: "fixed_odds", category: "sports" }),
+    quotaSlot({ mode: "fixed_odds", category: "tech" }),
+  ];
+  assert.equal(
+    admitToRun(quotaSlot({ mode: "pool", category: "macro" }), accepted, policy(), 10).admitted,
+    true,
+  );
+});
+
+test("a run caps how many markets one creator may take", () => {
+  // Otherwise the whole feed is one wallet's opinion even with varied topics.
+  const accepted = [
+    quotaSlot({ creator: "0xAA", category: "crypto" }),
+    quotaSlot({ creator: "0xaa", category: "sports" }),
+    quotaSlot({ creator: "0xAa", category: "tech" }),
+  ];
+  const result = admitToRun(quotaSlot({ creator: "0xaa", category: "macro" }), accepted, policy(), 10);
+  assert.equal(result.admitted, false);
+  assert.equal(result.reason, "creator_quota");
+});
+
+test("creator matching is case-insensitive", () => {
+  // A checksummed address must not buy a fresh quota.
+  const accepted = [quotaSlot({ creator: "0xAA", category: "crypto" })];
+  assert.equal(
+    admitToRun(quotaSlot({ creator: "0xaa", category: "sports" }), accepted, policy({ maxPerCreatorPerRun: 1 }), 10)
+      .reason,
+    "creator_quota",
+  );
+});
+
+test("a slot that declares neither mode nor creator keeps the old behaviour", () => {
+  // An older caller must not be refused by a field it does not know about.
+  const accepted = [quotaSlot({ category: "sports" }), quotaSlot({ category: "tech" })];
+  assert.equal(admitToRun(quotaSlot({ category: "macro" }), accepted, policy(), 10).admitted, true);
+});
+
+test("the category cap still fires before the mode cap", () => {
+  // The first reason reported is the one the operator can act on.
+  const accepted = [
+    quotaSlot({ category: "crypto", mode: "pool" }),
+    quotaSlot({ category: "crypto", mode: "pool" }),
+  ];
+  assert.equal(
+    admitToRun(quotaSlot({ category: "crypto", mode: "pool" }), accepted, policy(), 10).reason,
+    "category_quota",
+  );
 });

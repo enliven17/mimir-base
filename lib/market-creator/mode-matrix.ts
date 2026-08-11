@@ -60,6 +60,21 @@ export interface CreatorPolicy {
   shadowMode: boolean;
   /** Markets per category per run, so one topic cannot flood the feed. */
   maxPerCategoryPerRun: number;
+  /**
+   * Markets per settlement mode per run.
+   *
+   * Separate from the category cap because the failure is different: five
+   * fixed-odds markets in one run is five bets against the creator's own wallet
+   * regardless of how many topics they span.
+   */
+  maxPerModePerRun: number;
+  /**
+   * Markets per creator address per run.
+   *
+   * One agent should not be able to fill a run on its own even when its topics and
+   * modes are varied — otherwise the whole feed is one wallet's opinion.
+   */
+  maxPerCreatorPerRun: number;
 }
 
 export function defaultCreatorPolicy(
@@ -73,6 +88,8 @@ export function defaultCreatorPolicy(
     // shadow precision must be measured before it is enabled.
     shadowMode: env.MARKET_CREATOR_AUTONOMOUS !== "1",
     maxPerCategoryPerRun: Number(env.MARKET_CREATOR_MAX_PER_CATEGORY ?? 2),
+    maxPerModePerRun: Number(env.MARKET_CREATOR_MAX_PER_MODE ?? 3),
+    maxPerCreatorPerRun: Number(env.MARKET_CREATOR_MAX_PER_CREATOR ?? 3),
   };
 }
 
@@ -280,11 +297,15 @@ export function isDuplicate(
 export interface RunSlot {
   category: string;
   signature: DuplicateSignature;
+  /** Settlement mode this slot would open in. */
+  mode?: SettlementMode;
+  /** Address that would create it. */
+  creator?: string;
 }
 
 export interface AdmissionResult {
   admitted: boolean;
-  reason?: "duplicate" | "category_quota" | "run_quota";
+  reason?: "duplicate" | "category_quota" | "mode_quota" | "creator_quota" | "run_quota";
 }
 
 /**
@@ -307,6 +328,20 @@ export function admitToRun(
   const inCategory = accepted.filter((slot) => slot.category === candidate.category).length;
   if (inCategory >= policy.maxPerCategoryPerRun) {
     return { admitted: false, reason: "category_quota" };
+  }
+  // Mode and creator caps only apply when the slot declares them: an older caller
+  // that supplies neither keeps its previous behaviour rather than being refused
+  // by a field it does not know about.
+  if (candidate.mode) {
+    const inMode = accepted.filter((slot) => slot.mode === candidate.mode).length;
+    if (inMode >= policy.maxPerModePerRun) return { admitted: false, reason: "mode_quota" };
+  }
+  if (candidate.creator) {
+    const key = candidate.creator.toLowerCase();
+    const byCreator = accepted.filter((slot) => slot.creator?.toLowerCase() === key).length;
+    if (byCreator >= policy.maxPerCreatorPerRun) {
+      return { admitted: false, reason: "creator_quota" };
+    }
   }
   return { admitted: true };
 }

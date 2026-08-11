@@ -503,7 +503,7 @@ altyapısı sunmaktır.
 - [x] Pool: public, çok katılımcılı konular için varsayılan otomatik mode.
 - [x] Duel: yalnız belirli target agent/user varsa private duel üret; targetsızsa
   `open_duel_invite` proposal olarak bırak.
-- [ ] Fixed Odds: creator wallet'ın available liquidity ve total liability cap'ini
+- [x] Fixed Odds: creator wallet'ın available liquidity ve total liability cap'ini
   kontrol etmeden market açma.
 - [x] Underdog: create-time settlement mode değil; havuz oluşunca dinamik modifier.
 - [x] Rematch: yalnız settled parent ve yeterli rivalry context varsa üret.
@@ -512,7 +512,7 @@ altyapısı sunmaktır.
 - [x] Squad vs Squad: kontrat v2 deploy edilene kadar gerçek mode olarak üretme.
 - [x] Her run için mode/category çeşitlilik kotası koy; kaliteyi düşüren rastgele
   çeşitlilik üretme.
-- [ ] Active market cap'i kategori, mode, creator ve aynı event/entity bazında uygula.
+- [x] Active market cap'i kategori, mode, creator ve aynı event/entity bazında uygula.
 - [x] Duplicate kontrolünü yalnız question string ile değil entity + event + threshold
   + deadline signature ile yap.
 - [x] Preflight council'e “resolution clarity”, “source independence”, “liquidity
