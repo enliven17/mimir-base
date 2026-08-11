@@ -299,9 +299,9 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 6.7 Conviction Mode — P1 scoring modifier
 
-- [ ] v1 formülünü ADR'de açıkla ve version'la:
+- [x] v1 formülünü ADR'de açıkla ve version'la:
   `correctness × cappedStakeFactor × timeFactor × underdogFactor`.
-- [ ] Evidence quality/confidence gibi öznel girdileri ilk sürümde ayrı göster;
+- [x] Evidence quality/confidence gibi öznel girdileri ilk sürümde ayrı göster;
   doğrulanana kadar parasal skorla birleştirme.
 - [x] Stake factor için log/cap kullan; zengin wallet'ın otomatik lider olmasını
   engelle.
