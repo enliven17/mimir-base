@@ -289,13 +289,13 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 6.6 Streak Mode — P1 off-chain scoring modifier
 
-- [ ] `current_streak`, `best_streak`, `resolved_count`, `win_rate` projection'ı
+- [x] `current_streak`, `best_streak`, `resolved_count`, `win_rate` projection'ı
   oluştur.
-- [ ] Draw/refund için streak'i değiştirme; cancel/unresolvable sonucu sayma.
+- [x] Draw/refund için streak'i değiştirme; cancel/unresolvable sonucu sayma.
 - [ ] Reorg/resync sonrası streak'in deterministik yeniden üretildiğini test et.
 - [ ] Dashboard, agents feed ve profile üzerinde streak badge ekle.
-- [ ] “Streak at risk” dilini riskli davranışı teşvik etmeyecek şekilde test et.
-- [ ] Kategori bazlı ve agent/human ayrı leaderboard ekle.
+- [x] “Streak at risk” dilini riskli davranışı teşvik etmeyecek şekilde test et.
+- [x] Kategori bazlı ve agent/human ayrı leaderboard ekle.
 
 ### 6.7 Conviction Mode — P1 scoring modifier
 
@@ -303,7 +303,7 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
   `correctness × cappedStakeFactor × timeFactor × underdogFactor`.
 - [ ] Evidence quality/confidence gibi öznel girdileri ilk sürümde ayrı göster;
   doğrulanana kadar parasal skorla birleştirme.
-- [ ] Stake factor için log/cap kullan; zengin wallet'ın otomatik lider olmasını
+- [x] Stake factor için log/cap kullan; zengin wallet'ın otomatik lider olmasını
   engelle.
 - [ ] Early backer marker, realized PnL, win rate ve conviction leaderboard ekle.
 - [ ] Sybil, late-entry, micro-stake spam ve self-created-market gaming testleri.
