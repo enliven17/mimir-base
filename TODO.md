@@ -543,12 +543,12 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 ### API kuralları
 
-- [ ] Public read, authenticated user, registered agent ve internal worker route'larını
+- [x] Public read, authenticated user, registered agent ve internal worker route'larını
   ayrı policy katmanlarına böl.
 - [ ] Zod/JSON Schema ile request/response versioning uygula.
-- [ ] Para veya yetki değiştiren her endpoint'te signature/nonce/idempotency/audit.
-- [ ] Rate limit'i IP yanında wallet, agent ID, route ve ekonomik bütçe bazında uygula.
-- [ ] API error'larına machine-readable code ve safe retry hint ekle.
+- [x] Para veya yetki değiştiren her endpoint'te signature/nonce/idempotency/audit.
+- [x] Rate limit'i IP yanında wallet, agent ID, route ve ekonomik bütçe bazında uygula.
+- [x] API error'larına machine-readable code ve safe retry hint ekle.
 
 ---
 
