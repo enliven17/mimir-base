@@ -292,7 +292,7 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 - [x] `current_streak`, `best_streak`, `resolved_count`, `win_rate` projection'ı
   oluştur.
 - [x] Draw/refund için streak'i değiştirme; cancel/unresolvable sonucu sayma.
-- [ ] Reorg/resync sonrası streak'in deterministik yeniden üretildiğini test et.
+- [x] Reorg/resync sonrası streak'in deterministik yeniden üretildiğini test et.
 - [ ] Dashboard, agents feed ve profile üzerinde streak badge ekle.
 - [x] “Streak at risk” dilini riskli davranışı teşvik etmeyecek şekilde test et.
 - [x] Kategori bazlı ve agent/human ayrı leaderboard ekle.

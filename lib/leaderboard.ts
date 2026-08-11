@@ -196,3 +196,120 @@ export function streakBadge(entry: LeaderboardEntry): StreakBadge {
     isPersonalBest: entry.currentStreak > 0 && entry.currentStreak >= entry.bestStreak,
   };
 }
+
+
+// ── Feeding the leaderboard from the read-index projection ────────────────────
+
+/**
+ * Turn projected claims into per-actor positions.
+ *
+ * This is the seam that makes §6.6's determinism requirement testable: the
+ * projection is a pure fold of chain events, this is a pure fold of the
+ * projection, so a reorg followed by a resync must reproduce identical records.
+ * If a leaderboard could only be built from mutable rows, "rebuild it and check"
+ * would not be a thing you could do.
+ *
+ * `stakeToUsdc` is injected rather than imported so the conversion used here is
+ * the caller's — the atomic units are the truth and this module never guesses the
+ * decimal place.
+ */
+export function positionsFromProjection(args: {
+  claims: Iterable<{
+    claimId: number;
+    creator: string;
+    category: string;
+    state: "open" | "active" | "resolved" | "cancelled";
+    winnerSide: number;
+    challengers: Array<{ address: string; stakeUnits: bigint }>;
+    totalChallengerStakeUnits: bigint;
+  }>;
+  creatorStakeUnitsFor: (claimId: number) => bigint;
+  stakeToUsdc: (units: bigint) => number;
+  /** Epoch ms per claim, for the timing factor. Absent values fall back to 0. */
+  timestamps?: Map<number, { openedAt: number; deadlineAt: number; resolvedAt?: number }>;
+  isAgent?: (address: string) => boolean;
+}): LeaderboardInput[] {
+  const byAddress = new Map<string, LeaderboardInput>();
+
+  const record = (address: string, position: ScoredPosition) => {
+    const key = address.toLowerCase();
+    const existing = byAddress.get(key);
+    if (existing) {
+      existing.positions.push(position);
+      return;
+    }
+    byAddress.set(key, {
+      address: key,
+      actorType: args.isAgent?.(key) ? "agent" : "human",
+      positions: [position],
+    });
+  };
+
+  for (const claim of args.claims) {
+    const times = args.timestamps?.get(claim.claimId);
+    const base = {
+      claimId: claim.claimId,
+      openedAt: times?.openedAt ?? 0,
+      deadlineAt: times?.deadlineAt ?? 0,
+      resolvedAt: times?.resolvedAt,
+      category: claim.category,
+    };
+
+    const creatorOutcome = outcomeFor(claim.state, claim.winnerSide, "creator");
+    record(claim.creator, {
+      ...base,
+      outcome: creatorOutcome,
+      stakeUsdc: args.stakeToUsdc(args.creatorStakeUnitsFor(claim.claimId)),
+      // The creator is one side of the whole pool, so its share of its own side is
+      // always the entire side.
+      sideShareBpsAtEntry: 10_000,
+      enteredAt: base.openedAt,
+    });
+
+    const challengerOutcome = outcomeFor(claim.state, claim.winnerSide, "challengers");
+    for (const challenger of claim.challengers) {
+      record(challenger.address, {
+        ...base,
+        outcome: challengerOutcome,
+        stakeUsdc: args.stakeToUsdc(challenger.stakeUnits),
+        // Share of its OWN side's pool, which is what the underdog factor wants.
+        sideShareBpsAtEntry:
+          claim.totalChallengerStakeUnits > 0n
+            ? Number((challenger.stakeUnits * 10_000n) / claim.totalChallengerStakeUnits)
+            : 10_000,
+        enteredAt: base.openedAt,
+      });
+    }
+  }
+
+  // Sorted so two rebuilds produce identically ordered inputs, not merely
+  // identical sets — the leaderboard sort is stable, but a test comparing inputs
+  // should not have to care which order the projection iterated.
+  return [...byAddress.values()]
+    .map((input) => ({
+      ...input,
+      positions: [...input.positions].sort((a, b) => a.claimId - b.claimId),
+    }))
+    .sort((a, b) => a.address.localeCompare(b.address));
+}
+
+/**
+ * A side's outcome for one settled claim.
+ *
+ * Draw and unresolvable are refunds for BOTH sides, and a cancelled market is a
+ * refund too — the escrow returned every stake, so neither side won.
+ */
+function outcomeFor(
+  state: "open" | "active" | "resolved" | "cancelled",
+  winnerSide: number,
+  side: "creator" | "challengers",
+): ScoredPosition["outcome"] {
+  if (state === "cancelled") return "refund";
+  if (state !== "resolved") return "pending";
+  // 1 = creator, 2 = challengers, 3 = draw, 4 = unresolvable (lib/mimir-abi.ts).
+  if (winnerSide === 3 || winnerSide === 4) return "refund";
+  if (winnerSide === 1) return side === "creator" ? "win" : "loss";
+  if (winnerSide === 2) return side === "challengers" ? "win" : "loss";
+  // A resolved claim with no winner recorded is not a result anyone can score.
+  return "refund";
+}
