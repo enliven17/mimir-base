@@ -46,6 +46,7 @@ import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
 import { reportingPoll } from "../../lib/ops/heartbeat";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../lib/usdc";
 import { gatherCouncilPreflight } from "./council-preflight";
+import { dimensionsReported } from "../../lib/market-creator/preflight-score";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CONTRACT_ADDRESS    = getContractAddress();
@@ -305,6 +306,30 @@ async function applyCouncilPreflight(candidates: ClaimCandidate[]): Promise<Clai
     if (avg < PREFLIGHT_MIN_SCORE || result.skipVotes > result.openVotes + result.reviseVotes) {
       console.warn(
         `[market-creator] Drop candidate after council preflight (${avg}/100): ${candidate.question.slice(0, 90)}`,
+      );
+      continue;
+    }
+
+    // The named dimensions are the real gate: a blended average lets a market
+    // nobody can settle through on the strength of its sources. The blocker is
+    // logged rather than swallowed so a repeated failure names its own cause.
+    //
+    // A persona fleet that predates the dimensions returns none of them. Treating
+    // that as "all four failed" would silently stop creation altogether, so the
+    // gate is skipped — loudly — and the blended average above stands alone.
+    if (!dimensionsReported(result.verdict)) {
+      console.warn(
+        "[market-creator] Preflight returned no named dimensions; falling back to the blended score. " +
+        "Update the persona preflight prompt to restore the dimension gate.",
+      );
+    } else if (!result.verdict.autonomousOk) {
+      console.warn(
+        `[market-creator] Drop candidate — preflight dimension gate: ${result.verdict.blockedBy} ` +
+        `(clarity=${result.verdict.dimensions.resolutionClarity.score ?? "?"}, ` +
+        `sources=${result.verdict.dimensions.sourceIndependence.score ?? "?"}, ` +
+        `liquidity=${result.verdict.dimensions.liquidityFit.score ?? "?"}, ` +
+        `mode=${result.verdict.dimensions.bestMode.score ?? "?"}) ` +
+        `for "${candidate.question.slice(0, 70)}..."`,
       );
       continue;
     }

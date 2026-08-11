@@ -13,6 +13,8 @@ import { paidRoute, queryParam } from "@/lib/x402/server";
 import type { HTTPRequestContext } from "@x402/core/http";
 import { PRICES } from "@/lib/x402/config";
 import { COUNCIL_PERSONAS } from "@/agents/council/personas";
+import { isSettlementMode, type SettlementMode } from "@/lib/market-modes";
+import { isPreflightDimension, type PreflightDimension } from "@/lib/market-creator/preflight-score";
 import { getCouncilAddress } from "@/lib/agent-wallets";
 import { callLLM } from "@/lib/llm";
 
@@ -63,11 +65,41 @@ function cleanCandidate(value: unknown): CandidatePayload | null {
   };
 }
 
+/**
+ * Named dimension scores out of the model's JSON.
+ *
+ * A key the model invented is dropped and a non-numeric value is skipped rather
+ * than coerced: "high" is not a score, and turning it into 0 would veto a market
+ * on a parse failure. A skipped dimension reads as an abstention, which the
+ * aggregator already treats as "unknown", not "fine".
+ */
+function parseModelDimensions(raw: unknown): Partial<Record<PreflightDimension, number>> {
+  if (typeof raw !== "object" || raw === null) return {};
+  const out: Partial<Record<PreflightDimension, number>> = {};
+  for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!isPreflightDimension(key)) continue;
+    if (typeof value !== "number" || !Number.isFinite(value)) continue;
+    out[key] = Math.max(0, Math.min(100, Math.round(value)));
+  }
+  return out;
+}
+
+function parseModelMode(value: unknown): SettlementMode | undefined {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  // squad_pool is refused here even though it is a valid mode name: the escrow for
+  // it is not deployed, so a persona suggesting it would propose an unopenable
+  // market.
+  if (normalized === "squad_pool") return undefined;
+  return isSettlementMode(normalized) ? normalized : undefined;
+}
+
 function parseModelJson(text: string): {
   decision: "open" | "revise" | "skip";
   score: number;
   confidence: number;
   reasoning: string;
+  dimensions: Partial<Record<PreflightDimension, number>>;
+  suggestedMode?: SettlementMode;
 } {
   try {
     const match = text.match(/\{[\s\S]*\}/);
@@ -82,6 +114,8 @@ function parseModelJson(text: string): {
       score: Math.max(0, Math.min(100, Math.round(Number(parsed.score ?? 50)))),
       confidence: Math.max(0, Math.min(100, Math.round(Number(parsed.confidence ?? 50)))),
       reasoning: String(parsed.reasoning ?? "").slice(0, 400),
+      dimensions: parseModelDimensions(parsed.dimensions),
+      suggestedMode: parseModelMode(parsed.suggestedMode),
     };
   } catch {
     return {
@@ -89,6 +123,9 @@ function parseModelJson(text: string): {
       score: 50,
       confidence: 30,
       reasoning: "(persona response could not be parsed)",
+      // No dimensions: an unparseable response has not scored anything, and the
+      // aggregator refuses an autonomous publish on unknown dimensions.
+      dimensions: {},
     };
   }
 }
@@ -152,10 +189,23 @@ Return JSON only:
   "decision": "open" | "revise" | "skip",
   "score": 0-100,
   "confidence": 0-100,
+  "dimensions": {
+    "resolutionClarity": 0-100,
+    "sourceIndependence": 0-100,
+    "liquidityFit": 0-100,
+    "bestMode": 0-100
+  },
+  "suggestedMode": "pool" | "duel" | "fixed_odds",
   "reasoning": "one tight sentence, max 45 words"
 }
 
-Score the candidate as a market to create, not as a final outcome. Favor clear, verifiable, balanced markets. Penalize vague rules, weak sources, stale outcomes, or one-sided framing. Stay in character.`;
+Score the candidate as a market to create, not as a final outcome. Each dimension is judged on its own:
+- resolutionClarity: could an oracle settle this rule after the deadline without guessing? Threshold, units, timezone, tie-break and void conditions all stated?
+- sourceIndependence: would the sources independently confirm the outcome, or do they republish one another?
+- liquidityFit: is this stake and deadline sensible for how much interest this topic will attract?
+- bestMode: is the proposed settlement mode right for this claim?
+
+Omit a dimension rather than guessing at it. Favor clear, verifiable, balanced markets. Penalize vague rules, weak sources, stale outcomes, or one-sided framing. Stay in character.`;
 
   let result: ReturnType<typeof parseModelJson>;
   try {
@@ -166,6 +216,7 @@ Score the candidate as a market to create, not as a final outcome. Favor clear, 
       score: 50,
       confidence: 20,
       reasoning: "(reasoning unavailable right now)",
+      dimensions: {},
     };
   }
 

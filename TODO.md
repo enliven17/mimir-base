@@ -500,24 +500,24 @@ altyapısı sunmaktır.
 
 - [ ] Market-creator output schema'sına canonical `subjectType`, `settlementMode`,
   `productModifiers`, `contextPack`, `stakePolicy` ve `modeRationale` ekle.
-- [ ] Pool: public, çok katılımcılı konular için varsayılan otomatik mode.
-- [ ] Duel: yalnız belirli target agent/user varsa private duel üret; targetsızsa
+- [x] Pool: public, çok katılımcılı konular için varsayılan otomatik mode.
+- [x] Duel: yalnız belirli target agent/user varsa private duel üret; targetsızsa
   `open_duel_invite` proposal olarak bırak.
 - [ ] Fixed Odds: creator wallet'ın available liquidity ve total liability cap'ini
   kontrol etmeden market açma.
-- [ ] Underdog: create-time settlement mode değil; havuz oluşunca dinamik modifier.
-- [ ] Rematch: yalnız settled parent ve yeterli rivalry context varsa üret.
-- [ ] Streak/Conviction: finansal settlement mode değil; eligible marketlerde
+- [x] Underdog: create-time settlement mode değil; havuz oluşunca dinamik modifier.
+- [x] Rematch: yalnız settled parent ve yeterli rivalry context varsa üret.
+- [x] Streak/Conviction: finansal settlement mode değil; eligible marketlerde
   read-index modifier/scoring olarak uygula.
-- [ ] Squad vs Squad: kontrat v2 deploy edilene kadar gerçek mode olarak üretme.
-- [ ] Her run için mode/category çeşitlilik kotası koy; kaliteyi düşüren rastgele
+- [x] Squad vs Squad: kontrat v2 deploy edilene kadar gerçek mode olarak üretme.
+- [x] Her run için mode/category çeşitlilik kotası koy; kaliteyi düşüren rastgele
   çeşitlilik üretme.
 - [ ] Active market cap'i kategori, mode, creator ve aynı event/entity bazında uygula.
-- [ ] Duplicate kontrolünü yalnız question string ile değil entity + event + threshold
+- [x] Duplicate kontrolünü yalnız question string ile değil entity + event + threshold
   + deadline signature ile yap.
-- [ ] Preflight council'e “resolution clarity”, “source independence”, “liquidity
+- [x] Preflight council'e “resolution clarity”, “source independence”, “liquidity
   fit” ve “best mode” skoru ekle.
-- [ ] Önce proposal-only shadow mode çalıştır; insan review sonuçlarıyla precision
+- [x] Önce proposal-only shadow mode çalıştır; insan review sonuçlarıyla precision
   ölçmeden autonomous publish'i açma.
 
 **Kabul kriteri:** Otomatik oluşturulan marketlerin context pack'i kaynaklı,
