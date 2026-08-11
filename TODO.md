@@ -467,20 +467,20 @@ altyapısı sunmaktır.
 
 ### 10.2 Context pack schema
 
-- [ ] Her aday market için `MarketContextPack` üret:
-  - [ ] canonical claim ve taraflar
-  - [ ] category/topic ve entity'ler
-  - [ ] primary resolution source
-  - [ ] corroborating sources[]
-  - [ ] capturedAt, publish time, source timezone
-  - [ ] excerpt/structured fact ve content hash
-  - [ ] freshness, trust tier, corroboration/conflict flags
-  - [ ] deadline, resolution window, edge cases ve void rule
-  - [ ] geographic scope, units, threshold ve exact rounding rule
-  - [ ] agent confidence ve unresolved questions
-- [ ] Onchain'e uzun context yazma; immutable hash/URI ve settlement rule özeti yaz.
-- [ ] Primary resolution source değişirse version ve audit event üret.
-- [ ] Source kaybolursa snapshot/hash ve fallback source policy uygula.
+- [x] Her aday market için `MarketContextPack` üret:
+  - [x] canonical claim ve taraflar
+  - [x] category/topic ve entity'ler
+  - [x] primary resolution source
+  - [x] corroborating sources[]
+  - [x] capturedAt, publish time, source timezone
+  - [x] excerpt/structured fact ve content hash
+  - [x] freshness, trust tier, corroboration/conflict flags
+  - [x] deadline, resolution window, edge cases ve void rule
+  - [x] geographic scope, units, threshold ve exact rounding rule
+  - [x] agent confidence ve unresolved questions
+- [x] Onchain'e uzun context yazma; immutable hash/URI ve settlement rule özeti yaz.
+- [x] Primary resolution source değişirse version ve audit event üret.
+- [x] Source kaybolursa snapshot/hash ve fallback source policy uygula.
 
 ### 10.3 Konu kapsamını genişlet
 
