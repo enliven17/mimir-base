@@ -131,24 +131,24 @@ private market kartı yetkisiz kişiye claim detayını sızdırmaz.
 Mevcut council reasoning akışını okunabilir ve kaynak izli bir market timeline'ına
 dönüştür.
 
-- [ ] Append-only `agent_reasoning_events` tablosu tasarla:
+- [x] Append-only `agent_reasoning_events` tablosu tasarla:
   `event_id`, `claim_id`, `agent_id`, `stage`, `position`, `confidence_bps`,
   `summary`, `evidence_refs`, `model/provider`, `prompt_version`, `created_at`,
   `visibility`, `payment_identifier`.
-- [ ] Raw hidden chain-of-thought yayınlama; kullanıcıya kısa gerekçe, iddia,
+- [x] Raw hidden chain-of-thought yayınlama; kullanıcıya kısa gerekçe, iddia,
   evidence ve belirsizlik yayınla.
-- [ ] Council preflight, pre-stake görüşü, peer response, vote ve settlement
+- [x] Council preflight, pre-stake görüşü, peer response, vote ve settlement
   reflection event tiplerini ayır.
-- [ ] Her evidence referansında URL/domain, capture time, content hash ve freshness
+- [x] Her evidence referansında URL/domain, capture time, content hash ve freshness
   göster.
-- [ ] Aynı reasoning'in retry ile iki kez yazılmasını engelle.
+- [x] Aynı reasoning'in retry ile iki kez yazılmasını engelle.
 - [x] `/vs/[id]` üzerinde kronolojik feed, agent/category filtresi ve “before/after
   stake” ayrımı ekle.
-- [ ] Public özet ile x402 premium ayrıntısını ayır; ödeme sonrası erişimi mevcut
+- [x] Public özet ile x402 premium ayrıntısını ayır; ödeme sonrası erişimi mevcut
   `payments_v2` idempotency modeliyle ilişkilendir.
-- [ ] Prompt injection, kişisel veri, güvenli olmayan URL ve telifli uzun alıntı
+- [x] Prompt injection, kişisel veri, güvenli olmayan URL ve telifli uzun alıntı
   redaction katmanı ekle.
-- [ ] Reasoning silinirse audit kaydını tombstone olarak koru.
+- [x] Reasoning silinirse audit kaydını tombstone olarak koru.
 
 **Kabul kriteri:** Kullanıcı her ajan kararında pozisyonu, zamanı, kullanılan
 kaynakları ve belirsizliği görebilir; gizli model reasoning'i veya credentials
@@ -451,18 +451,18 @@ altyapısı sunmaktır.
 
 ### 10.1 Research Gateway
 
-- [ ] Server-side, read-only `Research Gateway` oluştur; ajanlar doğrudan internet
+- [x] Server-side, read-only `Research Gateway` oluştur; ajanlar doğrudan internet
   veya internal network'e çıkmasın.
 - [ ] Adapter'lar: official web/API, RSS, GitHub public metadata, sports, weather,
   market data, release calendars ve gerektiğinde x402/Bazaar kaynakları.
-- [ ] Domain allow/deny list, DNS/IP SSRF koruması, redirect limiti, response-size
+- [x] Domain allow/deny list, DNS/IP SSRF koruması, redirect limiti, response-size
   limiti, MIME kontrolü ve timeout ekle.
-- [ ] Private browser session, cookie, localhost, cloud metadata, file URL ve write
+- [x] Private browser session, cookie, localhost, cloud metadata, file URL ve write
   action'larını yasakla.
-- [ ] Per-agent request, token, x402 USDC ve günlük bütçe uygula.
-- [ ] Sonuçları cache et; aynı kaynak için gereksiz ücret/istek tekrarını engelle.
+- [x] Per-agent request, token, x402 USDC ve günlük bütçe uygula.
+- [x] Sonuçları cache et; aynı kaynak için gereksiz ücret/istek tekrarını engelle.
 - [ ] Tool manifest'inde capability, fiyat, freshness ve trust tier yayınla.
-- [ ] x402 Bazaar discovery sonuçlarını fiyat/capability allowlist'inden geçir;
+- [x] x402 Bazaar discovery sonuçlarını fiyat/capability allowlist'inden geçir;
   keşfedilen endpoint'i otomatik güvenilir sayma.
 
 ### 10.2 Context pack schema
