@@ -33,13 +33,24 @@ export interface LeaderboardEntry {
   losses: number;
   refunds: number;
   winRateBps: number | null;
+  /** Sum of per-position conviction scores. Shown, but not the ranking key. */
   convictionScore: number;
+  /**
+   * Mean conviction per scored position — the ranking key.
+   *
+   * A sum rewards volume: winning a hundred 0.50 USDC markets outscores winning
+   * three real ones, because per-position scores are capped at 1 but add up
+   * without limit. The mean plus the qualifying floor ranks judgement instead.
+   */
+  convictionPerPosition: number;
   /** Realized profit and loss in display USDC. Negative is a real result. */
   realizedPnlUsdc: number;
   /** Positions taken early on the minority side — the "early backer" marker. */
   earlyUnderdogCount: number;
   /** Categories this actor has settled positions in, sorted. */
   categories: string[];
+  /** Positions dropped because the actor stood on both sides of one claim. */
+  selfDealtClaims: number;
 }
 
 export interface LeaderboardInput {
@@ -54,6 +65,8 @@ export interface LeaderboardInput {
    * — two places computing PnL is two places for it to disagree.
    */
   payouts?: Map<number, number>;
+  /** Claims where this actor was on both sides, excluded from scoring. */
+  selfDealtClaims?: number;
 }
 
 export interface LeaderboardOptions {
@@ -100,11 +113,14 @@ function statsFor(input: LeaderboardInput, category?: string): LeaderboardEntry 
     refunds: streak.refunds,
     winRateBps: streak.winRateBps,
     convictionScore: conviction.score,
+    convictionPerPosition:
+      conviction.positionsScored > 0 ? conviction.score / conviction.positionsScored : 0,
     realizedPnlUsdc: conviction.realizedPnlUsdc,
     earlyUnderdogCount: conviction.earlyUnderdogCount,
     categories: [
       ...new Set(positions.map((p) => (p.category ?? "").trim()).filter((c) => c.length > 0)),
     ].sort(),
+    selfDealtClaims: input.selfDealtClaims ?? 0,
   };
 }
 
@@ -125,9 +141,11 @@ function comparator(sortBy: LeaderboardOptions["sortBy"]) {
           ? b.currentStreak - a.currentStreak
           : sortBy === "volume"
             ? b.resolvedCount - a.resolvedCount
-            : b.convictionScore - a.convictionScore;
+            : b.convictionPerPosition - a.convictionPerPosition;
     if (primary !== 0) return primary;
-    if (b.convictionScore !== a.convictionScore) return b.convictionScore - a.convictionScore;
+    if (b.convictionPerPosition !== a.convictionPerPosition) {
+      return b.convictionPerPosition - a.convictionPerPosition;
+    }
     if (b.resolvedCount !== a.resolvedCount) return b.resolvedCount - a.resolvedCount;
     return a.address.localeCompare(b.address);
   };
@@ -231,21 +249,70 @@ export function positionsFromProjection(args: {
 }): LeaderboardInput[] {
   const byAddress = new Map<string, LeaderboardInput>();
 
-  const record = (address: string, position: ScoredPosition) => {
+  const entryFor = (address: string): LeaderboardInput => {
     const key = address.toLowerCase();
     const existing = byAddress.get(key);
-    if (existing) {
-      existing.positions.push(position);
-      return;
-    }
-    byAddress.set(key, {
+    if (existing) return existing;
+    const created: LeaderboardInput = {
       address: key,
       actorType: args.isAgent?.(key) ? "agent" : "human",
-      positions: [position],
-    });
+      positions: [],
+      selfDealtClaims: 0,
+    };
+    byAddress.set(key, created);
+    return created;
   };
 
+  const record = (address: string, position: ScoredPosition) => {
+    entryFor(address).positions.push(position);
+  };
+
+  function recordChallenger(
+    claim: {
+      claimId: number;
+      category: string;
+      state: "open" | "active" | "resolved" | "cancelled";
+      winnerSide: number;
+      totalChallengerStakeUnits: bigint;
+    },
+    challenger: { address: string; stakeUnits: bigint },
+  ): void {
+    const times = args.timestamps?.get(claim.claimId);
+    record(challenger.address, {
+      claimId: claim.claimId,
+      category: claim.category,
+      openedAt: times?.openedAt ?? 0,
+      deadlineAt: times?.deadlineAt ?? 0,
+      resolvedAt: times?.resolvedAt,
+      outcome: outcomeFor(claim.state, claim.winnerSide, "challengers"),
+      stakeUsdc: args.stakeToUsdc(challenger.stakeUnits),
+      // Share of its OWN side's pool, which is what the underdog factor wants.
+      sideShareBpsAtEntry:
+        claim.totalChallengerStakeUnits > 0n
+          ? Number((challenger.stakeUnits * 10_000n) / claim.totalChallengerStakeUnits)
+          : 10_000,
+      enteredAt: times?.openedAt ?? 0,
+    });
+  }
+
   for (const claim of args.claims) {
+    // Standing on both sides of your own market is not a forecast: the creator
+    // loses exactly what the challenger wins, so it costs nothing but would
+    // register a win whose factors need not cancel the paired loss. Both sides are
+    // dropped and the claim is counted, so the behaviour is visible rather than
+    // quietly filtered.
+    const creatorKey = claim.creator.toLowerCase();
+    if (claim.challengers.some((c) => c.address.toLowerCase() === creatorKey)) {
+      const entry = entryFor(creatorKey);
+      entry.selfDealtClaims = (entry.selfDealtClaims ?? 0) + 1;
+      // Other challengers on that claim are genuine counterparties and still count.
+      for (const challenger of claim.challengers) {
+        if (challenger.address.toLowerCase() === creatorKey) continue;
+        recordChallenger(claim, challenger);
+      }
+      continue;
+    }
+
     const times = args.timestamps?.get(claim.claimId);
     const base = {
       claimId: claim.claimId,
@@ -266,19 +333,8 @@ export function positionsFromProjection(args: {
       enteredAt: base.openedAt,
     });
 
-    const challengerOutcome = outcomeFor(claim.state, claim.winnerSide, "challengers");
     for (const challenger of claim.challengers) {
-      record(challenger.address, {
-        ...base,
-        outcome: challengerOutcome,
-        stakeUsdc: args.stakeToUsdc(challenger.stakeUnits),
-        // Share of its OWN side's pool, which is what the underdog factor wants.
-        sideShareBpsAtEntry:
-          claim.totalChallengerStakeUnits > 0n
-            ? Number((challenger.stakeUnits * 10_000n) / claim.totalChallengerStakeUnits)
-            : 10_000,
-        enteredAt: base.openedAt,
-      });
+      recordChallenger(claim, challenger);
     }
   }
 

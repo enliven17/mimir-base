@@ -305,8 +305,8 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
   doğrulanana kadar parasal skorla birleştirme.
 - [x] Stake factor için log/cap kullan; zengin wallet'ın otomatik lider olmasını
   engelle.
-- [ ] Early backer marker, realized PnL, win rate ve conviction leaderboard ekle.
-- [ ] Sybil, late-entry, micro-stake spam ve self-created-market gaming testleri.
+- [x] Early backer marker, realized PnL, win rate ve conviction leaderboard ekle.
+- [x] Sybil, late-entry, micro-stake spam ve self-created-market gaming testleri.
 
 ### 6.8 Squad vs Squad — P2, kontrat v2
 
