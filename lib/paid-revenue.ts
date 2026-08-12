@@ -9,6 +9,7 @@
  */
 
 import {
+  getMarketRevenueSummary,
   insertPayment,
   getPaymentsRevenueSummary,
   type PaymentsRevenueSummary,
@@ -98,7 +99,26 @@ export interface RevenueSummary {
   byResource: Array<{ resource: string; calls: number; usdc: number }>;
   bySeller: Array<{ seller: string; calls: number; usdc: number }>;
   recent: RevenuePaymentView[];
+  market: {
+    settledMarkets: number;
+    grossVolumeUsdc: number;
+    payoutUsdc: number;
+    platformFeeUsdc: number;
+    agentOwnerFeeUsdc: number;
+    dustUsdc: number;
+    unclaimedUsdc: number;
+  };
 }
+
+const EMPTY_MARKET: RevenueSummary["market"] = {
+  settledMarkets: 0,
+  grossVolumeUsdc: 0,
+  payoutUsdc: 0,
+  platformFeeUsdc: 0,
+  agentOwnerFeeUsdc: 0,
+  dustUsdc: 0,
+  unclaimedUsdc: 0,
+};
 
 /**
  * Volume served before a database reset. Those rows may be gone, so displayed
@@ -146,6 +166,7 @@ function fromDbSummary(s: PaymentsRevenueSummary): RevenueSummary {
       transactionHash: r.transaction_hash,
       at: r.settled_at,
     })),
+    market: EMPTY_MARKET,
   };
 }
 
@@ -197,6 +218,7 @@ function inMemorySummary(limit: number): RevenueSummary {
         transactionHash: e.transactionHash,
         at: e.settledAt,
       })),
+    market: EMPTY_MARKET,
   };
 }
 
@@ -215,7 +237,22 @@ export async function getRevenueSummary(limit = 25): Promise<RevenueSummary> {
     };
   };
   try {
-    return withBaseline(fromDbSummary(await getPaymentsRevenueSummary(limit)));
+    const [payments, market] = await Promise.all([
+      getPaymentsRevenueSummary(limit),
+      getMarketRevenueSummary(),
+    ]);
+    return {
+      ...withBaseline(fromDbSummary(payments)),
+      market: {
+        settledMarkets: market.settledMarkets,
+        grossVolumeUsdc: unitsToUsdc(market.grossVolumeAtomic),
+        payoutUsdc: unitsToUsdc(market.payoutAtomic),
+        platformFeeUsdc: unitsToUsdc(market.platformFeeAtomic),
+        agentOwnerFeeUsdc: unitsToUsdc(market.agentOwnerFeeAtomic),
+        dustUsdc: unitsToUsdc(market.dustAtomic),
+        unclaimedUsdc: unitsToUsdc(market.unclaimedAtomic),
+      },
+    };
   } catch {
     return withBaseline(inMemorySummary(limit));
   }

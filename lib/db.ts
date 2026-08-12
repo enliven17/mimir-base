@@ -255,6 +255,61 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_resource ON payments_v2(resource)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_seller ON payments_v2(seller)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_payments_v2_tx ON payments_v2(network, transaction_hash, resource)" },
+  // Rebuildable read-index for MimirV2 fee events. Every monetary value stays
+  // in atomic USDC units; transaction hash + log index makes replay idempotent.
+  { sql: `CREATE TABLE IF NOT EXISTS fee_policies (
+    policy_id TEXT PRIMARY KEY,
+    platform_fee_bps INTEGER NOT NULL,
+    agent_owner_fee_bps INTEGER NOT NULL,
+    platform_recipient TEXT NOT NULL,
+    effective_at BIGINT NOT NULL,
+    transaction_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    UNIQUE(transaction_hash, log_index)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS fee_accruals (
+    accrual_id TEXT PRIMARY KEY,
+    claim_id BIGINT NOT NULL,
+    recipient TEXT NOT NULL,
+    source TEXT NOT NULL CHECK(source IN ('platform', 'agent_owner')),
+    amount_atomic NUMERIC(78,0) NOT NULL,
+    claimed_atomic NUMERIC(78,0) NOT NULL DEFAULT 0,
+    transaction_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    accrued_at BIGINT NOT NULL,
+    UNIQUE(transaction_hash, log_index)
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_fee_accruals_recipient ON fee_accruals(recipient)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_fee_accruals_claim ON fee_accruals(claim_id)" },
+  { sql: `CREATE TABLE IF NOT EXISTS fee_claims (
+    claim_event_id TEXT PRIMARY KEY,
+    recipient TEXT NOT NULL,
+    amount_atomic NUMERIC(78,0) NOT NULL,
+    transaction_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    claimed_at BIGINT NOT NULL,
+    UNIQUE(transaction_hash, log_index)
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_fee_claims_recipient ON fee_claims(recipient)" },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_revenue_attribution (
+    claim_id BIGINT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    owner_fee_recipient TEXT NOT NULL,
+    transaction_hash TEXT NOT NULL,
+    log_index INTEGER NOT NULL,
+    attributed_at BIGINT NOT NULL,
+    UNIQUE(transaction_hash, log_index)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS market_settlements (
+    claim_id BIGINT PRIMARY KEY,
+    gross_volume_atomic NUMERIC(78,0) NOT NULL,
+    payout_atomic NUMERIC(78,0) NOT NULL,
+    platform_fee_atomic NUMERIC(78,0) NOT NULL,
+    agent_owner_fee_atomic NUMERIC(78,0) NOT NULL,
+    dust_atomic NUMERIC(78,0) NOT NULL,
+    transaction_hash TEXT NOT NULL UNIQUE,
+    settled_at BIGINT NOT NULL
+  )` },
   /**
    * Market-creator proposals, in the canonical mode schema (§10.4).
    *
@@ -988,6 +1043,47 @@ export interface PaymentsRevenueSummary {
   recent: PaymentRow[];
 }
 
+export interface MarketSettlementRow {
+  claim_id: number;
+  gross_volume_atomic: bigint;
+  payout_atomic: bigint;
+  platform_fee_atomic: bigint;
+  agent_owner_fee_atomic: bigint;
+  dust_atomic: bigint;
+  transaction_hash: string;
+  settled_at: number;
+}
+
+export interface FeeAccrualRow {
+  accrual_id: string;
+  claim_id: number;
+  recipient: string;
+  source: "platform" | "agent_owner";
+  amount_atomic: bigint;
+  transaction_hash: string;
+  log_index: number;
+  accrued_at: number;
+}
+
+export interface FeeClaimRow {
+  claim_event_id: string;
+  recipient: string;
+  amount_atomic: bigint;
+  transaction_hash: string;
+  log_index: number;
+  claimed_at: number;
+}
+
+export interface MarketRevenueSummary {
+  settledMarkets: number;
+  grossVolumeAtomic: bigint;
+  payoutAtomic: bigint;
+  platformFeeAtomic: bigint;
+  agentOwnerFeeAtomic: bigint;
+  dustAtomic: bigint;
+  unclaimedAtomic: bigint;
+}
+
 /** NUMERIC(78,0) comes back as a string from pg — parse it, never via Number(). */
 function getBigInt(value: unknown): bigint {
   if (typeof value === "bigint") return value;
@@ -1129,6 +1225,94 @@ export async function insertPayment(e: PaymentRow): Promise<void> {
       e.created_at,
     ],
   });
+}
+
+/** Upsert one settlement projection rebuilt from MarketSettled + FeeAccrued logs. */
+export async function upsertMarketSettlement(e: MarketSettlementRow): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO market_settlements (
+      claim_id, gross_volume_atomic, payout_atomic, platform_fee_atomic,
+      agent_owner_fee_atomic, dust_atomic, transaction_hash, settled_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(claim_id) DO UPDATE SET
+      gross_volume_atomic=excluded.gross_volume_atomic,
+      payout_atomic=excluded.payout_atomic,
+      platform_fee_atomic=excluded.platform_fee_atomic,
+      agent_owner_fee_atomic=excluded.agent_owner_fee_atomic,
+      dust_atomic=excluded.dust_atomic,
+      transaction_hash=excluded.transaction_hash,
+      settled_at=excluded.settled_at`,
+    args: [
+      e.claim_id,
+      e.gross_volume_atomic.toString(),
+      e.payout_atomic.toString(),
+      e.platform_fee_atomic.toString(),
+      e.agent_owner_fee_atomic.toString(),
+      e.dust_atomic.toString(),
+      e.transaction_hash.toLowerCase(),
+      e.settled_at,
+    ],
+  });
+}
+
+/** Idempotently project FeeAccrued; replaying the same block cannot duplicate revenue. */
+export async function insertFeeAccrual(e: FeeAccrualRow): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO fee_accruals (
+      accrual_id, claim_id, recipient, source, amount_atomic,
+      transaction_hash, log_index, accrued_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(transaction_hash, log_index) DO NOTHING`,
+    args: [e.accrual_id, e.claim_id, e.recipient.toLowerCase(), e.source,
+      e.amount_atomic.toString(), e.transaction_hash.toLowerCase(), e.log_index, e.accrued_at],
+  });
+}
+
+/** Idempotently project FeeClaimed without mutating the append-only accrual ledger. */
+export async function insertFeeClaim(e: FeeClaimRow): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO fee_claims (
+      claim_event_id, recipient, amount_atomic, transaction_hash, log_index, claimed_at
+    ) VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(transaction_hash, log_index) DO NOTHING`,
+    args: [e.claim_event_id, e.recipient.toLowerCase(), e.amount_atomic.toString(),
+      e.transaction_hash.toLowerCase(), e.log_index, e.claimed_at],
+  });
+}
+
+/** Atomic market totals. x402 is deliberately queried separately and merged at the API boundary. */
+export async function getMarketRevenueSummary(): Promise<MarketRevenueSummary> {
+  const pool = await getDb();
+  const [settlements, accruals] = await Promise.all([
+    execute(pool, {
+      sql: `SELECT COUNT(*) AS markets,
+        COALESCE(SUM(gross_volume_atomic), 0) AS gross,
+        COALESCE(SUM(payout_atomic), 0) AS payouts,
+        COALESCE(SUM(platform_fee_atomic), 0) AS platform,
+        COALESCE(SUM(agent_owner_fee_atomic), 0) AS agent_owner,
+        COALESCE(SUM(dust_atomic), 0) AS dust
+      FROM market_settlements`,
+    }),
+    execute(pool, {
+      sql: `SELECT GREATEST(
+        COALESCE((SELECT SUM(amount_atomic) FROM fee_accruals), 0) -
+        COALESCE((SELECT SUM(amount_atomic) FROM fee_claims), 0), 0
+      ) AS unclaimed`,
+    }),
+  ]);
+  const s = settlements.rows[0] ?? {};
+  return {
+    settledMarkets: getNumber(s.markets),
+    grossVolumeAtomic: getBigInt(s.gross),
+    payoutAtomic: getBigInt(s.payouts),
+    platformFeeAtomic: getBigInt(s.platform),
+    agentOwnerFeeAtomic: getBigInt(s.agent_owner),
+    dustAtomic: getBigInt(s.dust),
+    unclaimedAtomic: getBigInt(accruals.rows[0]?.unclaimed),
+  };
 }
 
 export async function getPaymentsRevenueSummary(limit = 25): Promise<PaymentsRevenueSummary> {

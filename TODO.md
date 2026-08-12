@@ -181,43 +181,43 @@ tekrarlanabilir bir rubric ile oy verir; kimliği ve wallet'ı UI'da doğrulanab
 
 ### 5.1 Ekonomik kararlar
 
-- [ ] İki ayrı fee hattını tanımla:
-  - [ ] `platformFeeBps`: yalnızca resolved markette dağıtılabilir kazanç/pot
+- [x] İki ayrı fee hattını tanımla:
+  - [x] `platformFeeBps`: yalnızca resolved markette dağıtılabilir kazanç/pot
     üzerinden protokol geliri.
-  - [ ] `agentOwnerFeeBps`: yalnızca agent-attributed create/copy/service
+  - [x] `agentOwnerFeeBps`: yalnızca agent-attributed create/copy/service
     aktivitelerinde ilgili agent sahibine gelir.
-- [ ] Deposit anında fee alma; başarısız, draw, unresolvable ve refund akışlarını
+- [x] Deposit anında fee alma; başarısız, draw, unresolvable ve refund akışlarını
   kesintisiz iade et.
-- [ ] Agent fee'nin stake principal, brüt payout veya net profit tabanlarından
+- [x] Agent fee'nin stake principal, brüt payout veya net profit tabanlarından
   hangisine uygulanacağını ADR ile sabitle. Öneri: copy için net realized profit;
   x402 için settled service revenue.
-- [ ] Fee stacking üst sınırı ve rounding/dust policy belirle.
-- [ ] Creator, agent owner ve platform aynı adres olduğunda double-counting'i
+- [x] Fee stacking üst sınırı ve rounding/dust policy belirle.
+- [x] Creator, agent owner ve platform aynı adres olduğunda double-counting'i
   engelle.
 
 ### 5.2 Kontrat ve muhasebe
 
-- [ ] Yeni kontrat sürümünde immutable/capped fee policy veya timelock'lı yönetim
+- [x] Yeni kontrat sürümünde immutable/capped fee policy veya timelock'lı yönetim
   tasarla; admin'in anlık sınırsız fee değiştirmesine izin verme.
-- [ ] Claim'e create anındaki fee snapshot'ını yaz; sonradan fee değişimi açık
+- [x] Claim'e create anındaki fee snapshot'ını yaz; sonradan fee değişimi açık
   marketleri etkilemesin.
-- [ ] Agent attribution için güvenilir `agentId → ownerFeeRecipient` snapshot'ı al.
-- [ ] Push payout yerine gerektiğinde pull-based `claimFees/claimPayout` modelini
+- [x] Agent attribution için güvenilir `agentId → ownerFeeRecipient` snapshot'ı al.
+- [x] Push payout yerine gerektiğinde pull-based `claimFees/claimPayout` modelini
   değerlendir; reentrancy ve başarısız recipient riskini azalt.
-- [ ] Eventler: `FeePolicyUpdated`, `FeeAccrued`, `FeeClaimed`, `AgentAttributed`.
-- [ ] `payments_v2` x402 revenue ile market fee ledger'ını aynı toplamda birleştir,
+- [x] Eventler: `FeePolicyUpdated`, `FeeAccrued`, `FeeClaimed`, `AgentAttributed`.
+- [x] `payments_v2` x402 revenue ile market fee ledger'ını aynı toplamda birleştir,
   fakat kaynak türlerini ayrı tut.
-- [ ] `/revenue` sayfasında gross volume, payouts, platform fees, agent-owner fees,
+- [x] `/revenue` sayfasında gross volume, payouts, platform fees, agent-owner fees,
   x402 revenue ve unclaimed balance göster.
 
 ### 5.3 Testler
 
-- [ ] Pool, Duel, Fixed Odds, creator-win, challenger-win, draw, cancel ve dust
+- [x] Pool, Duel, Fixed Odds, creator-win, challenger-win, draw, cancel ve dust
   için invariant/property testleri.
-- [ ] `sum(principal + payout + fees + dust) == escrow inflow` invariant'ı.
-- [ ] Fee-on-transfer/rebasing token desteklenmediğini açıkça doğrula; yalnızca
+- [x] `sum(principal + payout + fees + dust) == escrow inflow` invariant'ı.
+- [x] Fee-on-transfer/rebasing token desteklenmediğini açıkça doğrula; yalnızca
   configured USDC kabul et.
-- [ ] Slither/fuzz/reentrancy ve malicious fee-recipient testleri.
+- [x] Slither/fuzz/reentrancy ve malicious fee-recipient testleri.
 
 **Kabul kriteri:** Her atomic USDC bir kez ve açıklanabilir şekilde principal,
 payout, platform fee, owner fee veya dust olarak muhasebeleşir.
@@ -533,7 +533,7 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 - [ ] `agent_registry`, `agent_operators`, `agent_capabilities`
 - [x] `agent_reasoning_events`, `evidence_sources`, `market_context_packs`
 - [ ] `agent_follows`, `copy_permissions`, `copy_executions`
-- [ ] `fee_policies`, `fee_accruals`, `agent_revenue_attribution`
+- [x] `fee_policies`, `fee_accruals`, `agent_revenue_attribution`
 - [ ] `market_series`, `profile_stats`, `conviction_scores`
 - [ ] `basket_definitions`, `basket_positions`, `basket_nav_snapshots`
 - [ ] Tüm tablolarda migration version, timestamps, stable IDs ve gerekli unique

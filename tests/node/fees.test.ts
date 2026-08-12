@@ -439,3 +439,49 @@ test("an empty market conserves trivially", () => {
   assert.equal(settlement.escrowInflowUnits, 0n);
   assert.equal(settlement.dustUnits, 0n);
 });
+
+test("seeded fuzz conserves every atomic unit across 2,000 markets", () => {
+  let seed = 0x6d696d69;
+  const random = (): number => {
+    seed ^= seed << 13;
+    seed ^= seed >>> 17;
+    seed ^= seed << 5;
+    return seed >>> 0;
+  };
+  for (let i = 0; i < 2_000; i += 1) {
+    const creatorStake = BigInt((random() % 10_000_000) + 1);
+    const challengerStake = BigInt((random() % 10_000_000) + 1);
+    const inflow = creatorStake + challengerStake;
+    const creatorWins = (random() & 1) === 0;
+    const totalFeeBps = random() % 1_001;
+    const ownerFeeBps = random() % (totalFeeBps + 1);
+    const outcome: SettlementOutcome = random() % 5 === 0
+      ? (["draw", "unresolvable", "cancelled"] as const)[random() % 3]!
+      : creatorWins ? "creator_wins" : "challengers_win";
+    const participants: Participant[] = [
+      { address: CREATOR, stakeUnits: creatorStake, grossPayoutUnits: creatorWins ? inflow : 0n },
+      { address: AGENT_OWNER, stakeUnits: challengerStake, grossPayoutUnits: creatorWins ? 0n : inflow },
+    ];
+    const result = settleMarket({
+      participants,
+      outcome,
+      snapshot: snapshot({
+        platformFeeBps: totalFeeBps - ownerFeeBps,
+        agentOwnerFeeBps: ownerFeeBps,
+        agentOwnerRecipient: (random() & 3) === 0 ? PLATFORM : AGENT_OWNER,
+      }),
+    });
+    assert.equal(conservationHolds(result), true, `iteration ${i}`);
+    assert.ok(result.dustUnits >= 0n, `iteration ${i} has negative dust`);
+    if (isRefundOutcome(outcome)) {
+      assert.equal(
+        result.totalPlatformFeeUnits + result.totalAgentOwnerFeeUnits,
+        0n,
+        `iteration ${i} charged a refund`,
+      );
+      assert.equal(result.totalPayoutUnits, inflow, `iteration ${i} under-refunded`);
+    } else {
+      assert.equal(noWinnerLosesPrincipal(participants, result), true, `iteration ${i}`);
+    }
+  }
+});

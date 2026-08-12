@@ -37,6 +37,15 @@ interface RevenueSummary {
   byResource: Array<{ resource: string; calls: number; usdc: number }>;
   bySeller: Array<{ seller: string; calls: number; usdc: number }>;
   recent: PaymentEvent[];
+  market: {
+    settledMarkets: number;
+    grossVolumeUsdc: number;
+    payoutUsdc: number;
+    platformFeeUsdc: number;
+    agentOwnerFeeUsdc: number;
+    dustUsdc: number;
+    unclaimedUsdc: number;
+  };
 }
 
 function short(addr: string | null): string {
@@ -92,9 +101,8 @@ export default function RevenuePage() {
     <div className="mx-auto w-full max-w-6xl px-4 pb-24 pt-10">
       <BlueprintHeading>Agent revenue</BlueprintHeading>
       <p className="mt-3 max-w-2xl text-sm leading-relaxed text-pv-muted">
-        USDC paid to Mimir&apos;s paid endpoints — premium price oracle,
-        oracle-as-a-service, and council reasoning — settled per request over
-        x402 on Base Sepolia and verified on-chain.
+        A reconciled view of market settlement fees and x402 service revenue.
+        The ledgers remain separate by source and use atomic USDC accounting.
       </p>
 
       {err && (
@@ -108,14 +116,17 @@ export default function RevenuePage() {
 
       {data && (
         <>
-          <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <Stat label="Paid calls" value={String(data.totalCalls)} />
-            <Stat label="USDC earned" value={`${data.totalUsdc.toFixed(6)} USDC`} accent />
-            <Stat
-              label="Paying agents"
-              value={`${data.uniquePayers} → ${data.uniqueSellers} sellers`}
-            />
+          <section className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <Stat label="Gross market volume" value={`${data.market.grossVolumeUsdc.toFixed(6)} USDC`} />
+            <Stat label="Market payouts" value={`${data.market.payoutUsdc.toFixed(6)} USDC`} />
+            <Stat label="Platform fees" value={`${data.market.platformFeeUsdc.toFixed(6)} USDC`} accent />
+            <Stat label="Agent-owner fees" value={`${data.market.agentOwnerFeeUsdc.toFixed(6)} USDC`} accent />
+            <Stat label="x402 service revenue" value={`${data.totalUsdc.toFixed(6)} USDC`} accent />
+            <Stat label="Unclaimed fees" value={`${data.market.unclaimedUsdc.toFixed(6)} USDC`} />
           </section>
+          <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-pv-muted">
+            {data.market.settledMarkets} settled markets · {data.market.dustUsdc.toFixed(6)} USDC recorded dust · {data.totalCalls} paid calls · {data.uniquePayers} payers / {data.uniqueSellers} sellers
+          </p>
           {(data.baselineCalls > 0 || data.baselineUsdc > 0) && (
             <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-pv-muted">
               includes {data.baselineCalls} calls / {data.baselineUsdc.toFixed(6)} USDC carried

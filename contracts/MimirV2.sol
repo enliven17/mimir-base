@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.20;
+pragma solidity 0.8.28;
 
 /**
  * Minimal ERC-20 interface used by Mimir for stake custody.
@@ -154,11 +154,12 @@ contract MimirV2 {
     event ClaimResolved(uint256 indexed id, uint8 winnerSide, string summary, uint8 confidence, bytes32 evidenceHash);
     event ClaimCancelled(uint256 indexed id);
     event OracleChanged(address indexed previous, address indexed next);
+    event OwnershipTransferred(address indexed previous, address indexed next);
     event WithdrawalPending(address indexed to, uint256 amount);
     event Withdrawal(address indexed to, uint256 amount);
 
-    event FeePolicyQueued(uint16 platformFeeBps, uint16 agentOwnerFeeBps, address platformRecipient, uint256 executableAt);
-    event FeePolicyUpdated(uint16 platformFeeBps, uint16 agentOwnerFeeBps, address platformRecipient);
+    event FeePolicyQueued(uint16 platformFeeBps, uint16 agentOwnerFeeBps, address indexed platformRecipient, uint256 executableAt);
+    event FeePolicyUpdated(uint16 platformFeeBps, uint16 agentOwnerFeeBps, address indexed platformRecipient);
     event FeePolicyCancelled();
     event AgentAttributed(uint256 indexed id, address indexed agentOwnerRecipient);
     event FeeAccrued(uint256 indexed id, address indexed recipient, uint256 amount, bool isAgentOwnerFee);
@@ -193,6 +194,7 @@ contract MimirV2 {
         uint16  _agentOwnerFeeBps,
         address _platformRecipient
     ) {
+        require(_oracle != address(0), "Mimir: zero oracle");
         require(_usdc != address(0), "Mimir: zero USDC");
         require(
             uint256(_platformFeeBps) + uint256(_agentOwnerFeeBps) <= MAX_TOTAL_FEE_BPS,
@@ -206,17 +208,20 @@ contract MimirV2 {
         feePolicy = FeePolicy(_platformFeeBps, _agentOwnerFeeBps, _platformRecipient);
 
         emit OracleChanged(address(0), _oracle);
+        emit OwnershipTransferred(address(0), msg.sender);
         emit FeePolicyUpdated(_platformFeeBps, _agentOwnerFeeBps, _platformRecipient);
     }
 
     // ── Admin ─────────────────────────────────────────────────────────────────
     function setOracle(address _oracle) external onlyOwner {
+        require(_oracle != address(0), "Mimir: zero oracle");
         emit OracleChanged(oracle, _oracle);
         oracle = _oracle;
     }
 
     function transferOwnership(address _owner) external onlyOwner {
         require(_owner != address(0), "Mimir: zero owner");
+        emit OwnershipTransferred(owner, _owner);
         owner = _owner;
     }
 
@@ -275,8 +280,13 @@ contract MimirV2 {
 
     function _pullStake(uint256 amount) internal {
         require(amount > 0, "Mimir: zero stake");
+        uint256 beforeBalance = usdc.balanceOf(address(this));
         bool ok = usdc.transferFrom(msg.sender, address(this), amount);
         require(ok, "Mimir: USDC pull failed");
+        // MimirV2 accounts in exact atomic USDC units. Fee-on-transfer and
+        // rebasing assets would break escrow conservation, so reject them even
+        // if a misconfigured deployment points `usdc` at such a token.
+        require(usdc.balanceOf(address(this)) == beforeBalance + amount, "Mimir: unsupported token");
     }
 
     /**
@@ -732,7 +742,4 @@ contract MimirV2 {
         return keccak256(bytes(a)) == keccak256(bytes(b));
     }
 
-    receive() external payable {
-        revert("Mimir: stakes are USDC - approve + createClaim/challengeClaim");
-    }
 }
