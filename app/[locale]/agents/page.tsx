@@ -56,6 +56,39 @@ type EventRow =
       blockNumber: number;
     };
 
+type CompactStreak = { current: number; best: number };
+
+function deriveStreaks(rows: EventRow[]): Map<string, CompactStreak> {
+  const creators = new Map<number, string>();
+  const challengers = new Map<number, Set<string>>();
+  const streaks = new Map<string, CompactStreak>();
+  const update = (address: string, won: boolean) => {
+    const key = address.toLowerCase();
+    const prior = streaks.get(key) ?? { current: 0, best: 0 };
+    const current = won
+      ? prior.current > 0 ? prior.current + 1 : 1
+      : prior.current < 0 ? prior.current - 1 : -1;
+    streaks.set(key, { current, best: Math.max(prior.best, current) });
+  };
+
+  for (const row of [...rows].sort((a, b) => a.blockNumber - b.blockNumber)) {
+    if (row.kind === "created") creators.set(row.claimId, row.actor.toLowerCase());
+    if (row.kind === "challenged") {
+      const set = challengers.get(row.claimId) ?? new Set<string>();
+      set.add(row.actor.toLowerCase());
+      challengers.set(row.claimId, set);
+    }
+    if (row.kind === "resolved" && (row.winnerSide === 1 || row.winnerSide === 2)) {
+      const creator = creators.get(row.claimId);
+      if (creator) update(creator, row.winnerSide === 1);
+      for (const challenger of challengers.get(row.claimId) ?? []) {
+        update(challenger, row.winnerSide === 2);
+      }
+    }
+  }
+  return streaks;
+}
+
 const fetchEvents = cachedFor(fetchEventsUncached, 20_000);
 
 async function fetchEventsUncached() {
@@ -204,27 +237,51 @@ function ActorTag({
   addr,
   oracle,
   creator,
-}: { addr: string; oracle?: string; creator?: string }) {
+  streak,
+}: { addr: string; oracle?: string; creator?: string; streak?: CompactStreak }) {
   const actor = classifyActor(addr, oracle, creator);
+  const badge = streak?.current
+    ? <StreakPill streak={streak} />
+    : null;
   if (actor.kind === "oracle") {
-    return <span className="inline-flex items-center rounded-md border border-pv-emerald/40 bg-pv-emerald/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-emerald">oracle</span>;
+    return <span className="inline-flex items-center gap-1"><span className="inline-flex items-center rounded-md border border-pv-emerald/40 bg-pv-emerald/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-emerald">oracle</span>{badge}</span>;
   }
   if (actor.kind === "market-creator") {
-    return <span className="inline-flex items-center rounded-md border border-pv-border/60 bg-pv-surface2/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-text/80">market-creator</span>;
+    return <span className="inline-flex items-center gap-1"><span className="inline-flex items-center rounded-md border border-pv-border/60 bg-pv-surface2/60 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-text/80">market-creator</span>{badge}</span>;
   }
   if (actor.kind === "council") {
     const p = actor.persona;
     return (
-      <span className="inline-flex items-center gap-1 rounded-md border border-pv-border/50 bg-pv-surface2/40 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-text/80">
-        <span className="text-[11px] leading-none grayscale opacity-75">{p.emoji}</span>
-        <span>{p.displayName.replace(/^The /, "")}</span>
+      <span className="inline-flex items-center gap-1">
+        <span className="inline-flex items-center gap-1 rounded-md border border-pv-border/50 bg-pv-surface2/40 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-text/80">
+          <span className="text-[11px] leading-none grayscale opacity-75">{p.emoji}</span>
+          <span>{p.displayName.replace(/^The /, "")}</span>
+        </span>
+        {badge}
       </span>
     );
   }
   return (
     <span className="inline-flex items-center gap-1.5">
       <span className="inline-flex items-center rounded-md border border-pv-fuch/40 bg-pv-fuch/[0.08] px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-fuch">human</span>
-      <span className="font-mono text-[11px] text-pv-muted">{shortenAddress(addr)}</span>
+      <span className="font-mono text-[11px] text-pv-muted">{shortenAddress(addr)}</span>{badge}
+    </span>
+  );
+}
+
+function StreakPill({ streak }: { streak: CompactStreak }) {
+  const winning = streak.current > 0;
+  const length = Math.abs(streak.current);
+  return (
+    <span
+      className={`rounded-md border px-1.5 py-0.5 font-mono text-[10px] font-bold ${
+        winning
+          ? "border-pv-emerald/35 bg-pv-emerald/[0.08] text-pv-emerald"
+          : "border-pv-border/50 bg-pv-surface2/50 text-pv-muted"
+      }`}
+      title={winning && length >= streak.best ? "Current run · personal best" : "Current resolved run"}
+    >
+      {length}{winning ? "W" : "L"}
     </span>
   );
 }
@@ -255,6 +312,7 @@ export default async function AgentsPage({
   ]);
   const filter = parseFilter(sp?.filter);
   const councilPersonas = getActiveCouncilPersonas();
+  const streaks = deriveStreaks(events);
 
   const isOracle  = (a: string) => !!agentInfo && a.toLowerCase() === agentInfo.oracle.toLowerCase();
   const isCreator = (a: string) => !!agentInfo && a.toLowerCase() === agentInfo.owner.toLowerCase();
@@ -473,14 +531,14 @@ export default async function AgentsPage({
                   <span className="font-mono text-[11px] text-pv-emerald">claim #{e.claimId}</span>
                   {e.kind === "created" && (
                     <>
-                      <ActorTag addr={e.actor} oracle={agentInfo?.oracle} creator={agentInfo?.owner} />
+                      <ActorTag addr={e.actor} oracle={agentInfo?.oracle} creator={agentInfo?.owner} streak={streaks.get(e.actor.toLowerCase())} />
                       <span className="text-[13px] font-bold text-pv-text">opened a market</span>
                       <span className="text-[11px] text-pv-muted">· {e.category}</span>
                     </>
                   )}
                   {e.kind === "challenged" && (
                     <>
-                      <ActorTag addr={e.actor} oracle={agentInfo?.oracle} creator={agentInfo?.owner} />
+                      <ActorTag addr={e.actor} oracle={agentInfo?.oracle} creator={agentInfo?.owner} streak={streaks.get(e.actor.toLowerCase())} />
                       <span className="text-[13px] font-bold text-pv-text">staked the contrarian side</span>
                       <span className="text-[11px] font-mono text-pv-text/85">{unitsToUsdc(e.stakeUnits).toFixed(2)} USDC</span>
                     </>

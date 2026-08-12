@@ -118,6 +118,19 @@ test("confidence is an integer in basis points, never a float", () => {
   assert.equal(validateReasoningEvent(event({ confidenceBps: 10_000 })).ok, true);
 });
 
+test("an underpriced claim always requires evidence and non-zero confidence", () => {
+  const summary = "This challenger side is underpriced relative to the settlement evidence.";
+  const noEvidence = validateReasoningEvent(event({ stage: "preflight", summary, evidenceRefs: [] }));
+  assert.equal(noEvidence.ok, false);
+  assert.match(noEvidence.errors.join(" "), /must cite evidence/);
+
+  const noConfidence = validateReasoningEvent(event({ summary, confidenceBps: 0 }));
+  assert.equal(noConfidence.ok, false);
+  assert.match(noConfidence.errors.join(" "), /non-zero confidence/);
+
+  assert.equal(validateReasoningEvent(event({ summary, confidenceBps: 6_500 })).ok, true);
+});
+
 test("the agent id must be a registry id, not a wallet address", () => {
   const result = validateReasoningEvent(
     event({ agentId: "0x1111111111111111111111111111111111111111" }),

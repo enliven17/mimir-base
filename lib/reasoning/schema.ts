@@ -123,6 +123,7 @@ export function reasoningEventId(parts: {
 export const MAX_SUMMARY_CHARS = 700;
 export const MAX_UNCERTAINTY_CHARS = 400;
 export const MAX_EVIDENCE_REFS = 12;
+const MARKET_VALUE_ASSERTION = /\b(?:underpriced|mispriced|undervalued)\b/i;
 
 export interface ValidationResult {
   ok: boolean;
@@ -205,6 +206,18 @@ export function validateReasoningEvent(event: ReasoningEvent): ValidationResult 
       errors.push(`evidenceRefs[${i}].capturedAt is required`);
     }
   });
+
+  // A market-value claim is stronger than ordinary commentary. In particular,
+  // preflight events normally may have no sources, but calling a side
+  // "underpriced" must always carry both evidence and a non-zero confidence.
+  if (MARKET_VALUE_ASSERTION.test(event.summary)) {
+    if (event.evidenceRefs.length === 0) {
+      errors.push("underpriced/mispriced claims must cite evidence");
+    }
+    if (event.confidenceBps <= 0) {
+      errors.push("underpriced/mispriced claims must state non-zero confidence");
+    }
+  }
 
   // A position other than abstain with no evidence is an assertion, not analysis.
   if (event.position !== "abstain" && event.evidenceRefs.length === 0 && event.stage !== "preflight") {

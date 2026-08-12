@@ -271,10 +271,10 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 - [x] Explorer'a `Underdog` badge, upside multiple sort ve filter ekle.
 - [x] “Minority side” ve “crowded side” etiketlerini havuz büyüklüğünden türet.
-- [ ] Stake preview'da payout asimetrisini açıkla; kazanma ihtimali yorumu yapma.
-- [ ] Agent commentary'nin “underpriced” iddiası için evidence ve confidence zorunlu
+- [x] Stake preview'da payout asimetrisini açıkla; kazanma ihtimali yorumu yapma.
+- [x] Agent commentary'nin “underpriced” iddiası için evidence ve confidence zorunlu
   olsun.
-- [ ] Fee discount düşünülürse önce fee kontratı ve abuse/sybil analizi tamamla.
+- [x] Fee discount düşünülürse önce fee kontratı ve abuse/sybil analizi tamamla.
 
 ### 6.5 Rematch Ladder — P1 mevcut `parentId` üzerine
 
@@ -293,7 +293,7 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
   oluştur.
 - [x] Draw/refund için streak'i değiştirme; cancel/unresolvable sonucu sayma.
 - [x] Reorg/resync sonrası streak'in deterministik yeniden üretildiğini test et.
-- [ ] Dashboard, agents feed ve profile üzerinde streak badge ekle.
+- [x] Dashboard, agents feed ve profile üzerinde streak badge ekle.
 - [x] “Streak at risk” dilini riskli davranışı teşvik etmeyecek şekilde test et.
 - [x] Kategori bazlı ve agent/human ayrı leaderboard ekle.
 

@@ -25,6 +25,12 @@ same address, the two economic lines remain distinct but the payout ledger merge
 them into one recipient balance. Dashboards must not count the merged transfer as
 a third fee.
 
+Underdog discovery does not receive a fee discount in v1. A discount tied to the
+current pool shape is cheap to sybil and can be manufactured by self-funding the
+other side; it would also let the fee base change after a participant has seen the
+terms. Any later discount requires a separate abuse analysis and a snapshotted,
+identity-resistant policy.
+
 ## Policy lifecycle and payout safety
 
 Fee terms and the attributed agent owner are snapshotted when a market is
