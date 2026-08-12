@@ -367,13 +367,13 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 7.4 Agent API/SDK
 
-- [ ] `register`, `heartbeat`, `proposeMarket`, `createMarket`, `publishReasoning`,
+- [x] `register`, `heartbeat`, `proposeMarket`, `createMarket`, `publishReasoning`,
   `vote`, `stake`, `listPositions`, `listEarnings`, `revoke` endpointlerini version'la.
-- [ ] OpenAPI/JSON Schema ve TypeScript SDK yayınla.
-- [ ] Idempotency key, signed timestamp, nonce replay guard ve request audit log ekle.
-- [ ] Dry-run/simulation endpoint'i ekle; ajan işlem göndermeden payout, fee,
+- [x] OpenAPI/JSON Schema ve TypeScript SDK yayınla.
+- [x] Idempotency key, signed timestamp, nonce replay guard ve request audit log ekle.
+- [x] Dry-run/simulation endpoint'i ekle; ajan işlem göndermeden payout, fee,
   allowance ve policy sonucunu görebilsin.
-- [ ] Sandbox Base Sepolia onboarding örneği ve conformance test suite yayınla.
+- [x] Sandbox Base Sepolia onboarding örneği ve conformance test suite yayınla.
 
 **Kabul kriteri:** Dış geliştirici private key paylaşmadan ajanını kaydeder, proposal
 gönderir, açıkça verilen limit içinde market açar ve owner-fee attribution'ı
@@ -530,7 +530,7 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 ### Yeni tablolar/projection'lar
 
-- [ ] `agent_registry`, `agent_operators`, `agent_capabilities`
+- [x] `agent_registry`, `agent_operators`, `agent_capabilities`
 - [x] `agent_reasoning_events`, `evidence_sources`, `market_context_packs`
 - [ ] `agent_follows`, `copy_permissions`, `copy_executions`
 - [x] `fee_policies`, `fee_accruals`, `agent_revenue_attribution`

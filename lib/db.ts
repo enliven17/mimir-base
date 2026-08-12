@@ -3,6 +3,7 @@ import ws from "ws";
 
 import type { ChallengeOpportunity } from "@/lib/claimDrafts";
 import type { ClaimChallenger, ClaimData } from "@/lib/contract";
+import type { AgentRecord } from "@/lib/agents/registry";
 
 // Neon's @neondatabase/serverless uses WebSockets in Node — wire up the ws
 // implementation. In edge/serverless runtimes that don't ship a global
@@ -228,6 +229,68 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_agent ON agent_reasoning_events(agent_id)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_track ON agent_reasoning_events(track)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_visibility ON agent_reasoning_events(visibility)" },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_registry (
+    agent_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL,
+    owner_wallet TEXT NOT NULL,
+    operator_wallet TEXT NOT NULL,
+    payout_wallet TEXT NOT NULL,
+    display_name TEXT NOT NULL,
+    description TEXT NOT NULL DEFAULT '',
+    metadata_uri TEXT,
+    metadata_hash TEXT,
+    authority_level SMALLINT NOT NULL DEFAULT 0,
+    limits_json TEXT NOT NULL DEFAULT '{}',
+    status TEXT NOT NULL DEFAULT 'pending',
+    reputation_bps INTEGER NOT NULL DEFAULT 0,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    revoked_at BIGINT,
+    revoked_reason TEXT
+  )` },
+  { sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_registry_owner_id ON agent_registry(owner_wallet, agent_id)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_agent_registry_operator ON agent_registry(operator_wallet)" },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_operators (
+    agent_id TEXT NOT NULL,
+    operator_wallet TEXT NOT NULL,
+    valid_from BIGINT NOT NULL,
+    valid_to BIGINT,
+    PRIMARY KEY(agent_id, operator_wallet, valid_from)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_capabilities (
+    agent_id TEXT NOT NULL,
+    capability TEXT NOT NULL,
+    granted_at BIGINT NOT NULL,
+    revoked_at BIGINT,
+    PRIMARY KEY(agent_id, capability, granted_at)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_api_nonces (
+    nonce TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    consumed_at BIGINT NOT NULL
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_request_audit (
+    request_id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    signed_at BIGINT NOT NULL,
+    nonce TEXT NOT NULL,
+    outcome TEXT NOT NULL,
+    reason TEXT,
+    created_at BIGINT NOT NULL,
+    UNIQUE(agent_id, action, idempotency_key)
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_agent_audit_created ON agent_request_audit(created_at DESC)" },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_api_responses (
+    agent_id TEXT NOT NULL,
+    action TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    response_json TEXT NOT NULL,
+    status_code INTEGER NOT NULL,
+    created_at BIGINT NOT NULL,
+    PRIMARY KEY(agent_id, action, idempotency_key)
+  )` },
   // x402 settlement ledger. Amounts are ATOMIC token units, never floats — a
   // DOUBLE PRECISION column cannot hold 6dp money without rounding drift, and
   // SUM() over it compounds it. The old float `payments` table is deliberately
@@ -1198,6 +1261,116 @@ export async function getProposalPrecision(): Promise<{
   };
 }
 
+// ── BYOA registry and request audit ─────────────────────────────────────────
+
+export async function upsertAgentRecord(agent: AgentRecord): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO agent_registry (
+      agent_id, schema_version, owner_wallet, operator_wallet, payout_wallet,
+      display_name, description, metadata_uri, metadata_hash, authority_level,
+      limits_json, status, reputation_bps, created_at, updated_at, revoked_at, revoked_reason
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(agent_id) DO UPDATE SET
+      operator_wallet=excluded.operator_wallet, payout_wallet=excluded.payout_wallet,
+      display_name=excluded.display_name, description=excluded.description,
+      metadata_uri=excluded.metadata_uri, metadata_hash=excluded.metadata_hash,
+      authority_level=excluded.authority_level, limits_json=excluded.limits_json,
+      status=excluded.status, reputation_bps=excluded.reputation_bps,
+      updated_at=excluded.updated_at, revoked_at=excluded.revoked_at,
+      revoked_reason=excluded.revoked_reason`,
+    args: [agent.agentId, agent.schemaVersion, agent.ownerWallet.toLowerCase(),
+      agent.operatorWallet.toLowerCase(), agent.payoutWallet.toLowerCase(), agent.displayName,
+      agent.description, agent.metadataUri ?? null, agent.metadataHash ?? null,
+      agent.authorityLevel, JSON.stringify(agent.limits), agent.status, agent.reputationBps,
+      agent.createdAt, agent.updatedAt, agent.revokedAt ?? null, agent.revokedReason ?? null],
+  });
+  await execute(pool, {
+    sql: `INSERT INTO agent_operators(agent_id, operator_wallet, valid_from)
+      VALUES (?, ?, ?) ON CONFLICT DO NOTHING`,
+    args: [agent.agentId, agent.operatorWallet.toLowerCase(), agent.updatedAt],
+  });
+  for (const capability of agent.capabilities) {
+    await execute(pool, {
+      sql: `INSERT INTO agent_capabilities(agent_id, capability, granted_at)
+        VALUES (?, ?, ?) ON CONFLICT DO NOTHING`,
+      args: [agent.agentId, capability, agent.updatedAt],
+    });
+  }
+}
+
+export async function getAgentRecord(agentId: string): Promise<AgentRecord | null> {
+  const pool = await getDb();
+  const [record, capabilities] = await Promise.all([
+    execute(pool, { sql: "SELECT * FROM agent_registry WHERE agent_id = ? LIMIT 1", args: [agentId] }),
+    execute(pool, { sql: `SELECT capability FROM agent_capabilities
+      WHERE agent_id = ? AND revoked_at IS NULL ORDER BY capability`, args: [agentId] }),
+  ]);
+  const row = record.rows[0];
+  if (!row) return null;
+  return {
+    schemaVersion: getNumber(row.schema_version), agentId: getString(row.agent_id),
+    ownerWallet: getString(row.owner_wallet), operatorWallet: getString(row.operator_wallet),
+    payoutWallet: getString(row.payout_wallet), displayName: getString(row.display_name),
+    description: getString(row.description), metadataUri: getNullableString(row.metadata_uri) ?? undefined,
+    metadataHash: getNullableString(row.metadata_hash) ?? undefined,
+    capabilities: capabilities.rows.map((r) => getString(r.capability)) as AgentRecord["capabilities"],
+    authorityLevel: getNumber(row.authority_level) as AgentRecord["authorityLevel"],
+    limits: JSON.parse(getString(row.limits_json) || "{}") as AgentRecord["limits"],
+    status: getString(row.status) as AgentRecord["status"], reputationBps: getNumber(row.reputation_bps),
+    createdAt: getNumber(row.created_at), updatedAt: getNumber(row.updated_at),
+    revokedAt: row.revoked_at == null ? undefined : getNumber(row.revoked_at),
+    revokedReason: getNullableString(row.revoked_reason) ?? undefined,
+  };
+}
+
+/** Returns false on replay. The nonce insert and audit idempotency are DB-enforced. */
+export async function consumeAgentNonce(agentId: string, nonce: string, at: number): Promise<boolean> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `INSERT INTO agent_api_nonces(nonce, agent_id, consumed_at)
+      VALUES (?, ?, ?) ON CONFLICT(nonce) DO NOTHING RETURNING nonce`,
+    args: [nonce, agentId, at],
+  });
+  return result.rows.length === 1;
+}
+
+export async function insertAgentRequestAudit(row: {
+  requestId: string; agentId: string; action: string; idempotencyKey: string;
+  signedAt: number; nonce: string; outcome: string; reason?: string; createdAt: number;
+}): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO agent_request_audit (
+      request_id, agent_id, action, idempotency_key, signed_at, nonce, outcome, reason, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(agent_id, action, idempotency_key) DO NOTHING`,
+    args: [row.requestId, row.agentId, row.action, row.idempotencyKey, row.signedAt,
+      row.nonce, row.outcome, row.reason ?? null, row.createdAt],
+  });
+}
+
+export async function getAgentApiResponse(agentId: string, action: string, key: string): Promise<{ body: unknown; status: number } | null> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT response_json, status_code FROM agent_api_responses
+      WHERE agent_id = ? AND action = ? AND idempotency_key = ? LIMIT 1`,
+    args: [agentId, action, key],
+  });
+  const row = result.rows[0];
+  return row ? { body: JSON.parse(getString(row.response_json)), status: getNumber(row.status_code) } : null;
+}
+
+export async function saveAgentApiResponse(row: {
+  agentId: string; action: string; idempotencyKey: string; body: unknown; status: number; createdAt: number;
+}): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO agent_api_responses(agent_id, action, idempotency_key, response_json, status_code, created_at)
+      VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(agent_id, action, idempotency_key) DO NOTHING`,
+    args: [row.agentId, row.action, row.idempotencyKey, JSON.stringify(row.body), row.status, row.createdAt],
+  });
+}
+
 export async function insertPayment(e: PaymentRow): Promise<void> {
   const pool = await getDb();
   await execute(pool, {
@@ -1313,6 +1486,25 @@ export async function getMarketRevenueSummary(): Promise<MarketRevenueSummary> {
     dustAtomic: getBigInt(s.dust),
     unclaimedAtomic: getBigInt(accruals.rows[0]?.unclaimed),
   };
+}
+
+export async function getAgentEarningsSummary(payoutWallet: string): Promise<{
+  ownerFeesAtomic: bigint; unclaimedAtomic: bigint; x402Atomic: bigint;
+}> {
+  const pool = await getDb();
+  const wallet = payoutWallet.toLowerCase();
+  const result = await execute(pool, {
+    sql: `SELECT
+      COALESCE((SELECT SUM(amount_atomic) FROM fee_accruals WHERE recipient = ? AND source = 'agent_owner'), 0) AS owner_fees,
+      GREATEST(
+        COALESCE((SELECT SUM(amount_atomic) FROM fee_accruals WHERE recipient = ?), 0) -
+        COALESCE((SELECT SUM(amount_atomic) FROM fee_claims WHERE recipient = ?), 0), 0
+      ) AS unclaimed,
+      COALESCE((SELECT SUM(amount_atomic) FROM payments_v2 WHERE seller = ?), 0) AS x402`,
+    args: [wallet, wallet, wallet, wallet],
+  });
+  const row = result.rows[0] ?? {};
+  return { ownerFeesAtomic: getBigInt(row.owner_fees), unclaimedAtomic: getBigInt(row.unclaimed), x402Atomic: getBigInt(row.x402) };
 }
 
 export async function getPaymentsRevenueSummary(limit = 25): Promise<PaymentsRevenueSummary> {

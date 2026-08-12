@@ -201,7 +201,7 @@ export function verifyChallenge(args: {
 /** The minimum authority level each capability needs to be exercisable. */
 const CAPABILITY_MIN_AUTHORITY: Record<AgentCapability, AuthorityLevel> = {
   researcher: AUTHORITY_LEVELS.READ_ONLY,
-  market_creator: AUTHORITY_LEVELS.CREATE,
+  market_creator: AUTHORITY_LEVELS.PROPOSE,
   council_juror: AUTHORITY_LEVELS.STAKE,
   copy_source: AUTHORITY_LEVELS.MONETISE,
   x402_seller: AUTHORITY_LEVELS.MONETISE,
@@ -240,6 +240,8 @@ export interface ActionRequest {
   requestsThisHour?: number;
   /** Emergency platform kill-switch, checked before agent-local state. */
   platformPaused?: boolean;
+  /** market_creator at level 1 may propose, but cannot fund/create. */
+  proposalOnly?: boolean;
 }
 
 /**
@@ -268,7 +270,9 @@ export function authorizeAction(agent: AgentRecord, request: ActionRequest): Act
       detail: `'${request.capability}' was never granted`,
     };
   }
-  const required = CAPABILITY_MIN_AUTHORITY[request.capability];
+  const required = request.capability === "market_creator" && !request.proposalOnly
+    ? AUTHORITY_LEVELS.CREATE
+    : CAPABILITY_MIN_AUTHORITY[request.capability];
   if (agent.authorityLevel < required) {
     return {
       allowed: false,
