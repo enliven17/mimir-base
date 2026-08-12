@@ -11,7 +11,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import solc from "solc";
 
-const CONTRACTS = ["Mimir", "MimirV2"];
+const CONTRACTS = ["Mimir", "MimirV2", "MimirSquad"];
 const EIP170_LIMIT = 24_576;
 
 const only = process.argv[2];

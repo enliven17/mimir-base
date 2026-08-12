@@ -312,17 +312,17 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 - [x] V0 görsel prototip: creator'ı Side A captain, challengers'ı Side B olarak
   sun; bunun gerçek two-sided deposit olmadığını açıkça belirt.
-- [ ] V1 kontrat tasarımı: her iki tarafa çoklu deposit, side shares, proportional
+- [x] V1 kontrat tasarımı: her iki tarafa çoklu deposit, side shares, proportional
   payout, withdrawal/cancel, deadline ve dust accounting.
 - [x] Creator'a ayrı ekonomik ayrıcalık vermek gerekiyorsa açıkça modelle; gizli
   bir avantaj bırakma.
-- [ ] `Back YES / Back NO`, iki taraf participant count/pool ve stacked avatar UI.
-- [ ] İki taraf için fee, late liquidity ve payout invariant fuzz testleri.
+- [x] `Back YES / Back NO`, iki taraf participant count/pool ve stacked avatar UI.
+- [x] İki taraf için fee, late liquidity ve payout invariant fuzz testleri.
 
 ### Game-mode rollout gate
 
-- [ ] Pool legibility tamamlanmadan yeni mode'u default yapma.
-- [ ] Sıra: Pool UI → Duel → Fixed Odds hardening → Underdog → Rematch →
+- [x] Pool legibility tamamlanmadan yeni mode'u default yapma.
+- [x] Sıra: Pool UI → Duel → Fixed Odds hardening → Underdog → Rematch →
   Streak/Conviction → gerçek Squad vs Squad.
 
 ---
