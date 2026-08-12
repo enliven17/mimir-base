@@ -6,7 +6,7 @@
  * are dollar strings; the seller-side scheme resolves them to USDC atomic units.
  */
 import { BASE_CAIP2 } from "../base";
-import { USDC_ADDRESS } from "../usdc";
+import { parseUsdcAtomic, USDC_ADDRESS } from "../usdc";
 
 export const X402_NETWORK = (process.env.X402_NETWORK?.trim() || BASE_CAIP2) as `${string}:${string}`;
 export const X402_SCHEME = "exact";
@@ -42,11 +42,8 @@ export type PriceKey = keyof typeof PRICES;
 
 /** Dollar price string -> USDC atomic units, for buyer-side budget caps. */
 export function priceToUsdcUnits(price: string): bigint {
-  const dollars = Number(price.replace(/^\$/, ""));
-  if (!Number.isFinite(dollars) || dollars < 0) {
-    throw new Error(`Invalid x402 price: ${price}`);
-  }
-  return BigInt(Math.round(dollars * 1_000_000));
+  try { return parseUsdcAtomic(price.replace(/^\$/, "")); }
+  catch { throw new Error(`Invalid x402 price: ${price}`); }
 }
 
 /**

@@ -19,6 +19,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { withX402, x402ResourceServer } from "@x402/next";
+import { declareDiscoveryExtension } from "@x402/extensions/bazaar";
 import { HTTPFacilitatorClient, decodePaymentSignatureHeader } from "@x402/core/http";
 import type { DynamicPayTo, HTTPRequestContext } from "@x402/core/http";
 import { ExactEvmScheme } from "@x402/evm/exact/server";
@@ -198,7 +199,11 @@ export function paidRoute<T>(
       serviceName: meta.serviceName,
       tags: meta.tags,
       // Bazaar discovery: agents can enumerate these services and their shapes.
-      extensions: { bazaar: { example: meta.example } },
+      extensions: declareDiscoveryExtension(
+        priceKey === "premiumPrice" || priceKey === "councilReasoning" || priceKey === "councilVote"
+          ? { input: (meta.example?.input ?? {}) as Record<string, unknown>, output: { example: meta.example?.output } }
+          : { bodyType: "json", input: (meta.example?.input ?? {}) as Record<string, unknown>, output: { example: meta.example?.output } },
+      ),
     } as never,
     getResourceServer(),
   );

@@ -20,6 +20,14 @@ export const USDC_SYMBOL = "USDC";
 /** 1 USDC in atomic units. */
 export const USDC_UNIT = 1_000_000n;
 
+/** Strict 6-decimal parser. Financial boundaries should pass the user's raw string. */
+export function parseUsdcAtomic(input: string | number): bigint {
+  const value = String(input).trim();
+  if (!/^\d+(?:\.\d{1,6})?$/.test(value)) throw new Error("Invalid USDC amount");
+  const [whole, fraction = ""] = value.split(".");
+  return BigInt(whole) * USDC_UNIT + BigInt(fraction.padEnd(USDC_DECIMALS, "0"));
+}
+
 /** Exact decimal rendering for logs/API/UI; never passes through IEEE-754. */
 export function formatAtomicUsdc(units: bigint | string, maxFractionDigits = USDC_DECIMALS): string {
   const value = typeof units === "bigint" ? units : BigInt(units);
@@ -51,7 +59,7 @@ export const ERC20_ABI = parseAbi([
  */
 export function usdcToUnits(usdc: number): bigint {
   if (!Number.isFinite(usdc) || usdc < 0) throw new Error("Invalid USDC amount");
-  return BigInt(Math.round(usdc * 1_000_000));
+  return parseUsdcAtomic(usdc);
 }
 
 /** Convert atomic units to display USDC. */

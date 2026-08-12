@@ -22,6 +22,7 @@
  */
 
 import { checkUrl, checkDomainPolicy, type DomainPolicy } from "@/lib/research/ssrf";
+import { parseUsdcAtomic } from "@/lib/usdc";
 
 /** A Bazaar listing as advertised by its seller. Every field is untrusted. */
 export interface DiscoveredResource {
@@ -80,11 +81,8 @@ export function parseAdvertisedPrice(price: string | undefined): bigint | null {
   if (typeof price !== "string") return null;
   const trimmed = price.trim();
   if (!/^\$?\d+(\.\d{1,6})?$/.test(trimmed)) return null;
-  const dollars = Number(trimmed.replace(/^\$/, ""));
-  if (!Number.isFinite(dollars) || dollars < 0) return null;
-  // Six decimals is USDC's precision; the regex already refused more, so this
-  // rounding cannot silently drop a fraction of a cent.
-  return BigInt(Math.round(dollars * 1_000_000));
+  try { return parseUsdcAtomic(trimmed.replace(/^\$/, "")); }
+  catch { return null; }
 }
 
 export function admitDiscovered(
