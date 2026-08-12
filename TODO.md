@@ -534,9 +534,9 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 - [x] `agent_reasoning_events`, `evidence_sources`, `market_context_packs`
 - [x] `agent_follows`, `copy_permissions`, `copy_executions`
 - [x] `fee_policies`, `fee_accruals`, `agent_revenue_attribution`
-- [ ] `market_series`, `profile_stats`, `conviction_scores`
-- [ ] `basket_definitions`, `basket_positions`, `basket_nav_snapshots`
-- [ ] Tüm tablolarda migration version, timestamps, stable IDs ve gerekli unique
+- [x] `market_series`, `profile_stats`, `conviction_scores`
+- [x] `basket_definitions`, `basket_positions`, `basket_nav_snapshots`
+- [x] Tüm tablolarda migration version, timestamps, stable IDs ve gerekli unique
   idempotency constraint'leri.
 - [x] Finansal tabloları PostHog'a kaynak yapma; analytics eventlerini finansal
   ledger yerine kullanma.

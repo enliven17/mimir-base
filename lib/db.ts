@@ -113,6 +113,12 @@ interface SqlStatement {
  * On-conflict syntax is identical to SQLite since Postgres 9.5.
  */
 const SCHEMA_STATEMENTS: SqlStatement[] = [
+  { sql: `CREATE TABLE IF NOT EXISTS schema_migrations (
+    migration_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL UNIQUE,
+    checksum TEXT NOT NULL UNIQUE,
+    applied_at BIGINT NOT NULL
+  )` },
   { sql: `CREATE TABLE IF NOT EXISTS claims (
     id BIGINT PRIMARY KEY,
     creator TEXT NOT NULL,
@@ -448,6 +454,82 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   )` },
   { sql: "CREATE INDEX IF NOT EXISTS idx_market_proposals_created ON market_proposals(created_at DESC)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_market_proposals_disposition ON market_proposals(disposition)" },
+  { sql: `CREATE TABLE IF NOT EXISTS market_series (
+    series_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL DEFAULT 1,
+    root_claim_id BIGINT NOT NULL UNIQUE,
+    best_of SMALLINT NOT NULL,
+    creator_score SMALLINT NOT NULL DEFAULT 0,
+    challenger_score SMALLINT NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'active',
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS profile_stats (
+    profile_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL DEFAULT 1,
+    actor_type TEXT NOT NULL,
+    actor_id TEXT NOT NULL,
+    stats_json TEXT NOT NULL DEFAULT '{}',
+    source_block BIGINT NOT NULL DEFAULT 0,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    UNIQUE(actor_type, actor_id)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS conviction_scores (
+    score_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL DEFAULT 1,
+    claim_id BIGINT NOT NULL,
+    actor_id TEXT NOT NULL,
+    scoring_version SMALLINT NOT NULL,
+    score_atomic NUMERIC(78,0) NOT NULL,
+    factors_json TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    UNIQUE(claim_id, actor_id, scoring_version)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS basket_definitions (
+    basket_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL DEFAULT 1,
+    owner_wallet TEXT NOT NULL,
+    name TEXT NOT NULL,
+    policy_json TEXT NOT NULL,
+    weights_json TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'virtual',
+    idempotency_key TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    UNIQUE(owner_wallet, idempotency_key)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS basket_positions (
+    position_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL DEFAULT 1,
+    basket_id TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    weight_bps INTEGER NOT NULL,
+    allocated_atomic NUMERIC(78,0) NOT NULL DEFAULT 0,
+    realized_pnl_atomic NUMERIC(78,0) NOT NULL DEFAULT 0,
+    status TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    UNIQUE(basket_id, agent_id)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS basket_nav_snapshots (
+    snapshot_id TEXT PRIMARY KEY,
+    schema_version SMALLINT NOT NULL DEFAULT 1,
+    basket_id TEXT NOT NULL,
+    nav_atomic NUMERIC(78,0) NOT NULL,
+    share_price_atomic NUMERIC(78,0) NOT NULL,
+    high_water_mark_atomic NUMERIC(78,0) NOT NULL,
+    source_block BIGINT NOT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    UNIQUE(basket_id, source_block)
+  )` },
+  {
+    sql: "INSERT INTO schema_migrations(migration_id, schema_version, checksum, applied_at) VALUES($1, $2, $3, $4) ON CONFLICT(schema_version) DO NOTHING",
+    args: ["base-platform-schema-v2", 2, "market-series-profile-conviction-baskets-v2", 0],
+  },
   {
     sql: "INSERT INTO sync_meta(key, value) VALUES($1, $2) ON CONFLICT(key) DO NOTHING",
     args: ["last_claim_count", "0"],
