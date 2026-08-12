@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { getContractAddress, isContractConfigured } from "@/lib/base";
+import { createBasePublicClient, getContractAddress, isContractConfigured } from "@/lib/base";
 import { verifyAgentSignature } from "@/lib/agents/signature";
 import { getUserVSDirect } from "@/lib/contract";
 import { publishReasoning } from "@/lib/reasoning/publish";
