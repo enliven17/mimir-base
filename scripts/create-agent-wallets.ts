@@ -18,7 +18,7 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import {
-  COUNCIL_PERSONAS,
+  listCouncilPersonas,
   personaPrivateKeyEnv,
   personaAddressEnv,
 } from "../agents/council/personas";
@@ -65,7 +65,7 @@ function main(): void {
 
   const oracle = make("ORACLE_PRIVATE_KEY", "oracle");
   make("CREATOR_PRIVATE_KEY", "market-creator");
-  for (const persona of COUNCIL_PERSONAS) {
+  for (const persona of listCouncilPersonas()) {
     make(personaPrivateKeyEnv(persona), `council:${persona.slug}`, personaAddressEnv(persona));
   }
   // The philosopher jury gets its own wallets, so a philosopher's budget and its

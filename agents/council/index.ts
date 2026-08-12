@@ -47,7 +47,7 @@ import { reportingPoll } from "../../lib/ops/heartbeat";
 import { fetchDecodedClaim } from "../../lib/claim-codec";
 import { activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint } from "../../lib/llm";
 import {
-  COUNCIL_PERSONAS,
+  listCouncilPersonas,
   personaAddressEnv,
   personaPrivateKeyEnv,
   type PersonaSpec,
@@ -98,7 +98,8 @@ const PERSONA_ALLOWLIST = (() => {
 
 // Skip personas missing a private key (e.g. before agents:create-wallets has
 // run for that persona). Warn once at startup, not every cycle.
-const ACTIVE_PERSONAS = COUNCIL_PERSONAS.filter((p) => {
+const CLASSIC_PERSONAS = listCouncilPersonas();
+const ACTIVE_PERSONAS = CLASSIC_PERSONAS.filter((p) => {
   if (PERSONA_ALLOWLIST && !PERSONA_ALLOWLIST.has(p.slug)) {
     return false;
   }
@@ -286,7 +287,7 @@ async function main(): Promise<void> {
   console.log(`  Contract       : ${CONTRACT_ADDRESS}`);
   console.log(`  Network        : Base Sepolia (${baseSepolia.id})`);
   console.log(`  LLM            : ${activeLLMProvider()} / ${activeLLMModel()} · key=${activeLLMKeyFingerprint()}`);
-  console.log(`  Active personas: ${ACTIVE_PERSONAS.length} / ${COUNCIL_PERSONAS.length}`);
+  console.log(`  Active personas: ${ACTIVE_PERSONAS.length} / ${CLASSIC_PERSONAS.length}`);
   console.log(`  Philosophers   : ${PHILOSOPHERS_ENABLED ? `${ACTIVE_PHILOSOPHERS.length} / ${PHILOSOPHER_PERSONAS.length}` : "off"}`);
   console.log(`  Max claims/cycle: ${MAX_CLAIMS_PER_CYCLE}`);
   console.log(`  Decision gap   : ${DECISION_DELAY_MS / 1000}s`);

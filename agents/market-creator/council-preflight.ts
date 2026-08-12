@@ -6,7 +6,7 @@
  * jurors after the deadline.
  */
 
-import { COUNCIL_PERSONAS } from "../council/personas";
+import { listCouncilPersonas } from "../council/personas";
 import { fetchWithBudget, type PayingWallet } from "../../lib/x402/buyer";
 import { usdcToUnits } from "../../lib/usdc";
 import { isSettlementMode, type SettlementMode } from "../../lib/market-modes";
@@ -98,7 +98,7 @@ function selectedPersonas(raw: string | undefined) {
     .map((s) => s.trim())
     .filter(Boolean);
   const wanted = new Set(slugs);
-  return COUNCIL_PERSONAS.filter((p) => wanted.has(p.slug));
+  return listCouncilPersonas().filter((p) => wanted.has(p.slug));
 }
 
 function parseDecision(value: unknown): "open" | "revise" | "skip" {

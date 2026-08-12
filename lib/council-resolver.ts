@@ -11,7 +11,7 @@
 
 import "server-only";
 import {
-  COUNCIL_PERSONAS,
+  listCouncilPersonas,
   personaAddressEnv,
   type PersonaSpec,
 } from "../agents/council/personas";
@@ -26,7 +26,7 @@ let cachedPersonaByAddress: Map<string, PersonaSpec> | null = null;
 
 function buildPersonaIndex(): Map<string, PersonaSpec> {
   const map = new Map<string, PersonaSpec>();
-  for (const p of COUNCIL_PERSONAS) {
+  for (const p of listCouncilPersonas()) {
     const addr = process.env[personaAddressEnv(p)]?.toLowerCase();
     if (addr) map.set(addr, p);
   }
@@ -50,7 +50,7 @@ export function getActiveCouncilPersonas(): Array<{
   address: string;
 }> {
   const out: Array<{ persona: PersonaSpec; address: string }> = [];
-  for (const p of COUNCIL_PERSONAS) {
+  for (const p of listCouncilPersonas()) {
     const addr = process.env[personaAddressEnv(p)];
     if (addr) out.push({ persona: p, address: addr });
   }

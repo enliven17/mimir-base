@@ -21,7 +21,7 @@
  * reference earn a bonus, parroting the prior earns exactly zero.
  */
 
-import { COUNCIL_PERSONAS, type PersonaSpec } from "../council/personas";
+import { listCouncilPersonas, type PersonaSpec } from "../council/personas";
 import { fetchWithBudget, type PayingWallet } from "../../lib/x402/buyer";
 import { transferUsdc, type AgentWallet } from "../../lib/agent-wallets";
 import { usdcToUnits } from "../../lib/usdc";
@@ -145,7 +145,7 @@ export function allocateBonus(scores: number[], poolUsdc: number): number[] {
  *  for specialists, only within their category. Rule-based traders abstain. */
 function eligiblePersonas(category: string): PersonaSpec[] {
   const cat = category.toLowerCase();
-  return COUNCIL_PERSONAS.filter(
+  return listCouncilPersonas().filter(
     (p) =>
       !!p.promptBias &&
       (!p.categoryFilter || p.categoryFilter.some((c) => c.toLowerCase() === cat)),

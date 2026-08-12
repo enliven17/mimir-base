@@ -14,7 +14,7 @@ import {
   baseSepolia,
 } from "../lib/base";
 import {
-  COUNCIL_PERSONAS,
+  listCouncilPersonas,
   personaPrivateKeyEnv,
 } from "../agents/council/personas";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
@@ -38,7 +38,7 @@ async function main() {
   process.env.ORACLE_PRIVATE_KEY = funderKey;
   for (const name of [
     "CREATOR_PRIVATE_KEY",
-    ...COUNCIL_PERSONAS.map((p) => personaPrivateKeyEnv(p)),
+    ...listCouncilPersonas().map((p) => personaPrivateKeyEnv(p)),
   ]) {
     const c = cleanEnv(name);
     if (c) process.env[name] = c;
@@ -66,7 +66,7 @@ async function main() {
   };
 
   add("market-creator", "CREATOR_PRIVATE_KEY", USDC_CREATOR);
-  for (const persona of COUNCIL_PERSONAS) {
+  for (const persona of listCouncilPersonas()) {
     add(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDC_COUNCIL);
   }
 

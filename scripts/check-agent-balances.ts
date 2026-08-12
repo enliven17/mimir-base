@@ -6,7 +6,7 @@
  */
 import { privateKeyToAccount } from "viem/accounts";
 import { createBasePublicClient, weiToEth, getExplorerAddressUrl } from "../lib/base";
-import { COUNCIL_PERSONAS, personaPrivateKeyEnv, personaAddressEnv } from "../agents/council/personas";
+import { listCouncilPersonas, personaPrivateKeyEnv, personaAddressEnv } from "../agents/council/personas";
 import {
   PHILOSOPHER_PERSONAS,
   philosopherAddressEnv,
@@ -28,7 +28,7 @@ async function main(): Promise<void> {
   const creator = addressFromKeyEnv("CREATOR_PRIVATE_KEY") ?? (process.env.CREATOR_ADDRESS as `0x${string}` | undefined);
   if (oracle) rows.push({ label: "oracle", address: oracle });
   if (creator) rows.push({ label: "market-creator", address: creator });
-  for (const persona of COUNCIL_PERSONAS) {
+  for (const persona of listCouncilPersonas()) {
     const addr =
       addressFromKeyEnv(personaPrivateKeyEnv(persona)) ??
       (process.env[personaAddressEnv(persona)] as `0x${string}` | undefined);

@@ -9,7 +9,17 @@ import {
   philosopherAddressEnv,
   philosopherPrivateKeyEnv,
 } from "../../agents/council/philosophers";
-import { COUNCIL_PERSONAS, personaPrivateKeyEnv } from "../../agents/council/personas";
+import {
+  COUNCIL_PERSONAS,
+  configureCouncilPersonaRegistry,
+  listCouncilPersonas,
+  personaPrivateKeyEnv,
+  resetCouncilPersonaRegistry,
+} from "../../agents/council/personas";
+import {
+  PHILOSOPHER_CALIBRATION_SET,
+  evaluateCalibrationResponse,
+} from "../../agents/council/philosopher-calibration";
 
 test("the philosopher jury is non-empty and every member is tagged", () => {
   assert.ok(PHILOSOPHER_PERSONAS.length >= 6);
@@ -200,4 +210,50 @@ test("a hyphenated slug becomes a valid env name", () => {
   for (const persona of PHILOSOPHER_PERSONAS) {
     assert.match(philosopherPrivateKeyEnv(persona.slug), /^COUNCIL_[A-Z0-9_]+_PRIVATE_KEY$/);
   }
+});
+
+test("every philosopher has a minimum calibration, bias and consistency set", () => {
+  for (const persona of PHILOSOPHER_PERSONAS) {
+    const fixtures = PHILOSOPHER_CALIBRATION_SET.filter((row) => row.personaSlug === persona.slug);
+    assert.ok(fixtures.length >= 5, `${persona.slug} has too few fixtures`);
+    assert.ok(fixtures.some((row) => row.expectedVerdict === "CREATOR_WINS"));
+    assert.ok(fixtures.some((row) => row.expectedVerdict === "CHALLENGERS_WIN"));
+    assert.ok(fixtures.some((row) => row.kind === "bias" && row.expectedVerdict === "UNRESOLVABLE"));
+
+    const consistency = fixtures.filter((row) => row.kind === "consistency");
+    assert.equal(new Set(consistency.map((row) => row.consistencyKey)).size, 1);
+    assert.equal(new Set(consistency.map((row) => row.expectedVerdict)).size, 1);
+  }
+});
+
+test("calibration responses enforce verdict, bounds and reasoning method", () => {
+  const fixture = PHILOSOPHER_CALIBRATION_SET[0]!;
+  assert.deepEqual(
+    evaluateCalibrationResponse(fixture, {
+      verdict: fixture.expectedVerdict,
+      confidenceBps: 8_000,
+      reasoningMethod: fixture.reasoningMethod,
+    }),
+    [],
+  );
+  assert.equal(
+    evaluateCalibrationResponse(fixture, {
+      verdict: "UNRESOLVABLE",
+      confidenceBps: 10_001,
+      reasoningMethod: "style-only",
+    }).length,
+    3,
+  );
+});
+
+test("the classic roster is replaceable through a validated registry adapter", () => {
+  const first = COUNCIL_PERSONAS[0]!;
+  configureCouncilPersonaRegistry({ listClassicPersonas: () => [first] });
+  assert.deepEqual(listCouncilPersonas().map((persona) => persona.slug), [first.slug]);
+  assert.throws(
+    () => configureCouncilPersonaRegistry({ listClassicPersonas: () => [first, first] }),
+    /invalid council persona registry slug/,
+  );
+  resetCouncilPersonaRegistry();
+  assert.equal(listCouncilPersonas().length, COUNCIL_PERSONAS.length);
 });

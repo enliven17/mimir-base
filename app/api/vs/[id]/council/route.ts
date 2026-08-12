@@ -22,7 +22,7 @@ import {
 } from "@/lib/base";
 import { unitsToUsdc } from "@/lib/usdc";
 import {
-  COUNCIL_PERSONAS,
+  listCouncilPersonas,
   personaAddressEnv,
   type PersonaSpec,
 } from "@/agents/council/personas";
@@ -111,7 +111,7 @@ export async function GET(
     }
   }
 
-  const votes: PersonaVote[] = COUNCIL_PERSONAS.map((p) => {
+  const votes: PersonaVote[] = listCouncilPersonas().map((p) => {
     const addr = process.env[personaAddressEnv(p)]?.toLowerCase();
     const hit = addr ? stakeByAddress.get(addr) : undefined;
     return {

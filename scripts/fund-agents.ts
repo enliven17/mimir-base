@@ -21,7 +21,7 @@ import {
   baseSepolia,
 } from "../lib/base";
 import {
-  COUNCIL_PERSONAS,
+  listCouncilPersonas,
   personaPrivateKeyEnv,
 } from "../agents/council/personas";
 import {
@@ -72,7 +72,7 @@ async function main(): Promise<void> {
 
   addTarget("oracle", "ORACLE_PRIVATE_KEY", USDC_CORE);
   addTarget("market-creator", "CREATOR_PRIVATE_KEY", USDC_CORE);
-  for (const persona of COUNCIL_PERSONAS) {
+  for (const persona of listCouncilPersonas()) {
     addTarget(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDC_COUNCIL);
   }
   // Each philosopher is funded to its own declared stake limit rather than the

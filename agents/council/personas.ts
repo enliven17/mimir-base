@@ -237,6 +237,44 @@ export const COUNCIL_PERSONAS: PersonaSpec[] = [
 ];
 
 /**
+ * Runtime seam for the classic council roster.
+ *
+ * The built-in array remains exported as immutable seed data for migrations and
+ * fixtures, but application code reads through this adapter. A BYOA-backed
+ * registry can therefore supply verified PersonaSpec rows without changing the
+ * runner, API routes or UI lookups.
+ */
+export interface CouncilPersonaRegistryAdapter {
+  listClassicPersonas(): readonly PersonaSpec[];
+}
+
+const LOCAL_PERSONA_REGISTRY: CouncilPersonaRegistryAdapter = {
+  listClassicPersonas: () => COUNCIL_PERSONAS,
+};
+
+let personaRegistry: CouncilPersonaRegistryAdapter = LOCAL_PERSONA_REGISTRY;
+
+export function configureCouncilPersonaRegistry(adapter: CouncilPersonaRegistryAdapter): void {
+  const personas = [...adapter.listClassicPersonas()];
+  const slugs = new Set<string>();
+  for (const persona of personas) {
+    if (!persona.slug || slugs.has(persona.slug)) {
+      throw new Error(`invalid council persona registry slug '${persona.slug}'`);
+    }
+    slugs.add(persona.slug);
+  }
+  personaRegistry = adapter;
+}
+
+export function resetCouncilPersonaRegistry(): void {
+  personaRegistry = LOCAL_PERSONA_REGISTRY;
+}
+
+export function listCouncilPersonas(): PersonaSpec[] {
+  return [...personaRegistry.listClassicPersonas()];
+}
+
+/**
  * SLUG_UPPER for env var names: "crypto-maxi" -> "CRYPTO_MAXI".
  */
 export function personaEnvSlug(persona: PersonaSpec): string {
@@ -253,7 +291,7 @@ export function personaAddressEnv(persona: PersonaSpec): string {
 
 /** Look up by slug. Returns null if not in roster. */
 export function getPersonaBySlug(slug: string): PersonaSpec | null {
-  return COUNCIL_PERSONAS.find((p) => p.slug === slug) ?? null;
+  return listCouncilPersonas().find((p) => p.slug === slug) ?? null;
 }
 
 /** Look up by on-chain address (case-insensitive). Returns null if not a council member. */
@@ -262,7 +300,7 @@ export function getPersonaByAddress(
   envLookup: (key: string) => string | undefined = (k) => process.env[k],
 ): PersonaSpec | null {
   const lower = address.toLowerCase();
-  for (const p of COUNCIL_PERSONAS) {
+  for (const p of listCouncilPersonas()) {
     const a = envLookup(personaAddressEnv(p))?.toLowerCase();
     if (a && a === lower) return p;
   }

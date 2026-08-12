@@ -167,9 +167,9 @@ göremez.
 - [x] Persona prompt versiyonlarını ve evaluation fixture'larını version-control et.
 - [x] Mevcut council ile philosopher track'i ayrı filtrele; kombine consensus'u
   ayrıca hesapla.
-- [ ] Her persona için minimum calibration seti, bias testi ve tutarlılık testi ekle.
+- [x] Her persona için minimum calibration seti, bias testi ve tutarlılık testi ekle.
 - [x] Wallet funding ve x402 bütçelerini persona bazında sınırla.
-- [ ] Sabit `COUNCIL_PERSONAS` dizisini ileride BYOA registry okuyabilecek adapter
+- [x] Sabit `COUNCIL_PERSONAS` dizisini ileride BYOA registry okuyabilecek adapter
   arkasına al.
 
 **Kabul kriteri:** Her philosopher aynı markette kendine özgü, kaynaklı ve
