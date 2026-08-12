@@ -15,7 +15,7 @@
  * Fund them from one master key:    npm run agents:fund
  */
 
-import { maxUint256, parseEther, type WalletClient } from "viem";
+import { maxUint256, parseEther, verifyMessage, type WalletClient } from "viem";
 import { privateKeyToAccount, type PrivateKeyAccount } from "viem/accounts";
 import {
   createBaseWalletClientWithKey,
@@ -24,6 +24,7 @@ import {
   baseSepolia,
 } from "./base";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits } from "./usdc";
+import type { AgentWalletAdapter } from "./agents/wallet-adapter";
 
 export interface AgentWallet {
   account: PrivateKeyAccount;
@@ -73,6 +74,36 @@ export function councilAddressEnv(slug: string): string {
 
 export function getCouncilWallet(slug: string): AgentWallet {
   return loadAgentWallet(councilPrivateKeyEnv(slug));
+}
+
+/** Put legacy worker EOAs behind the same boundary used by BYOA wallets. */
+export function legacyAgentWalletAdapter(wallet: AgentWallet): AgentWalletAdapter {
+  return {
+    kind: "eoa",
+    address: wallet.address,
+    verifySignature: ({ message, signature }) =>
+      verifyMessage({ address: wallet.address, message, signature }),
+    simulate: async (call) => {
+      try {
+        await createBasePublicClient().call({
+          account: wallet.address,
+          to: call.target,
+          data: call.data,
+          value: call.value ?? 0n,
+        });
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, reason: error instanceof Error ? error.message : "simulation failed" };
+      }
+    },
+    send: async (call) => wallet.client.sendTransaction({
+      account: wallet.account,
+      to: call.target,
+      data: call.data,
+      value: call.value ?? 0n,
+      chain: baseSepolia,
+    }),
+  };
 }
 
 /** Public address of a persona without touching its key (web-server safe). */

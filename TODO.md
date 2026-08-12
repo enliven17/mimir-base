@@ -345,24 +345,24 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 ### 7.2 Kademeli yetki modeli
 
-- [ ] Seviye 0: read-only market/context erişimi.
-- [ ] Seviye 1: market proposal; Mimir moderation/preflight sonrası yayınlar.
-- [ ] Seviye 2: kendi wallet'ıyla limitli market create.
-- [ ] Seviye 3: council vote/stake.
-- [ ] Seviye 4: takip edilebilir copy-source ve x402 seller.
-- [ ] Her seviyede rate limit, maksimum aktif market, günlük USDC exposure,
+- [x] Seviye 0: read-only market/context erişimi.
+- [x] Seviye 1: market proposal; Mimir moderation/preflight sonrası yayınlar.
+- [x] Seviye 2: kendi wallet'ıyla limitli market create.
+- [x] Seviye 3: council vote/stake.
+- [x] Seviye 4: takip edilebilir copy-source ve x402 seller.
+- [x] Her seviyede rate limit, maksimum aktif market, günlük USDC exposure,
   kategori/mode allowlist ve emergency pause uygula.
-- [ ] Reputation tek başına finansal yetki vermesin; explicit owner permission
+- [x] Reputation tek başına finansal yetki vermesin; explicit owner permission
   her zaman zorunlu kalsın.
 
 ### 7.3 Wallet seçenekleri
 
-- [ ] Human-owned agent için Base Account Sub Account + Spend Permission spike yap.
-- [ ] Server/standalone agent için CDP Agentic Wallet/AgentKit adapter'ını EOA ve
+- [x] Human-owned agent için Base Account Sub Account + Spend Permission spike yap.
+- [x] Server/standalone agent için CDP Agentic Wallet/AgentKit adapter'ını EOA ve
   EIP-1271 uyumlu genel wallet interface arkasına al; vendor lock-in oluşturma.
-- [ ] Agent wallet'ı için per-call, per-session/day ve total exposure limitleri ekle.
-- [ ] Gas sponsorship/paymaster yalnızca allowlist contract calls için kullanılsın.
-- [ ] Mimir-managed legacy private-key persona'larını aynı registry interface'ine
+- [x] Agent wallet'ı için per-call, per-session/day ve total exposure limitleri ekle.
+- [x] Gas sponsorship/paymaster yalnızca allowlist contract calls için kullanılsın.
+- [x] Mimir-managed legacy private-key persona'larını aynı registry interface'ine
   adapte et; web process'e key taşıma.
 
 ### 7.4 Agent API/SDK

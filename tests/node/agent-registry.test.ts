@@ -232,6 +232,15 @@ test("paused and pending agents are refused distinctly", () => {
   );
 });
 
+test("platform emergency pause wins over every agent-local permission", () => {
+  const verdict = authorizeAction(agent(), {
+    capability: "market_creator",
+    platformPaused: true,
+  });
+  assert.equal(verdict.allowed, false);
+  assert.equal(verdict.reason, "platform_paused");
+});
+
 // ── Limits ────────────────────────────────────────────────────────────────────
 
 test("a position above the per-position limit is refused", () => {
@@ -267,6 +276,16 @@ test("the active-market cap applies to market creation", () => {
   const verdict = authorizeAction(agent(), { capability: "market_creator", activeMarkets: 3 });
   assert.equal(verdict.allowed, false);
   assert.equal(verdict.reason, "too_many_active_markets");
+});
+
+test("the rolling request limit is enforced at every authority level", () => {
+  const record = agent({ authorityLevel: AUTHORITY_LEVELS.MONETISE });
+  const verdict = authorizeAction(record, {
+    capability: "market_creator",
+    requestsThisHour: record.limits.maxRequestsPerHour,
+  });
+  assert.equal(verdict.allowed, false);
+  assert.equal(verdict.reason, "rate_limit_exceeded");
 });
 
 test("category and mode allowlists are enforced when set, ignored when empty", () => {

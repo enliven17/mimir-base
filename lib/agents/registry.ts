@@ -208,6 +208,7 @@ const CAPABILITY_MIN_AUTHORITY: Record<AgentCapability, AuthorityLevel> = {
 };
 
 export type ActionRejection =
+  | "platform_paused"
   | "revoked"
   | "paused"
   | "pending"
@@ -217,7 +218,8 @@ export type ActionRejection =
   | "mode_not_allowed"
   | "position_too_large"
   | "daily_exposure_exceeded"
-  | "too_many_active_markets";
+  | "too_many_active_markets"
+  | "rate_limit_exceeded";
 
 export interface ActionVerdict {
   allowed: boolean;
@@ -234,6 +236,10 @@ export interface ActionRequest {
   /** USDC already at risk today. */
   exposureTodayUsdc?: number;
   activeMarkets?: number;
+  /** Requests already accepted in the current rolling hour. */
+  requestsThisHour?: number;
+  /** Emergency platform kill-switch, checked before agent-local state. */
+  platformPaused?: boolean;
 }
 
 /**
@@ -244,6 +250,9 @@ export interface ActionRequest {
  * "position too large" message — that would imply a smaller one would work.
  */
 export function authorizeAction(agent: AgentRecord, request: ActionRequest): ActionVerdict {
+  if (request.platformPaused) {
+    return { allowed: false, reason: "platform_paused", detail: "funded agent actions are paused" };
+  }
   if (agent.status === "revoked") {
     return { allowed: false, reason: "revoked", detail: agent.revokedReason ?? "agent revoked" };
   }
@@ -269,6 +278,13 @@ export function authorizeAction(agent: AgentRecord, request: ActionRequest): Act
   }
 
   const { limits } = agent;
+  if ((request.requestsThisHour ?? 0) >= limits.maxRequestsPerHour) {
+    return {
+      allowed: false,
+      reason: "rate_limit_exceeded",
+      detail: `${request.requestsThisHour} of ${limits.maxRequestsPerHour} requests used`,
+    };
+  }
   if (
     request.category &&
     limits.allowedCategories.length > 0 &&
