@@ -4,6 +4,7 @@ import ws from "ws";
 import type { ChallengeOpportunity } from "@/lib/claimDrafts";
 import type { ClaimChallenger, ClaimData } from "@/lib/contract";
 import type { AgentRecord } from "@/lib/agents/registry";
+import type { CopyAuditRecord, CopyPermission } from "@/lib/copy-trading";
 
 // Neon's @neondatabase/serverless uses WebSockets in Node — wire up the ws
 // implementation. In edge/serverless runtimes that don't ship a global
@@ -291,6 +292,44 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
     created_at BIGINT NOT NULL,
     PRIMARY KEY(agent_id, action, idempotency_key)
   )` },
+  // Social follow is intentionally separate from financial authorization.
+  { sql: `CREATE TABLE IF NOT EXISTS agent_follows (
+    follower_wallet TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    followed_at BIGINT NOT NULL,
+    unfollowed_at BIGINT,
+    PRIMARY KEY(follower_wallet, agent_id, followed_at)
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS copy_permissions (
+    permission_id TEXT PRIMARY KEY,
+    owner_wallet TEXT NOT NULL,
+    execution_agent_id TEXT NOT NULL,
+    signal_agent_id TEXT NOT NULL,
+    policy_json TEXT NOT NULL,
+    signed_policy_hash TEXT NOT NULL UNIQUE,
+    status TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    revoked_at BIGINT
+  )` },
+  { sql: `CREATE TABLE IF NOT EXISTS copy_executions (
+    execution_id TEXT PRIMARY KEY,
+    permission_id TEXT NOT NULL,
+    source_position_id TEXT NOT NULL,
+    signal_agent_id TEXT NOT NULL,
+    execution_agent_id TEXT NOT NULL,
+    source_attribution_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    stake_atomic NUMERIC(78,0) NOT NULL,
+    simulation_block BIGINT NOT NULL,
+    tx_hash TEXT,
+    platform_fee_atomic NUMERIC(78,0) NOT NULL DEFAULT 0,
+    owner_fee_atomic NUMERIC(78,0) NOT NULL DEFAULT 0,
+    skip_reason TEXT,
+    created_at BIGINT NOT NULL,
+    UNIQUE(permission_id, source_position_id)
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_copy_executions_permission ON copy_executions(permission_id, created_at DESC)" },
   // x402 settlement ledger. Amounts are ATOMIC token units, never floats — a
   // DOUBLE PRECISION column cannot hold 6dp money without rounding drift, and
   // SUM() over it compounds it. The old float `payments` table is deliberately
@@ -1369,6 +1408,49 @@ export async function saveAgentApiResponse(row: {
       VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(agent_id, action, idempotency_key) DO NOTHING`,
     args: [row.agentId, row.action, row.idempotencyKey, JSON.stringify(row.body), row.status, row.createdAt],
   });
+}
+
+export async function saveCopyPermission(permission: CopyPermission, at = Date.now()): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO copy_permissions(permission_id, owner_wallet, execution_agent_id,
+      signal_agent_id, policy_json, signed_policy_hash, status, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(permission_id) DO UPDATE SET policy_json=excluded.policy_json,
+      status=excluded.status, updated_at=excluded.updated_at,
+      revoked_at=CASE WHEN excluded.status='revoked' THEN excluded.updated_at ELSE copy_permissions.revoked_at END`,
+    args: [permission.permissionId, permission.ownerWallet.toLowerCase(), permission.executionAgentId,
+      permission.signalAgentId, JSON.stringify(permission, (_, v) => typeof v === "bigint" ? v.toString() : v),
+      permission.signedPolicyHash, permission.status, at, at],
+  });
+}
+
+export async function insertCopyExecution(record: CopyAuditRecord): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO copy_executions(execution_id, permission_id, source_position_id,
+      signal_agent_id, execution_agent_id, source_attribution_id, status, stake_atomic,
+      simulation_block, tx_hash, platform_fee_atomic, owner_fee_atomic, skip_reason, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(permission_id, source_position_id) DO NOTHING`,
+    args: [record.executionId, record.permissionId, record.sourcePositionId, record.signalAgentId,
+      record.executionAgentId, record.sourceAttributionId, record.status, record.stakeAtomic.toString(),
+      record.simulationBlock.toString(), record.txHash?.toLowerCase() ?? null,
+      record.platformFeeAtomic.toString(), record.ownerFeeAtomic.toString(), record.skipReason ?? null,
+      record.createdAt],
+  });
+}
+
+export async function listCopyExecutions(permissionId: string, limit = 100): Promise<Array<Record<string, unknown>>> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT execution_id, permission_id, source_position_id, signal_agent_id,
+      execution_agent_id, source_attribution_id, status, stake_atomic, simulation_block,
+      tx_hash, platform_fee_atomic, owner_fee_atomic, skip_reason, created_at
+      FROM copy_executions WHERE permission_id = ? ORDER BY created_at DESC LIMIT ?`,
+    args: [permissionId, limit],
+  });
+  return result.rows;
 }
 
 export async function insertPayment(e: PaymentRow): Promise<void> {

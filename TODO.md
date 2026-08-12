@@ -388,32 +388,32 @@ harcama izinleri tamamlanmadan production'a çıkmaz.
 
 ### 8.1 Human → agent copy MVP
 
-- [ ] Follow ile finansal copy permission'ı ayır; follow hiçbir zaman para harcatmaz.
-- [ ] Kullanıcı policy'si: agent, max per position, daily/weekly cap, total open
+- [x] Follow ile finansal copy permission'ı ayır; follow hiçbir zaman para harcatmaz.
+- [x] Kullanıcı policy'si: agent, max per position, daily/weekly cap, total open
   exposure, category/mode allowlist, min confidence, odds/payout floor, expiry.
-- [ ] Permission oluştururken worst-case USDC harcamayı açıkça göster ve imzalat.
-- [ ] Execution öncesi kontrat simulation, deadline, remaining slots, liquidity,
+- [x] Permission oluştururken worst-case USDC harcamayı açıkça göster ve imzalat.
+- [x] Execution öncesi kontrat simulation, deadline, remaining slots, liquidity,
   payout floor ve duplicate position guard uygula.
-- [ ] `executed`, `skipped`, `failed`, `expired` nedenlerini kullanıcıya göster.
-- [ ] Global pause ve tek permission revoke işlemini anında destekle.
+- [x] `executed`, `skipped`, `failed`, `expired` nedenlerini kullanıcıya göster.
+- [x] Global pause ve tek permission revoke işlemini anında destekle.
 
 ### 8.2 Agent → agent copy
 
-- [ ] İlk sürümde max copy depth = 1 uygula.
-- [ ] A→B→A cycle detection ve self-copy guard ekle.
-- [ ] Orijinal signal agent ile execution agent attribution'ını ayrı tut.
-- [ ] Owner fee ağacında aynı hacmi tekrar tekrar ücretlendirme; fee snapshot ve
+- [x] İlk sürümde max copy depth = 1 uygula.
+- [x] A→B→A cycle detection ve self-copy guard ekle.
+- [x] Orijinal signal agent ile execution agent attribution'ını ayrı tut.
+- [x] Owner fee ağacında aynı hacmi tekrar tekrar ücretlendirme; fee snapshot ve
   tek source-of-truth attribution ID kullan.
-- [ ] Agent bütçe limiti bitince yeni izin istemeden işlemi skip et.
+- [x] Agent bütçe limiti bitince yeni izin istemeden işlemi skip et.
 
 ### 8.3 Güvenlik ve kullanıcı kontrolü
 
-- [ ] Base Spend Permission kullanılıyorsa token=USDC, period, allowance ve spender
+- [x] Base Spend Permission kullanılıyorsa token=USDC, period, allowance ve spender
   sınırlarını onchain doğrula; yalnız UI database'ine güvenme.
-- [ ] Upgradeable spender/target allowlist riskini açıkça incele.
-- [ ] Copy executor'ın key compromise, replay, frontrun ve stale odds senaryolarını
+- [x] Upgradeable spender/target allowlist riskini açıkça incele.
+- [x] Copy executor'ın key compromise, replay, frontrun ve stale odds senaryolarını
   threat-model et.
-- [ ] Her copy işlemi için source position, permission ID, simulation snapshot,
+- [x] Her copy işlemi için source position, permission ID, simulation snapshot,
   tx hash, fee ve skip reason audit kaydı tut.
 
 **Kabul kriteri:** Kullanıcı imzaladığı maksimumdan fazla kaybedemez; izin iptalinden
@@ -532,7 +532,7 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 - [x] `agent_registry`, `agent_operators`, `agent_capabilities`
 - [x] `agent_reasoning_events`, `evidence_sources`, `market_context_packs`
-- [ ] `agent_follows`, `copy_permissions`, `copy_executions`
+- [x] `agent_follows`, `copy_permissions`, `copy_executions`
 - [x] `fee_policies`, `fee_accruals`, `agent_revenue_attribution`
 - [ ] `market_series`, `profile_stats`, `conviction_scores`
 - [ ] `basket_definitions`, `basket_positions`, `basket_nav_snapshots`
