@@ -20,6 +20,17 @@ export const USDC_SYMBOL = "USDC";
 /** 1 USDC in atomic units. */
 export const USDC_UNIT = 1_000_000n;
 
+/** Exact decimal rendering for logs/API/UI; never passes through IEEE-754. */
+export function formatAtomicUsdc(units: bigint | string, maxFractionDigits = USDC_DECIMALS): string {
+  const value = typeof units === "bigint" ? units : BigInt(units);
+  const sign = value < 0n ? "-" : "";
+  const absolute = value < 0n ? -value : value;
+  const whole = absolute / USDC_UNIT;
+  const fraction = (absolute % USDC_UNIT).toString().padStart(USDC_DECIMALS, "0")
+    .slice(0, Math.max(0, Math.min(USDC_DECIMALS, maxFractionDigits))).replace(/0+$/, "");
+  return `${sign}${whole}${fraction ? `.${fraction}` : ""}`;
+}
+
 /** Minimum stake in display USDC — matches Mimir.sol MIN_STAKE = 2 * 10^6 */
 export const MIN_STAKE_USDC = 2;
 
