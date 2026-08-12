@@ -125,6 +125,7 @@ test("shipped read-side features default ON", () => {
     "reasoning_feed",
     "share_cards",
     "byoa_registry",
+    "virtual_baskets",
   ] as const) {
     assert.equal(isFeatureEnabled(feature, {}), true, `${feature} should be on`);
   }

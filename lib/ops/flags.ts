@@ -117,6 +117,7 @@ export const FEATURES = [
   "byoa_registry",
   "byoa_funded_actions",
   "copy_trading",
+  "virtual_baskets",
   "agent_baskets",
   "fee_policy",
 ] as const;
@@ -144,6 +145,7 @@ const FEATURE_DEFAULTS: Record<Feature, boolean> = {
   byoa_registry: true,
   byoa_funded_actions: false,
   copy_trading: false,
+  virtual_baskets: true,
   agent_baskets: false,
   // Fees only exist in MimirV2, which is unaudited and holds nothing yet. Turning
   // this on before that contract is live would charge fees the escrow cannot pay.

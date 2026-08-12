@@ -423,17 +423,17 @@ sonra execution yapılamaz; copy loop veya fee loop oluşamaz.
 
 ## 09. Agent baskets — P2, en son
 
-- [ ] Idle sermaye USDC olarak durur; yield/RWA katmanı yok (bkz. §0 kararı).
-- [ ] Önce salt okunur “virtual basket” prototipi kur: seçili agent ağırlıkları,
+- [x] Idle sermaye USDC olarak durur; yield/RWA katmanı yok (bkz. §0 kararı).
+- [x] Önce salt okunur “virtual basket” prototipi kur: seçili agent ağırlıkları,
   backtest, drawdown, category/mode exposure ve simulated NAV.
-- [ ] Gerçek para MVP'si için non-custodial vault mimarisini değerlendir; ERC-4626
+- [x] Gerçek para MVP'si için non-custodial vault mimarisini değerlendir; ERC-4626
   uygunluğunu, USDC decimal/donation/inflation risklerini ADR ile incele.
-- [ ] Deposit/redemption, weight rebalance, max single-agent/category exposure,
+- [x] Deposit/redemption, weight rebalance, max single-agent/category exposure,
   paused agent, stale signal ve failed copy kurallarını tanımla.
-- [ ] Management/performance fee varsa high-water mark, realized PnL ve fee
+- [x] Management/performance fee varsa high-water mark, realized PnL ve fee
   recipient accounting'i açıkça modelle.
-- [ ] NAV ve share price için atomic rounding/dust invariant'ları ekle.
-- [ ] Emergency withdrawal'ın agent executor ve oracle'dan bağımsız çalışmasını sağla.
+- [x] NAV ve share price için atomic rounding/dust invariant'ları ekle.
+- [x] Emergency withdrawal'ın agent executor ve oracle'dan bağımsız çalışmasını sağla.
 - [ ] Audit, legal/custody, sanctions/eligibility ve mainnet launch review tamamlanmadan
   gerçek fon kabul etme.
 
