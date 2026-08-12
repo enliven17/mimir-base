@@ -10,7 +10,10 @@ import {
   type VSData,
 } from "@/lib/contract";
 import { shortenAddress, getCategoryInfo, ZERO_ADDRESS } from "@/lib/constants";
+import { toCanonicalMode } from "@/lib/market-modes";
+import { poolBalance } from "@/lib/payout";
 import { assessUnderdog } from "@/lib/underdog";
+import { usdcToUnits } from "@/lib/usdc";
 import VSStrip from "./ui/VSStrip";
 
 interface VSCardProps {
@@ -56,6 +59,21 @@ export default function VSCard({
   const underdog = assessUnderdog(vs);
   const marketType = vs.market_type ?? "binary";
   const oddsMode = vs.odds_mode ?? "pool";
+  const canonicalMode = toCanonicalMode({
+    marketType,
+    oddsMode,
+    maxChallengers,
+  });
+  const creatorPool = Math.max(0, vs.creator_stake ?? vs.stake_amount ?? 0);
+  const challengerPool = Math.max(0, vs.total_challenger_stake ?? 0);
+  const poolShape = poolBalance({
+    creatorStakeUnits: usdcToUnits(creatorPool),
+    challengerPoolUnits: usdcToUnits(challengerPool),
+  });
+  const creatorSharePercent = poolShape.creatorShareBps / 100;
+  const challengerSharePercent = 100 - creatorSharePercent;
+  const formatAmount = (amount: number) =>
+    amount.toLocaleString("en-US", { maximumFractionDigits: 6 });
   const t = useTranslations("vsDetail");
   const tCat = useTranslations("categories");
 
@@ -137,6 +155,40 @@ export default function VSCard({
           isOpen={isOpen}
           compact
         />
+
+        {canonicalMode.settlementMode === "pool" ? (
+          <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.08] bg-pv-bg/25">
+            <div className="grid grid-cols-3 divide-x divide-white/[0.07]">
+              <div className="min-w-0 px-2.5 py-2">
+                <div className="truncate text-[9px] font-bold uppercase tracking-[0.12em] text-pv-muted">{t("creatorPool")}</div>
+                <div className="mt-1 truncate font-mono text-xs font-bold tabular-nums text-pv-cyan">{formatAmount(creatorPool)}</div>
+              </div>
+              <div className="min-w-0 px-2.5 py-2">
+                <div className="truncate text-[9px] font-bold uppercase tracking-[0.12em] text-pv-muted">{t("challengerPool")}</div>
+                <div className="mt-1 truncate font-mono text-xs font-bold tabular-nums text-pv-fuch">{formatAmount(challengerPool)}</div>
+              </div>
+              <div className="min-w-0 px-2.5 py-2">
+                <div className="truncate text-[9px] font-bold uppercase tracking-[0.12em] text-pv-muted">{t("totalPot")}</div>
+                <div className="mt-1 truncate font-mono text-xs font-bold tabular-nums text-pv-gold">{formatAmount(pool)}</div>
+              </div>
+            </div>
+            <div className="border-t border-white/[0.07] px-2.5 py-2">
+              <div
+                className="flex h-1.5 overflow-hidden rounded-full bg-pv-fuch/50"
+                title={t("poolImbalance", {
+                  creator: creatorSharePercent.toFixed(1),
+                  challengers: challengerSharePercent.toFixed(1),
+                })}
+              >
+                <span className="h-full bg-pv-cyan" style={{ width: `${creatorSharePercent}%` }} />
+              </div>
+              <div className="mt-1.5 flex items-center justify-between gap-2 font-mono text-[9px] tabular-nums text-pv-muted">
+                <span>{t("creatorShare", { percent: creatorSharePercent.toFixed(1) })}</span>
+                <span>{t("challengerShare", { percent: challengerSharePercent.toFixed(1) })}</span>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
           <div className="flex flex-wrap gap-2 mt-3">
             <span className="px-2 py-1 rounded text-[10px] font-bold uppercase tracking-[0.12em] border border-pv-cyan/[0.25] bg-pv-cyan/[0.08] text-pv-cyan">

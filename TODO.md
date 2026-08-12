@@ -228,16 +228,16 @@ payout, platform fee, owner fee veya dust olarak muhasebeleşir.
 
 ### 6.1 Pool Market — canlı primitive, P0 anlaşılabilirlik
 
-- [ ] Explorer kartında creator pool, challenger pool, total pot ve side imbalance
+- [x] Explorer kartında creator pool, challenger pool, total pot ve side imbalance
   göster.
-- [ ] Stake öncesi `total return`, `returned principal`, `net profit` alanlarını
+- [x] Stake öncesi `total return`, `returned principal`, `net profit` alanlarını
   ayrı göster.
-- [ ] Challenger payout preview formülünü kontratla aynı atomic integer helper'da
+- [x] Challenger payout preview formülünü kontratla aynı atomic integer helper'da
   tut: `stake + stake / challengerPoolAfterJoin * creatorStake`.
-- [ ] Kalabalık tarafa katılımda düşük-upside uyarısı göster.
-- [ ] Doküman ve VS sayfasına “Kârın Mimir'den değil kaybeden taraftan gelir”
+- [x] Kalabalık tarafa katılımda düşük-upside uyarısı göster.
+- [x] Doküman ve VS sayfasına “Kârın Mimir'den değil kaybeden taraftan gelir”
   açıklamasını ekle.
-- [ ] 10 USDC creator / 10 × 10 USDC challenger örneğini golden test yap: NO
+- [x] 10 USDC creator / 10 × 10 USDC challenger örneğini golden test yap: NO
   kazanırsa challenger başına 11 USDC; YES kazanırsa creator 110 USDC.
 
 ### 6.2 Duel / 1v1 Fixed Challenge — P0 ilk yeni mode
