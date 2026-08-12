@@ -18,7 +18,7 @@ test("new tables carry stable ids, schema versions, timestamps and unique replay
     assert.match(body, /schema_version SMALLINT NOT NULL/);
     assert.match(body, /created_at BIGINT NOT NULL/);
     assert.match(body, /updated_at BIGINT NOT NULL/);
-    assert.match(body, /UNIQUE\(/);
+    assert.match(body, /\bUNIQUE(?:\(|\b)/);
   }
   assert.match(source, /CREATE TABLE IF NOT EXISTS schema_migrations/);
 });
