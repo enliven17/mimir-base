@@ -118,7 +118,7 @@ Bağımlılık: yok. Diğer milestone'lar bundan sonra feature flag ve event pla
 - [x] Kart URL'sine yalnızca public market ID koy; private invite key'i görsele,
   analytics'e veya cache key'e yazma.
 - [x] X, Farcaster ve standart Open Graph boyutlarında render testi ekle.
-- [ ] Lokalizasyon, uzun claim kırpma, emoji ve missing avatar fallback'lerini test et.
+- [x] Lokalizasyon, uzun claim kırpma, emoji ve missing avatar fallback'lerini test et.
 - [x] Share click → market view attribution'ını PostHog'a bağla.
 
 **Kabul kriteri:** Her public aktif/settled market deterministik bir kart üretir;

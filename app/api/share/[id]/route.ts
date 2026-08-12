@@ -14,7 +14,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { readClaimRaw } from "@/lib/contract";
 import { toCanonicalMode } from "@/lib/market-modes";
-import { buildShareCard, isCardSize, type ShareCard } from "@/lib/share-card";
+import { buildShareCard, isCardSize, type ShareCard, type ShareCardLocale } from "@/lib/share-card";
 import { capture } from "@/lib/analytics/server";
 import { idempotencyKey } from "@/lib/analytics/events";
 
@@ -80,13 +80,17 @@ function renderSvg(card: ShareCard, claimId: number): string {
 
   <g transform="translate(72, ${titleY + titleLines.length * 58 + 46})">
     <rect x="0" y="0" width="${(width - 176) / 2}" height="76" rx="12" fill="#141819" stroke="#1F2523"/>
-    <text x="20" y="30" font-family="ui-monospace, monospace" font-size="16" letter-spacing="2" fill="${muted}">SIDE A</text>
-    <text x="20" y="58" font-family="system-ui, sans-serif" font-size="24" font-weight="600" fill="${text}">${esc(card.sideA)}</text>
+    <circle cx="24" cy="38" r="22" fill="#202927" stroke="#34D399"/>
+    <text x="24" y="45" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13" font-weight="700" fill="${text}">${esc(card.avatarFallbackA)}</text>
+    <text x="58" y="25" font-family="ui-monospace, monospace" font-size="13" fill="${muted}">${esc(card.actorA)}</text>
+    <text x="58" y="56" font-family="system-ui, sans-serif" font-size="21" font-weight="600" fill="${text}">${esc(card.sideA)}</text>
 
     <g transform="translate(${(width - 176) / 2 + 32}, 0)">
       <rect x="0" y="0" width="${(width - 176) / 2}" height="76" rx="12" fill="#141819" stroke="#1F2523"/>
-      <text x="20" y="30" font-family="ui-monospace, monospace" font-size="16" letter-spacing="2" fill="${muted}">SIDE B</text>
-      <text x="20" y="58" font-family="system-ui, sans-serif" font-size="24" font-weight="600" fill="${text}">${esc(card.sideB)}</text>
+      <circle cx="24" cy="38" r="22" fill="#202927" stroke="#EC4899"/>
+      <text x="24" y="45" text-anchor="middle" font-family="ui-monospace, monospace" font-size="13" font-weight="700" fill="${text}">${esc(card.avatarFallbackB)}</text>
+      <text x="58" y="25" font-family="ui-monospace, monospace" font-size="13" fill="${muted}">${esc(card.actorB)}</text>
+      <text x="58" y="56" font-family="system-ui, sans-serif" font-size="21" font-weight="600" fill="${text}">${esc(card.sideB)}</text>
     </g>
   </g>
 
@@ -109,6 +113,8 @@ export async function GET(
 
   const sizeParam = req.nextUrl.searchParams.get("size") ?? "og";
   const size = isCardSize(sizeParam) ? sizeParam : "og";
+  const localeParam = req.nextUrl.searchParams.get("locale");
+  const locale: ShareCardLocale = localeParam === "tr" ? "tr" : "en";
 
   const claim = await readClaimRaw(claimId).catch(() => null);
   if (!claim) {
@@ -135,6 +141,9 @@ export async function GET(
       // The single guard that keeps a private claim off a public card.
       isPrivate: Boolean(claim.is_private || claim.visibility === "private"),
       winnerSide: claim.winner_side,
+      locale,
+      creatorIdentity: claim.creator,
+      challengerIdentity: claim.first_challenger,
     },
     size,
   );

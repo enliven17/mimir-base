@@ -19,6 +19,7 @@ import type { CanonicalMode, SettlementMode } from "./market-modes";
 import { SETTLEMENT_MODE_POLICY } from "./market-modes";
 
 export type ShareCardKind = "market" | "settlement" | "duel" | "rematch";
+export type ShareCardLocale = "en" | "tr";
 
 /** Open Graph default plus the platform sizes the roadmap names. */
 export const CARD_SIZES = {
@@ -53,6 +54,9 @@ export interface ShareCardInput {
   payout?: number;
   /** Rematch series position, when this claim is part of a ladder. */
   series?: { round: number; bestOf?: number; creatorWins: number; challengerWins: number };
+  locale?: ShareCardLocale;
+  creatorIdentity?: string;
+  challengerIdentity?: string;
 }
 
 export interface ShareCard {
@@ -62,6 +66,10 @@ export interface ShareCard {
   title: string;
   sideA: string;
   sideB: string;
+  actorA: string;
+  actorB: string;
+  avatarFallbackA: string;
+  avatarFallbackB: string;
   /** Registrable domain of the resolution source, or "" when withheld. */
   sourceDomain: string;
   potLabel: string;
@@ -78,11 +86,65 @@ export interface ShareCard {
 
 function truncateOnWord(text: string, max: number): string {
   const clean = text.replace(/\s+/g, " ").trim();
-  if (clean.length <= max) return clean;
-  const cut = clean.slice(0, max);
+  const glyphs = Array.from(clean);
+  if (glyphs.length <= max) return clean;
+  // Array.from slices Unicode code points, so a surrogate-pair emoji is never
+  // cut into an invalid replacement character.
+  const cut = glyphs.slice(0, max).join("");
   const lastSpace = cut.lastIndexOf(" ");
   // Truncation is visible, never silent.
   return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
+}
+
+const CARD_COPY = {
+  en: {
+    privateTitle: "Private claim on Mimir",
+    inviteOnly: "Invite only",
+    creator: "Creator",
+    rival: "Open rival",
+    challengers: "Challenger side",
+    winnerTakes: "Winner takes the pot",
+    fixedOdds: "Creator-backed fixed odds",
+    poolPayout: "Proportional pool payout",
+    cancelled: "Cancelled — stakes refunded",
+    creatorWins: "Creator wins",
+    rivalWins: "Rival wins",
+    challengersWin: "Challengers win",
+    draw: "Draw — refunded in full",
+    unresolvable: "Unresolvable — refunded in full",
+    settled: "Settled",
+    paidOut: "USDC paid out",
+    round: "Round",
+    bestOf: "Best of",
+  },
+  tr: {
+    privateTitle: "Mimir'de özel market",
+    inviteOnly: "Yalnız davetle",
+    creator: "Kurucu",
+    rival: "Açık rakip",
+    challengers: "Rakip tarafı",
+    winnerTakes: "Kazanan potun tamamını alır",
+    fixedOdds: "Kurucu teminatlı sabit oran",
+    poolPayout: "Oransal havuz ödemesi",
+    cancelled: "İptal — stake'ler iade edildi",
+    creatorWins: "Kurucu kazandı",
+    rivalWins: "Rakip kazandı",
+    challengersWin: "Rakip tarafı kazandı",
+    draw: "Berabere — tam iade",
+    unresolvable: "Çözülemedi — tam iade",
+    settled: "Sonuçlandı",
+    paidOut: "USDC ödendi",
+    round: "Tur",
+    bestOf: "Seri",
+  },
+} as const;
+
+function avatarFallback(identity: string): string {
+  const clean = identity.trim();
+  if (!clean) return "?";
+  if (/^0x[0-9a-f]+$/i.test(clean)) return "0x";
+  const words = clean.split(/\s+/).filter(Boolean);
+  return words.slice(0, 2).map((word) => Array.from(word)[0] ?? "").join("").toUpperCase() || "?";
 }
 
 export function shareCardDomain(url: string): string {
@@ -93,42 +155,45 @@ export function shareCardDomain(url: string): string {
   }
 }
 
-function economicsLabel(mode: SettlementMode): string {
+function economicsLabel(mode: SettlementMode, locale: ShareCardLocale): string {
+  const copy = CARD_COPY[locale];
   switch (mode) {
     case "duel":
-      return "Winner takes the pot";
+      return copy.winnerTakes;
     case "fixed_odds":
-      return "Creator-backed fixed odds";
+      return copy.fixedOdds;
     case "pool":
-      return "Proportional pool payout";
+      return copy.poolPayout;
     default:
       return "";
   }
 }
 
 function verdictLabel(input: ShareCardInput): string {
-  if (input.state === "cancelled") return "Cancelled — stakes refunded";
+  const copy = CARD_COPY[input.locale ?? "en"];
+  if (input.state === "cancelled") return copy.cancelled;
   if (input.state !== "resolved") return "";
   switch (input.winnerSide) {
     case "creator":
-      return "Creator wins";
+      return copy.creatorWins;
     case "challengers":
-      return input.mode.settlementMode === "duel" ? "Rival wins" : "Challengers win";
+      return input.mode.settlementMode === "duel" ? copy.rivalWins : copy.challengersWin;
     case "draw":
-      return "Draw — refunded in full";
+      return copy.draw;
     case "unresolvable":
-      return "Unresolvable — refunded in full";
+      return copy.unresolvable;
     default:
-      return "Settled";
+      return copy.settled;
   }
 }
 
 function seriesLabel(input: ShareCardInput): string {
   const series = input.series;
   if (!series) return "";
+  const copy = CARD_COPY[input.locale ?? "en"];
   const score = `${series.creatorWins}–${series.challengerWins}`;
-  if (series.bestOf) return `Round ${series.round} · Best of ${series.bestOf} · ${score}`;
-  return `Round ${series.round} · ${score}`;
+  if (series.bestOf) return `${copy.round} ${series.round} · ${copy.bestOf} ${series.bestOf} · ${score}`;
+  return `${copy.round} ${series.round} · ${score}`;
 }
 
 function cardKind(input: ShareCardInput): ShareCardKind {
@@ -145,6 +210,8 @@ function cardKind(input: ShareCardInput): ShareCardKind {
 export function buildShareCard(input: ShareCardInput, size: CardSize = "og"): ShareCard {
   const dimensions = CARD_SIZES[size];
   const policy = SETTLEMENT_MODE_POLICY[input.mode.settlementMode];
+  const locale = input.locale ?? "en";
+  const copy = CARD_COPY[locale];
 
   // A private market's card is requested by scrapers and strangers, so it must
   // be safe for someone with no invite key: no question, no sides, no source.
@@ -152,9 +219,13 @@ export function buildShareCard(input: ShareCardInput, size: CardSize = "og"): Sh
     return {
       kind: cardKind(input),
       size: dimensions,
-      title: "Private claim on Mimir",
-      sideA: "Invite only",
-      sideB: "Invite only",
+      title: copy.privateTitle,
+      sideA: copy.inviteOnly,
+      sideB: copy.inviteOnly,
+      actorA: copy.inviteOnly,
+      actorB: copy.inviteOnly,
+      avatarFallbackA: "?",
+      avatarFallbackB: "?",
       sourceDomain: "",
       potLabel: "",
       modeLabel: policy?.label ?? "",
@@ -173,15 +244,24 @@ export function buildShareCard(input: ShareCardInput, size: CardSize = "og"): Sh
     title: truncateOnWord(input.question, MAX_CLAIM_CHARS),
     sideA: truncateOnWord(input.creatorPosition, MAX_SIDE_CHARS),
     sideB: truncateOnWord(input.counterPosition, MAX_SIDE_CHARS),
+    actorA: input.creatorIdentity?.trim() || copy.creator,
+    actorB:
+      input.challengerIdentity?.trim() ||
+      (input.mode.settlementMode === "duel" ? copy.rival : copy.challengers),
+    avatarFallbackA: avatarFallback(input.creatorIdentity?.trim() || copy.creator),
+    avatarFallbackB: avatarFallback(
+      input.challengerIdentity?.trim() ||
+        (input.mode.settlementMode === "duel" ? copy.rival : copy.challengers),
+    ),
     sourceDomain: shareCardDomain(input.resolutionUrl),
     potLabel: `${formatPot(input.totalPot)} USDC`,
     modeLabel: policy?.label ?? "",
-    economicsLabel: economicsLabel(input.mode.settlementMode),
+    economicsLabel: economicsLabel(input.mode.settlementMode, locale),
     deadlineIso: input.deadline > 0 ? new Date(input.deadline * 1000).toISOString() : "",
     verdictLabel: verdictLabel(input),
     payoutLabel:
       input.state === "resolved" && typeof input.payout === "number" && input.payout > 0
-        ? `${formatPot(input.payout)} USDC paid out`
+        ? `${formatPot(input.payout)} ${copy.paidOut}`
         : "",
     seriesLabel: seriesLabel(input),
     locked: false,

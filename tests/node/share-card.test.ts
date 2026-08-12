@@ -95,6 +95,32 @@ test("a claim at the limit is not truncated", () => {
   assert.equal(buildShareCard(input({ question: exact })).title, exact);
 });
 
+test("emoji truncation never emits a broken surrogate pair", () => {
+  const card = buildShareCard(input({ question: `${"🚀".repeat(150)} finish` }));
+  assert.equal(card.title.includes("�"), false);
+  assert.ok(card.title.endsWith("…"));
+});
+
+test("card copy can be localized without changing financial data", () => {
+  const card = buildShareCard(
+    input({ locale: "tr", state: "resolved", winnerSide: "draw", totalPot: 40 }),
+  );
+  assert.match(card.verdictLabel, /Berabere/);
+  assert.equal(card.potLabel, "40 USDC");
+});
+
+test("missing avatars use deterministic identity fallbacks", () => {
+  const fallback = buildShareCard(input({ creatorIdentity: "", challengerIdentity: "" }));
+  assert.equal(fallback.avatarFallbackA, "C");
+  assert.equal(fallback.avatarFallbackB, "CS");
+
+  const identities = buildShareCard(
+    input({ creatorIdentity: "Ada Lovelace", challengerIdentity: "0xabc123" }),
+  );
+  assert.equal(identities.avatarFallbackA, "AL");
+  assert.equal(identities.avatarFallbackB, "0x");
+});
+
 test("duel cards use duel language and rival wording", () => {
   const card = buildShareCard(input({ mode: DUEL }));
   assert.equal(card.kind, "duel");
