@@ -19,6 +19,8 @@
  * plumbing is unfinished — so there is deliberately no env var that enables them.
  */
 
+import { recordCategoryCoverage, recordCategoryReject } from "./telemetry";
+
 export type CategoryTier = "allowed" | "restricted" | "blocked";
 
 export interface CategoryPolicy {
@@ -364,6 +366,7 @@ export function checkCategory(
 ): CategoryCheckResult {
   const policy = categoryPolicy(candidate.category);
   if (!policy) {
+    recordCategoryReject("unknown_category");
     return {
       ok: false,
       reason: "unknown_category",
@@ -371,9 +374,11 @@ export function checkCategory(
     };
   }
   if (policy.tier === "blocked") {
+    recordCategoryReject("blocked_category");
     return { ok: false, reason: "blocked_category", detail: policy.note };
   }
   if (policy.tier === "restricted" && !isRestrictedCategoryEnabled(policy.id, env)) {
+    recordCategoryReject("compliance_gate");
     return {
       ok: false,
       reason: "compliance_gate",
@@ -390,6 +395,7 @@ export function checkCategory(
   );
   const total = independent.size + 1;
   if (total < policy.minIndependentSources) {
+    recordCategoryReject("too_few_sources");
     return {
       ok: false,
       reason: "too_few_sources",
@@ -403,6 +409,7 @@ export function checkCategory(
       (allowed) => primary === allowed || primary.endsWith(`.${allowed}`),
     )
   ) {
+    recordCategoryReject("primary_source_not_allowed");
     return {
       ok: false,
       reason: "primary_source_not_allowed",
@@ -411,6 +418,7 @@ export function checkCategory(
   }
 
   if (candidate.sourceAgeSeconds > policy.maxSourceAgeSeconds) {
+    recordCategoryReject("source_too_stale");
     return {
       ok: false,
       reason: "source_too_stale",
@@ -419,6 +427,7 @@ export function checkCategory(
   }
 
   if (candidate.secondsUntilDeadline < policy.minDeadlineSeconds) {
+    recordCategoryReject("deadline_too_soon");
     return {
       ok: false,
       reason: "deadline_too_soon",
@@ -426,6 +435,7 @@ export function checkCategory(
     };
   }
   if (candidate.secondsUntilDeadline > policy.maxDeadlineSeconds) {
+    recordCategoryReject("deadline_too_far");
     return {
       ok: false,
       reason: "deadline_too_far",
@@ -436,6 +446,7 @@ export function checkCategory(
   // An unfilled placeholder means the template was copied, not completed.
   const unfilled = candidate.settlementRule.match(/\{[a-zA-Z]+\}/g);
   if (unfilled) {
+    recordCategoryReject("unfilled_template");
     return {
       ok: false,
       reason: "unfilled_template",
@@ -443,6 +454,7 @@ export function checkCategory(
     };
   }
 
+  recordCategoryCoverage(policy.id);
   return { ok: true };
 }
 

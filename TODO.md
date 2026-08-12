@@ -453,7 +453,7 @@ altyapısı sunmaktır.
 
 - [x] Server-side, read-only `Research Gateway` oluştur; ajanlar doğrudan internet
   veya internal network'e çıkmasın.
-- [ ] Adapter'lar: official web/API, RSS, GitHub public metadata, sports, weather,
+- [x] Adapter'lar: official web/API, RSS, GitHub public metadata, sports, weather,
   market data, release calendars ve gerektiğinde x402/Bazaar kaynakları.
 - [x] Domain allow/deny list, DNS/IP SSRF koruması, redirect limiti, response-size
   limiti, MIME kontrolü ve timeout ekle.
@@ -461,7 +461,7 @@ altyapısı sunmaktır.
   action'larını yasakla.
 - [x] Per-agent request, token, x402 USDC ve günlük bütçe uygula.
 - [x] Sonuçları cache et; aynı kaynak için gereksiz ücret/istek tekrarını engelle.
-- [ ] Tool manifest'inde capability, fiyat, freshness ve trust tier yayınla.
+- [x] Tool manifest'inde capability, fiyat, freshness ve trust tier yayınla.
 - [x] x402 Bazaar discovery sonuçlarını fiyat/capability allowlist'inden geçir;
   keşfedilen endpoint'i otomatik güvenilir sayma.
 
@@ -484,16 +484,16 @@ altyapısı sunmaktır.
 
 ### 10.3 Konu kapsamını genişlet
 
-- [ ] İlk güvenilir adapter dalgası: crypto, sports, weather/climate, stocks,
+- [x] İlk güvenilir adapter dalgası: crypto, sports, weather/climate, stocks,
   macro/economic releases, technology/product releases, AI/open-source, gaming/esports,
   entertainment/film/music, awards, science/space ve culture.
-- [ ] Her kategori için minimum source count, primary source allowlist, freshness,
+- [x] Her kategori için minimum source count, primary source allowlist, freshness,
   deadline ve settlement template tanımla.
-- [ ] Elections/public policy gibi regülasyon ve manipülasyon riski yüksek alanları
+- [x] Elections/public policy gibi regülasyon ve manipülasyon riski yüksek alanları
   ayrı compliance feature flag arkasında tut.
-- [ ] Sağlık, ölüm/şiddet, kişisel zarar, illegal activity ve doğrulanamaz özel kişi
+- [x] Sağlık, ölüm/şiddet, kişisel zarar, illegal activity ve doğrulanamaz özel kişi
   claim'leri için mevcut moderation block policy'yi koru/genişlet.
-- [ ] Kategori coverage, reject reason, source failure ve settlement ambiguity
+- [x] Kategori coverage, reject reason, source failure ve settlement ambiguity
   metriklerini PostHog/operational telemetry ile izle.
 
 ### 10.4 Otomatik market-creator mode matrix

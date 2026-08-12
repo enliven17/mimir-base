@@ -28,6 +28,7 @@ import {
   type DomainPolicy,
   type SsrfReason,
 } from "./ssrf";
+import { recordSourceFailure } from "./telemetry";
 
 export const MAX_REDIRECTS = 3;
 export const MAX_RESPONSE_BYTES = 512 * 1024;
@@ -256,6 +257,10 @@ async function readBounded(response: Response, limit: number): Promise<{ text: s
  */
 export async function gatewayFetch(args: GatewayFetchArgs): Promise<FetchResult> {
   const now = args.now ?? Date.now();
+  const fail = <T extends FetchFailure>(failure: T): { ok: false } & T => {
+    recordSourceFailure(failure.kind);
+    return { ok: false, ...failure };
+  };
   const policy = args.policy ?? domainPolicyFromEnv();
   const budget = args.budget ?? defaultAgentBudget();
   const doFetch = args.fetchImpl ?? fetch;
@@ -267,18 +272,16 @@ export async function gatewayFetch(args: GatewayFetchArgs): Promise<FetchResult>
   // is useful — a refused-after-connect request still cost the source a hit.
   const used = currentUsage(args.agentId, now);
   if (used.requests >= budget.maxRequests) {
-    return {
-      ok: false,
+    return fail({
       kind: "budget",
       detail: `agent '${args.agentId}' has used its ${budget.maxRequests} request budget`,
-    };
+    });
   }
   if (used.bytes >= budget.maxBytes) {
-    return {
-      ok: false,
+    return fail({
       kind: "budget",
       detail: `agent '${args.agentId}' has used its ${budget.maxBytes} byte budget`,
-    };
+    });
   }
 
   let current = args.url;
@@ -287,7 +290,7 @@ export async function gatewayFetch(args: GatewayFetchArgs): Promise<FetchResult>
   for (;;) {
     const hop = await validateHop(current, policy, args.resolve);
     if (!hop.allowed) {
-      return { ok: false, kind: "blocked", reason: hop.reason, detail: hop.detail };
+      return fail({ kind: "blocked", reason: hop.reason, detail: hop.detail });
     }
 
     used.requests += 1;
@@ -306,37 +309,36 @@ export async function gatewayFetch(args: GatewayFetchArgs): Promise<FetchResult>
         cache: "no-store",
       });
     } catch (err) {
-      return {
-        ok: false,
+      return fail({
         kind: "transport",
         detail: err instanceof Error ? err.message : "fetch failed",
-      };
+      });
     }
 
     if (response.status >= 300 && response.status < 400) {
       const location = response.headers.get("location");
       if (!location) {
-        return { ok: false, kind: "http_error", status: response.status, detail: "redirect without a location" };
+        return fail({ kind: "http_error", status: response.status, detail: "redirect without a location" });
       }
       redirects += 1;
       if (redirects > MAX_REDIRECTS) {
-        return { ok: false, kind: "too_many_redirects", detail: `more than ${MAX_REDIRECTS} redirects` };
+        return fail({ kind: "too_many_redirects", detail: `more than ${MAX_REDIRECTS} redirects` });
       }
       try {
         current = new URL(location, current).toString();
       } catch {
-        return { ok: false, kind: "http_error", status: response.status, detail: "unparseable redirect target" };
+        return fail({ kind: "http_error", status: response.status, detail: "unparseable redirect target" });
       }
       continue;
     }
 
     if (!response.ok) {
-      return { ok: false, kind: "http_error", status: response.status, detail: `upstream ${response.status}` };
+      return fail({ kind: "http_error", status: response.status, detail: `upstream ${response.status}` });
     }
 
     const contentType = response.headers.get("content-type") ?? "";
     if (!contentTypeAllowed(contentType)) {
-      return { ok: false, kind: "content_type", detail: `unsupported content-type '${contentType}'` };
+      return fail({ kind: "content_type", detail: `unsupported content-type '${contentType}'` });
     }
 
     const { text, bytes, truncated } = await readBounded(response, MAX_RESPONSE_BYTES);
@@ -344,7 +346,7 @@ export async function gatewayFetch(args: GatewayFetchArgs): Promise<FetchResult>
     if (truncated) {
       // A truncated source is a silent correctness hazard for settlement, so it
       // is a refusal rather than a partial success.
-      return { ok: false, kind: "too_large", detail: `response exceeds ${MAX_RESPONSE_BYTES} bytes` };
+      return fail({ kind: "too_large", detail: `response exceeds ${MAX_RESPONSE_BYTES} bytes` });
     }
 
     const success: FetchSuccess = {
