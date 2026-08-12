@@ -225,6 +225,7 @@ export default function CreatePage() {
   // Settlement mode is a real choice now. Duel is the default because it is the
   // shape the app has actually been creating (one slot), just unlabelled.
   const [settlementMode, setSettlementMode] = useState<SettlementMode>("duel");
+  const [duelTarget, setDuelTarget] = useState<string | null>(null);
   // Total-return basis points for fixed odds. 20000 = 2x total return = 1x profit.
   const [challengerPayoutBps, setChallengerPayoutBps] = useState(20_000);
   const [poolSlots, setPoolSlots] = useState(10);
@@ -664,6 +665,13 @@ export default function CreatePage() {
     }
 
     const searchParams = new URL(window.location.href).searchParams;
+    const requestedDuelTarget = searchParams.get("duelWith")?.trim() ?? "";
+    if (/^0x[0-9a-fA-F]{40}$/.test(requestedDuelTarget)) {
+      setDuelTarget(requestedDuelTarget);
+      setSettlementMode("duel");
+      setVisibility("private");
+      setAdvancedOpen(true);
+    }
     const rawRematchId = Number(searchParams.get("rematch") ?? "");
     const rawSourceUrl = searchParams.get("source") ?? "";
     setRematchId(Number.isInteger(rawRematchId) && rawRematchId > 0 ? rawRematchId : null);
@@ -2103,6 +2111,11 @@ export default function CreatePage() {
                   <p className="text-[11px] leading-relaxed text-pv-muted">
                     {t(`settlementModes.${settlementMode}.detail`)}
                   </p>
+                  {settlementMode === "duel" && duelTarget && (
+                    <p className="rounded-lg border border-pv-emerald/20 bg-pv-emerald/[0.06] px-3 py-2 font-mono text-[11px] text-pv-muted">
+                      {t("duelConversationTarget", { wallet: duelTarget })}
+                    </p>
+                  )}
 
                   {/* Fixed odds: the creator promises a TOTAL RETURN multiple and
                       backs the profit out of their own stake. Presets rather than a

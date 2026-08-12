@@ -242,14 +242,14 @@ payout, platform fee, owner fee veya dust olarak muhasebeleşir.
 
 ### 6.2 Duel / 1v1 Fixed Challenge — P0 ilk yeni mode
 
-- [ ] Create ekranına `Duel` ve `Pool Market` selector ekle.
-- [ ] Duel policy: `maxChallengers = 1`, challenger stake = creator stake,
+- [x] Create ekranına `Duel` ve `Pool Market` selector ekle.
+- [x] Duel policy: `maxChallengers = 1`, challenger stake = creator stake,
   winner takes two-person pot, draw/unresolvable = full refund.
-- [ ] Eşit stake'i yalnızca UI'da değil kontratta veya mode-aware write guard'da
+- [x] Eşit stake'i yalnızca UI'da değil kontratta veya mode-aware write guard'da
   enforce et; UI policy'sine güvenme.
-- [ ] CTA metnini `Accept Duel`; rolleri `Creator` ve `Rival` yap.
-- [ ] Public open duel ile belirli wallet/agent'a private duel'i ayır.
-- [ ] XMTP konuşmasından duel oluşturma/accept deep-link akışı ekle.
+- [x] CTA metnini `Accept Duel`; rolleri `Creator` ve `Rival` yap.
+- [x] Public open duel ile belirli wallet/agent'a private duel'i ayır.
+- [x] XMTP konuşmasından duel oluşturma/accept deep-link akışı ekle.
 - [x] Settlement sonrası `Run it back`, Best of 3 ve Best of 5 girişlerini ekle.
 
 **Kabul kriteri:** İkinci challenger katılamaz, eşit olmayan stake gönderilemez ve
@@ -259,13 +259,13 @@ kazanan fee sonrası hesaplanan iki kişilik payout'u alır.
 
 - [x] Create ekranında `1.25x`, `1.5x`, `2x`, `3x` total return preset'leri ekle.
 - [x] “2x profit” yerine daima “2x total return” yaz.
-- [ ] `availableCreatorLiquidity = creatorStake - reservedCreatorLiability`
+- [x] `availableCreatorLiquidity = creatorStake - reservedCreatorLiability`
   değerini göster.
-- [ ] Stake girilirken liability'yi kontratla aynı rounding ile önizle ve fazla
+- [x] Stake girilirken liability'yi kontratla aynı rounding ile önizle ve fazla
   stake'i submit öncesi engelle.
-- [ ] Birden çok challenger sonrası kalan kapasiteyi canlı güncelle.
-- [ ] RPC ile UI state yarışırsa simulation/revert mesajını anlaşılır göster.
-- [ ] Concurrent challenge ve liability exhaustion testi ekle.
+- [x] Birden çok challenger sonrası kalan kapasiteyi canlı güncelle.
+- [x] RPC ile UI state yarışırsa simulation/revert mesajını anlaşılır göster.
+- [x] Concurrent challenge ve liability exhaustion testi ekle.
 
 ### 6.4 Underdog Boost — P1 discovery modifier
 

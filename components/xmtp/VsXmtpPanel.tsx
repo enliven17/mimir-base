@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import Link from "next/link";
 import type { VSData } from "@/lib/contract";
 import { useWallet } from "@/lib/wallet";
 import { useXmtp } from "@/lib/xmtp/XmtpProvider";
@@ -620,6 +621,17 @@ export default function VsXmtpPanel({ vs, embedded = false }: VsXmtpPanelProps) 
       {!isXmtpProviderError && innerReady && dm && client && (
         <>
           <div className="overflow-hidden rounded-lg border border-white/[0.08] bg-pv-bg/40">
+            <div className="flex items-center justify-between gap-3 border-b border-white/[0.08] px-3 py-2.5 sm:px-3.5">
+              <p className="font-mono text-[10px] uppercase tracking-[0.12em] text-pv-muted">
+                {shortenAddress(peerAddress)}
+              </p>
+              <Link
+                href={`/vs/create?duelWith=${encodeURIComponent(peerAddress)}&fromConversation=${vs.id}`}
+                className="focus-ring rounded-md border border-pv-emerald/25 bg-pv-emerald/[0.07] px-2.5 py-1.5 font-display text-[9px] font-bold uppercase tracking-[0.12em] text-pv-emerald transition hover:bg-pv-emerald/[0.12]"
+              >
+                {t("createDuel")}
+              </Link>
+            </div>
             <div
               ref={threadScrollRef}
               className={VS_XMTP_PANEL_THREAD_SCROLL_CLASS}

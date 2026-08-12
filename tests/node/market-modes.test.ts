@@ -291,6 +291,33 @@ test("fixed odds rejects a stake the creator's remaining liquidity cannot back",
   );
 });
 
+test("concurrent fixed-odds challenges exhaust the same liability only once", () => {
+  const first = guardChallenge({
+    settlementMode: "fixed_odds",
+    creatorStake: 10,
+    challengerStake: 6,
+    existingChallengers: 0,
+    maxChallengers: 100,
+    challengerPayoutBps: 20_000,
+    availableCreatorLiquidity: 10,
+  });
+  assert.equal(first.ok, true);
+
+  // After the first transaction reserves 6, a competing 6-unit transaction
+  // re-read against fresh state must fail instead of oversubscribing escrow.
+  const raced = guardChallenge({
+    settlementMode: "fixed_odds",
+    creatorStake: 10,
+    challengerStake: 6,
+    existingChallengers: 1,
+    maxChallengers: 100,
+    challengerPayoutBps: 20_000,
+    availableCreatorLiquidity: 4,
+  });
+  assert.equal(raced.ok, false);
+  assert.equal(raced.code, "insufficient_creator_liquidity");
+});
+
 test("fixed odds with no multiple is refused rather than treated as 1x", () => {
   const result = guardChallenge({
     settlementMode: "fixed_odds",

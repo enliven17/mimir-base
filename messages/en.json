@@ -279,6 +279,7 @@
     "advancedToggle": "Advanced market terms",
     "advancedHint": "Use this for market type, category, and explicit settlement rules when the challenge needs tighter resolution terms.",
     "settlementMode": "Settlement mode",
+    "duelConversationTarget": "Private duel requested from XMTP conversation with {wallet}. Create it, then send the generated invite link in that encrypted chat.",
     "poolSlots": "Challenger slots",
     "settlementModes": {
       "pool": {
@@ -1008,6 +1009,7 @@
     "atStake": "at stake"
   },
   "xmtpVs": {
+    "createDuel": "Create private duel",
     "title": "XMTP MESSAGES",
     "featureOffTitle": "Messaging is off in this build",
     "featureOffDesc": "Enable NEXT_PUBLIC_FEATURE_XMTP in .env.local and restart the dev server. See docs/xmtp-integration.md.",

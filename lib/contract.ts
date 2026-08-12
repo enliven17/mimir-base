@@ -628,6 +628,24 @@ async function sendBrowserTx(
     await approveUsdc(wc, account);
   }
 
+  // Simulate against the latest chain state immediately before asking for the
+  // signature. This catches a rival filling the last slot or consuming fixed-
+  // odds liquidity between render and submit, and turns the RPC revert into a
+  // useful message without spending gas.
+  try {
+    await getPublicClient().simulateContract({
+      address: CONTRACT_ADDRESS,
+      abi: MIMIR_ABI,
+      functionName: functionName as any,
+      args: args as any,
+      account,
+    });
+  } catch (error) {
+    const candidate = error as { shortMessage?: string; details?: string; message?: string };
+    const reason = candidate.shortMessage || candidate.details || candidate.message || "simulation failed";
+    throw new Error(`Transaction can no longer be completed: ${reason}`);
+  }
+
   const txHash = await wc.writeContract({
     address:      CONTRACT_ADDRESS,
     abi:          MIMIR_ABI,
