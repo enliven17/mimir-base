@@ -1,6 +1,7 @@
 /** Copy trading policy and deterministic execution gate. */
 
 import { keccak256, toBytes } from "viem";
+import { parseUsdcAtomic } from "@/lib/usdc";
 
 export interface CopyPermission {
   permissionId: string;
@@ -88,18 +89,19 @@ export function evaluateCopy(permission: CopyPermission, signal: CopySignal, con
   if (context.existingClaimIds.has(signal.claimId)) return { allowed: false, reason: "duplicate_position" };
   if (signal.deadline <= context.now) return { allowed: false, reason: "stale_signal" };
   if (signal.remainingSlots <= 0) return { allowed: false, reason: "market_full" };
-  if (signal.requiredLiquidityUsdc > signal.availableLiquidityUsdc) return { allowed: false, reason: "liquidity_exhausted" };
+  if (parseUsdcAtomic(signal.requiredLiquidityUsdc) > parseUsdcAtomic(signal.availableLiquidityUsdc)) return { allowed: false, reason: "liquidity_exhausted" };
   if (permission.allowedCategories.length && !permission.allowedCategories.includes(signal.category)) return { allowed: false, reason: "category_blocked" };
   if (permission.allowedModes.length && !permission.allowedModes.includes(signal.mode)) return { allowed: false, reason: "mode_blocked" };
   if (signal.confidenceBps < permission.minConfidenceBps) return { allowed: false, reason: "confidence_below_floor" };
   if (signal.payoutBps < permission.minPayoutBps) return { allowed: false, reason: "payout_below_floor" };
-  const stake = Math.min(signal.stakeUsdc, permission.maxPerPositionUsdc);
-  if (stake <= 0 || signal.stakeUsdc > permission.maxPerPositionUsdc) return { allowed: false, reason: "position_cap" };
-  if (context.usage.usedTodayUsdc + stake > permission.dailyCapUsdc) return { allowed: false, reason: "daily_cap" };
-  if (context.usage.usedThisWeekUsdc + stake > permission.weeklyCapUsdc) return { allowed: false, reason: "weekly_cap" };
-  if (context.usage.openExposureUsdc + stake > permission.totalOpenExposureUsdc) return { allowed: false, reason: "open_exposure_cap" };
+  const stake = signal.stakeUsdc;
+  const stakeAtomic = parseUsdcAtomic(stake);
+  if (stakeAtomic <= 0n || stakeAtomic > parseUsdcAtomic(permission.maxPerPositionUsdc)) return { allowed: false, reason: "position_cap" };
+  if (parseUsdcAtomic(context.usage.usedTodayUsdc) + stakeAtomic > parseUsdcAtomic(permission.dailyCapUsdc)) return { allowed: false, reason: "daily_cap" };
+  if (parseUsdcAtomic(context.usage.usedThisWeekUsdc) + stakeAtomic > parseUsdcAtomic(permission.weeklyCapUsdc)) return { allowed: false, reason: "weekly_cap" };
+  if (parseUsdcAtomic(context.usage.openExposureUsdc) + stakeAtomic > parseUsdcAtomic(permission.totalOpenExposureUsdc)) return { allowed: false, reason: "open_exposure_cap" };
   const spend = permission.spendPermission;
-  const requiredAtomic = BigInt(Math.round(stake * 1e6));
+  const requiredAtomic = stakeAtomic;
   if (spend.token.toLowerCase() !== context.configuredUsdc.toLowerCase() ||
       spend.spender.toLowerCase() !== context.configuredSpender.toLowerCase() ||
       spend.allowanceAtomic < requiredAtomic || context.onchainAllowanceAtomic < requiredAtomic) {

@@ -13,7 +13,7 @@ ajanların market açabildiği, araştırabildiği, pozisyon alabildiği ve geli
 
 - [x] Kontrat state'ini tek finansal doğruluk kaynağı olarak koru; Neon yalnızca
   yeniden üretilebilir read-index, analytics ve off-chain metadata tutsun.
-- [ ] Tüm stake, payout, fee, agent bütçesi ve x402 ödemelerini 6 decimal USDC
+- [x] Tüm stake, payout, fee, agent bütçesi ve x402 ödemelerini 6 decimal USDC
   atomic integer olarak hesapla; UI dışında `number`/float kullanma.
 - [x] Base Sepolia dışındaki eski ağ isimlerini, adreslerini ve koşullu network
   dallarını geri getirme.

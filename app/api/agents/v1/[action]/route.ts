@@ -14,6 +14,7 @@ import {
 import { auditAgentRequest, consumeNonce, loadAgent, loadIdempotentResponse, saveAgent, saveIdempotentResponse } from "@/lib/agents/store";
 import { buildAgentDryRun } from "@/lib/agents/dry-run";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits } from "@/lib/usdc";
+import { parseUsdcAtomic } from "@/lib/usdc";
 import { getAgentEarningsSummary } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
@@ -125,8 +126,8 @@ export async function POST(req: Request, context: { params: Promise<{ action: st
     const proposalOnly = action === "proposeMarket";
     const gate = authorizeAction(agent, {
       capability, category: body.category, settlementMode: body.settlementMode,
-      positionUsdc: Number(body.positionUsdc ?? body.stakeUsdc ?? 0),
-      exposureTodayUsdc: Number(body.exposureTodayUsdc ?? 0),
+      positionAtomic: parseUsdcAtomic(String(body.positionUsdc ?? body.stakeUsdc ?? 0)).toString(),
+      exposureTodayAtomic: parseUsdcAtomic(String(body.exposureTodayUsdc ?? 0)).toString(),
       activeMarkets: Number(body.activeMarkets ?? 0), requestsThisHour: Number(body.requestsThisHour ?? 0),
       proposalOnly,
     } as any);

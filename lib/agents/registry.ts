@@ -18,6 +18,7 @@
  */
 
 import { keccak256, toBytes } from "viem";
+import { parseUsdcAtomic } from "@/lib/usdc";
 
 export const REGISTRY_SCHEMA_VERSION = 1;
 
@@ -69,6 +70,9 @@ export interface AgentLimits {
   maxDailyExposureUsdc: number;
   /** USDC per single position. */
   maxPositionUsdc: number;
+  /** Authoritative 6-decimal limits; decimal strings remain JSON/signature safe. */
+  maxDailyExposureAtomic: string;
+  maxPositionAtomic: string;
   /** Categories the agent may act in. Empty means all. */
   allowedCategories: string[];
   /** Settlement modes the agent may use. Empty means all. */
@@ -108,6 +112,8 @@ export function defaultLimits(): AgentLimits {
     maxActiveMarkets: 3,
     maxDailyExposureUsdc: 20,
     maxPositionUsdc: 5,
+    maxDailyExposureAtomic: "20000000",
+    maxPositionAtomic: "5000000",
     allowedCategories: [],
     allowedSettlementModes: [],
   };
@@ -233,8 +239,10 @@ export interface ActionRequest {
   settlementMode?: string;
   /** USDC this action puts at risk. */
   positionUsdc?: number;
+  positionAtomic?: string;
   /** USDC already at risk today. */
   exposureTodayUsdc?: number;
+  exposureTodayAtomic?: string;
   activeMarkets?: number;
   /** Requests already accepted in the current rolling hour. */
   requestsThisHour?: number;
@@ -304,20 +312,24 @@ export function authorizeAction(agent: AgentRecord, request: ActionRequest): Act
     return { allowed: false, reason: "mode_not_allowed", detail: request.settlementMode };
   }
 
-  if (request.positionUsdc !== undefined) {
-    if (request.positionUsdc > limits.maxPositionUsdc) {
+  if (request.positionUsdc !== undefined || request.positionAtomic !== undefined) {
+    const position = request.positionAtomic !== undefined ? BigInt(request.positionAtomic) : parseUsdcAtomic(request.positionUsdc!);
+    const maxPosition = BigInt(limits.maxPositionAtomic ?? parseUsdcAtomic(limits.maxPositionUsdc));
+    const maxDaily = BigInt(limits.maxDailyExposureAtomic ?? parseUsdcAtomic(limits.maxDailyExposureUsdc));
+    if (position > maxPosition) {
       return {
         allowed: false,
         reason: "position_too_large",
-        detail: `${request.positionUsdc} exceeds the ${limits.maxPositionUsdc} per-position limit`,
+        detail: `${position} atomic exceeds the ${maxPosition} atomic per-position limit`,
       };
     }
-    const exposure = (request.exposureTodayUsdc ?? 0) + request.positionUsdc;
-    if (exposure > limits.maxDailyExposureUsdc) {
+    const existing = request.exposureTodayAtomic !== undefined ? BigInt(request.exposureTodayAtomic) : parseUsdcAtomic(request.exposureTodayUsdc ?? 0);
+    const exposure = existing + position;
+    if (exposure > maxDaily) {
       return {
         allowed: false,
         reason: "daily_exposure_exceeded",
-        detail: `${exposure} would exceed the ${limits.maxDailyExposureUsdc} daily limit`,
+        detail: `${exposure} atomic would exceed the ${maxDaily} atomic daily limit`,
       };
     }
   }
