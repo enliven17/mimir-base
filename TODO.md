@@ -556,21 +556,21 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 ### Kontrat
 
-- [ ] Unit, invariant ve stateful fuzz: escrow conservation, liability cap, payout,
+- [x] Unit, invariant ve stateful fuzz: escrow conservation, liability cap, payout,
   fee, refund, duplicate claim ve max participants.
-- [ ] Mode başına malicious ERC-1271 signer, reverting receiver, reentrancy ve
+- [x] Mode başına malicious ERC-1271 signer, reverting receiver, reentrancy ve
   concurrent transaction senaryoları.
 - [ ] Deploy sonrası ABI/bytecode/address doğrulama ve Base Sepolia smoke test.
-- [ ] Yeni kontrat gerekiyorsa clean-state testnet redeploy planı; eski ağ için
+- [x] Yeni kontrat gerekiyorsa clean-state testnet redeploy planı; eski ağ için
   data/branch compatibility katmanı ekleme.
 
 ### Agent güvenliği
 
-- [ ] Prompt injection ve poisoned evidence fixture'ları.
-- [ ] Tool allowlist bypass, SSRF, redirect, DNS rebinding ve oversized content testleri.
-- [ ] Per-agent wallet/research/x402 bütçe kill-switch.
-- [ ] Agent key rotation, owner revoke ve compromised operator runbook'u.
-- [ ] Market create ve copy executor'ı için dry-run + simulation zorunluluğu.
+- [x] Prompt injection ve poisoned evidence fixture'ları.
+- [x] Tool allowlist bypass, SSRF, redirect, DNS rebinding ve oversized content testleri.
+- [x] Per-agent wallet/research/x402 bütçe kill-switch.
+- [x] Agent key rotation, owner revoke ve compromised operator runbook'u.
+- [x] Market create ve copy executor'ı için dry-run + simulation zorunluluğu.
 
 ### Operasyon
 

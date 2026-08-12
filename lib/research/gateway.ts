@@ -47,6 +47,7 @@ const ALLOWED_CONTENT_TYPES = [
 ];
 
 export type FetchFailure =
+  | { kind: "paused"; detail: string }
   | { kind: "blocked"; reason: SsrfReason; detail: string }
   | { kind: "budget"; detail: string }
   | { kind: "too_many_redirects"; detail: string }
@@ -264,6 +265,11 @@ export async function gatewayFetch(args: GatewayFetchArgs): Promise<FetchResult>
   const policy = args.policy ?? domainPolicyFromEnv();
   const budget = args.budget ?? defaultAgentBudget();
   const doFetch = args.fetchImpl ?? fetch;
+
+  const pausedAgents = new Set((process.env.RESEARCH_PAUSED_AGENT_IDS ?? "").split(",").map((id) => id.trim().toLowerCase()).filter(Boolean));
+  if (process.env.MIMIR_PAUSE_RESEARCH === "1" || pausedAgents.has(args.agentId.trim().toLowerCase())) {
+    return fail({ kind: "paused", detail: `research is paused for agent '${args.agentId}'` });
+  }
 
   const cached = cacheGet(args.url, now);
   if (cached) return { ok: true, ...cached, fromCache: true };

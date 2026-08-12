@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { createBasePublicClient, getContractAddress, isContractConfigured } from "@/lib/base";
+import { getContractAddress, isContractConfigured } from "@/lib/base";
+import { verifyAgentSignature } from "@/lib/agents/signature";
 import { getUserVSDirect } from "@/lib/contract";
 import { publishReasoning } from "@/lib/reasoning/publish";
 import {
@@ -23,11 +24,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 async function verify(address: string, message: string, signature: `0x${string}`): Promise<boolean> {
-  try {
-    return await createBasePublicClient().verifyMessage({
-      address: address as `0x${string}`, message, signature,
-    });
-  } catch { return false; }
+  return verifyAgentSignature({ address, message, signature });
 }
 
 async function audit(request: SignedAgentRequest, outcome: string, reason?: string) {

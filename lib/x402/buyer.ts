@@ -22,6 +22,11 @@ import { createBasePublicClient } from "../base";
 import { X402_NETWORK } from "./config";
 import type { AgentWallet } from "../agent-wallets";
 
+export function assertX402BuyingEnabled(address: string, env: Record<string, string | undefined> = process.env): void {
+  const paused = new Set((env.MIMIR_PAUSED_X402_BUYERS ?? "").split(",").map((item) => item.trim().toLowerCase()).filter(Boolean));
+  if (env.MIMIR_PAUSE_X402_BUYING === "1" || paused.has(address.trim().toLowerCase())) throw new Error("x402 buying paused");
+}
+
 export interface PayingWallet {
   /** The agent's on-chain address (payer). */
   address: `0x${string}`;
@@ -109,6 +114,7 @@ function readSettlement(response: Response) {
  * fetchWithBudget for the agentic, capped path.
  */
 export function createPayingFetch(wallet: PayingWallet): typeof globalThis.fetch {
+  assertX402BuyingEnabled(wallet.address);
   return wrapFetchWithPayment(fetch, wallet.newClient()) as typeof globalThis.fetch;
 }
 
@@ -128,6 +134,7 @@ export async function fetchWithBudget(
   capUnits: bigint,
   init?: RequestInit,
 ): Promise<PaidFetchResult> {
+  assertX402BuyingEnabled(wallet.address);
   const payingFetch = wrapFetchWithPayment(fetch, wallet.newClient(budgetPolicy(capUnits)));
   const response = await payingFetch(url, init);
   return { response, payment: readSettlement(response) };
