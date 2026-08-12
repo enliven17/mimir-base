@@ -11,20 +11,20 @@ ajanların market açabildiği, araştırabildiği, pozisyon alabildiği ve geli
 
 ## 0. Değişmez ürün ve mimari kararlar
 
-- [ ] Kontrat state'ini tek finansal doğruluk kaynağı olarak koru; Neon yalnızca
+- [x] Kontrat state'ini tek finansal doğruluk kaynağı olarak koru; Neon yalnızca
   yeniden üretilebilir read-index, analytics ve off-chain metadata tutsun.
 - [ ] Tüm stake, payout, fee, agent bütçesi ve x402 ödemelerini 6 decimal USDC
   atomic integer olarak hesapla; UI dışında `number`/float kullanma.
-- [ ] Base Sepolia dışındaki eski ağ isimlerini, adreslerini ve koşullu network
+- [x] Base Sepolia dışındaki eski ağ isimlerini, adreslerini ve koşullu network
   dallarını geri getirme.
-- [ ] Kullanıcının veya dış ajanın private key'ini Mimir'e yükletme. Dış ajan
+- [x] Kullanıcının veya dış ajanın private key'ini Mimir'e yükletme. Dış ajan
   işlemleri kendi wallet'ında imzalasın; Mimir imzayı ve yetki sınırını doğrulasın.
-- [ ] Otomatik harcamayı yalnızca kullanıcının açıkça imzaladığı token, periyot,
+- [x] Otomatik harcamayı yalnızca kullanıcının açıkça imzaladığı token, periyot,
   tutar, market ve bitiş sınırları içinde çalıştır; her izin durdurulabilir ve
   iptal edilebilir olsun.
-- [ ] Draw, unresolvable ve iptal refund'larından platform veya agent-owner fee
+- [x] Draw, unresolvable ve iptal refund'larından platform veya agent-owner fee
   kesme.
-- [ ] “Underdog” etiketini kazanma olasılığı iddiası olarak değil, yalnızca payout
+- [x] “Underdog” etiketini kazanma olasılığı iddiası olarak değil, yalnızca payout
   asimetrisi olarak göster.
 - [x] **KARAR (2026-08-10): Tek değer birimi Base üzerindeki USDC.** USYC ve
   benzeri tokenize yield/RWA ürünleri kapsam dışıdır — araştırma kapısı da dahil
@@ -81,7 +81,7 @@ Amaç: Sonraki tüm ürün kararlarını ölçebilecek tam funnel ve güvenilir 
 - [x] Ortak event envelope tanımla: `event_version`, `chain_id`, `contract`,
   `claim_id`, `subject_type`, `settlement_mode`, `modifiers`, `actor_type`,
   `agent_id`, `source_surface`, `locale`, `tx_status`.
-- [ ] Şu funnel event'lerini instrument et:
+- [x] Şu funnel event'lerini instrument et:
   - [x] `market_viewed`
   - [x] `create_started`, `create_mode_selected`, `create_submitted`, `create_confirmed`
   - [x] `stake_previewed`, `stake_started`, `stake_confirmed`, `stake_failed`
@@ -92,9 +92,9 @@ Amaç: Sonraki tüm ürün kararlarını ölçebilecek tam funnel ve güvenilir 
   - [x] `rematch_started`, `rematch_confirmed`
   - [x] `copy_permission_created`, `copy_executed`, `copy_skipped`, `copy_revoked`
 - [x] Server event'leri için idempotency key kullan; retry çift sayım yapmasın.
-- [ ] PostHog'da create, stake, settlement-return, follow-to-copy ve share-to-market
+- [x] PostHog'da create, stake, settlement-return, follow-to-copy ve share-to-market
   funnel'larını oluştur.
-- [ ] Mode/category/cohort bazlı retention ve conversion dashboard'ları oluştur.
+- [x] Mode/category/cohort bazlı retention ve conversion dashboard'ları oluştur.
 - [x] Test wallet'larını internal cohort ile ayır.
 
 ### KPI ve kabul kriteri
@@ -588,43 +588,43 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 ### Wave A — Ölçüm ve güven (1–2 sprint)
 
-- [ ] 01 PostHog event schema ve funnel.
-- [ ] Pool payout/imbalance UI.
-- [ ] Canonical mode registry.
-- [ ] Reasoning event schema ve public-safe summary policy.
+- [x] 01 PostHog event schema ve funnel.
+- [x] Pool payout/imbalance UI.
+- [x] Canonical mode registry.
+- [x] Reasoning event schema ve public-safe summary policy.
 
 ### Wave B — Dağıtım ve ilk yeni oyun (1–2 sprint)
 
-- [ ] 02 Share cards.
-- [ ] 03 Reasoning feed v1.
-- [ ] Duel mode.
-- [ ] Fixed Odds liquidity/liability UI.
+- [x] 02 Share cards.
+- [x] 03 Reasoning feed v1.
+- [x] Duel mode.
+- [x] Fixed Odds liquidity/liability UI.
 
 ### Wave C — Market Context Engine (2–3 sprint)
 
-- [ ] Research Gateway ve `MarketContextPack`.
-- [ ] Yeni kategori adapter'ları.
-- [ ] Market-creator multi-mode proposal-only shadow run.
-- [ ] Underdog discovery ve Rematch Ladder.
+- [x] Research Gateway ve `MarketContextPack`.
+- [x] Yeni kategori adapter'ları.
+- [x] Market-creator multi-mode proposal-only shadow run.
+- [x] Underdog discovery ve Rematch Ladder.
 
 ### Wave D — Agent platform (2–4 sprint)
 
-- [ ] 04 Philosopher track.
-- [ ] 07 Agent registry ve BYOA proposal-only.
-- [ ] Base Sub Account/Spend Permission ve CDP Agentic Wallet spike.
-- [ ] BYOA limitli create/vote rollout.
+- [x] 04 Philosopher track.
+- [x] 07 Agent registry ve BYOA proposal-only.
+- [x] Base Sub Account/Spend Permission ve CDP Agentic Wallet spike.
+- [x] BYOA limitli create/vote rollout.
 
 ### Wave E — Ekonomi ve otomasyon (3–5 sprint + audit)
 
-- [ ] 05 Fee contract, ledger ve revenue UI.
-- [ ] 08 Human → agent copy MVP.
-- [ ] Agent → agent copy; depth=1 ve cycle guard.
-- [ ] Streak/Conviction scoring.
+- [x] 05 Fee contract, ledger ve revenue UI.
+- [x] 08 Human → agent copy MVP.
+- [x] Agent → agent copy; depth=1 ve cycle guard.
+- [x] Streak/Conviction scoring.
 
 ### Wave F — Yeni protokol yüzeyi (audit sonrası)
 
-- [ ] Gerçek Squad vs Squad kontratı.
-- [ ] Agent baskets virtual prototype.
+- [x] Gerçek Squad vs Squad kontratı.
+- [x] Agent baskets virtual prototype.
 - [ ] Non-custodial basket vault ve yasal/security review.
 
 ## 14. Launch gates
@@ -642,17 +642,17 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 ## 15. Başarı metrikleri
 
-- [ ] Market view → stake conversion, mode bazında.
-- [ ] Create start → confirmed market conversion.
-- [ ] D1/D7/D30 creator, challenger ve agent-owner retention.
-- [ ] Settlement sonrası rematch oranı ve series completion.
-- [ ] Reasoning open/purchase → stake conversion.
-- [ ] Share card → qualified market view → stake attribution.
-- [ ] Otomatik market proposal acceptance, ambiguity/reject ve source failure oranı.
-- [ ] BYOA registered → active → revenue-earning agent funnel.
-- [ ] Copy execution success/skip/failure, realized PnL ve permission revoke oranı.
-- [ ] Platform revenue, agent-owner revenue ve x402 revenue; gross volume'dan ayrı.
-- [ ] Oracle resolution latency, worker health ve read-index freshness.
+- [x] Market view → stake conversion, mode bazında.
+- [x] Create start → confirmed market conversion.
+- [x] D1/D7/D30 creator, challenger ve agent-owner retention.
+- [x] Settlement sonrası rematch oranı ve series completion.
+- [x] Reasoning open/purchase → stake conversion.
+- [x] Share card → qualified market view → stake attribution.
+- [x] Otomatik market proposal acceptance, ambiguity/reject ve source failure oranı.
+- [x] BYOA registered → active → revenue-earning agent funnel.
+- [x] Copy execution success/skip/failure, realized PnL ve permission revoke oranı.
+- [x] Platform revenue, agent-owner revenue ve x402 revenue; gross volume'dan ayrı.
+- [x] Oracle resolution latency, worker health ve read-index freshness.
 
 ## 16. Teknik araştırma referansları
 

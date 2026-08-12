@@ -30,6 +30,15 @@ export interface DashboardDefinition {
   }[];
 }
 
+export interface MetricDefinition {
+  id: string;
+  name: string;
+  source: "posthog" | "onchain_ledger" | "read_index" | "operational";
+  numerator: string;
+  denominator?: string;
+  breakdowns: readonly string[];
+}
+
 export const PRODUCT_FUNNELS = [
   {
     id: "create",
@@ -94,12 +103,35 @@ export const PRODUCT_DASHBOARDS = [
   },
 ] as const satisfies readonly DashboardDefinition[];
 
+/** Roadmap §15, executable ownership map: money never comes from PostHog. */
+export const SUCCESS_METRICS = [
+  { id: "view_to_stake", name: "Market view → stake conversion", source: "posthog", numerator: "stake_confirmed", denominator: "market_viewed", breakdowns: ["settlement_mode"] },
+  { id: "create_to_confirmed", name: "Create start → confirmed", source: "posthog", numerator: "create_confirmed", denominator: "create_started", breakdowns: ["settlement_mode", "category"] },
+  { id: "actor_retention", name: "D1/D7/D30 retention", source: "posthog", numerator: "returning actor", denominator: "first active actor", breakdowns: ["creator", "challenger", "agent_owner"] },
+  { id: "rematch_series", name: "Rematch and series completion", source: "read_index", numerator: "settled rematches and completed series", denominator: "eligible settlements", breakdowns: ["best_of"] },
+  { id: "reasoning_to_stake", name: "Reasoning open/purchase → stake", source: "posthog", numerator: "stake_confirmed", denominator: "reasoning_opened or reasoning_x402_purchased", breakdowns: ["track"] },
+  { id: "share_attribution", name: "Share → qualified view → stake", source: "posthog", numerator: "stake_confirmed", denominator: "share_card_clicked", breakdowns: ["network", "settlement_mode"] },
+  { id: "automated_market_quality", name: "Proposal acceptance, ambiguity, reject and source failure", source: "operational", numerator: "accepted/rejected/ambiguous/failed proposals", denominator: "all proposals", breakdowns: ["category", "settlement_mode"] },
+  { id: "byoa_activation", name: "Registered → active → revenue earning agent", source: "read_index", numerator: "agents with actions/revenue", denominator: "registered agents", breakdowns: ["authority_level", "capability"] },
+  { id: "copy_quality", name: "Copy outcomes, realized PnL and revokes", source: "onchain_ledger", numerator: "executed/skipped/failed/revoked", denominator: "copy attempts and permissions", breakdowns: ["signal_agent", "execution_agent"] },
+  { id: "revenue", name: "Platform, owner and x402 revenue", source: "onchain_ledger", numerator: "atomic fee accruals and settled x402 payments", breakdowns: ["revenue_source"] },
+  { id: "operations", name: "Resolution latency, worker health and index freshness", source: "operational", numerator: "health samples and latency buckets", breakdowns: ["worker", "dependency"] },
+] as const satisfies readonly MetricDefinition[];
+
 export function analyticsDefinitionErrors(): string[] {
   const errors: string[] = [];
   const funnelIds = new Set(PRODUCT_FUNNELS.map((funnel) => funnel.id));
   for (const dashboard of PRODUCT_DASHBOARDS) {
     for (const id of dashboard.funnelIds) {
       if (!funnelIds.has(id)) errors.push(`${dashboard.id}: unknown funnel '${id}'`);
+    }
+  }
+  const metricIds = new Set<string>();
+  for (const metric of SUCCESS_METRICS) {
+    if (metricIds.has(metric.id)) errors.push(`duplicate metric '${metric.id}'`);
+    metricIds.add(metric.id);
+    if (metric.source === "posthog" && /revenue|fee|pnl/i.test(metric.numerator)) {
+      errors.push(`${metric.id}: financial truth cannot come from PostHog`);
     }
   }
   return errors;

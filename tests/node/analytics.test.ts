@@ -18,6 +18,7 @@ import { idempotencyKey } from "../../lib/analytics/events";
 import {
   PRODUCT_DASHBOARDS,
   PRODUCT_FUNNELS,
+  SUCCESS_METRICS,
   analyticsDefinitionErrors,
 } from "../../lib/analytics/insights";
 
@@ -293,4 +294,11 @@ test("the idempotency key distinguishes different steps", () => {
 test("undefined and empty parts are skipped so the key stays stable", () => {
   assert.equal(idempotencyKey(["a", undefined, "b"]), "a:b");
   assert.equal(idempotencyKey(["a", "", "b"]), "a:b");
+});
+test("every roadmap success metric has an owned, non-financial-analytics source", () => {
+  assert.equal(SUCCESS_METRICS.length, 11);
+  assert.deepEqual(analyticsDefinitionErrors(), []);
+  for (const metric of SUCCESS_METRICS) {
+    if (/revenue|pnl/i.test(metric.name)) assert.notEqual(metric.source, "posthog");
+  }
 });
