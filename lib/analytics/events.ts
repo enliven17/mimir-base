@@ -50,6 +50,7 @@ export interface EventEnvelope {
   chain_id: number;
   contract?: string;
   claim_id?: number;
+  category?: string;
   subject_type?: SubjectType;
   settlement_mode?: SettlementMode;
   modifiers?: ProductModifier[];
@@ -73,6 +74,8 @@ export const ANALYTICS_EVENTS = [
   "stake_started",
   "stake_confirmed",
   "stake_failed",
+
+  "settlement_return_viewed",
 
   "payout_preview_seen",
   "low_upside_warning_seen",
@@ -124,6 +127,7 @@ export function buildEnvelope(
   };
   if (contract) envelope.contract = contract.toLowerCase();
   if (partial.claim_id !== undefined) envelope.claim_id = partial.claim_id;
+  if (partial.category) envelope.category = partial.category;
   if (partial.subject_type) envelope.subject_type = partial.subject_type;
   if (partial.settlement_mode) envelope.settlement_mode = partial.settlement_mode;
   if (partial.modifiers && partial.modifiers.length > 0) envelope.modifiers = partial.modifiers;

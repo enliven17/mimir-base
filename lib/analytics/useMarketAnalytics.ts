@@ -24,6 +24,7 @@ import { SHARE_REF_PARAM, SHARE_REF_VALUE } from "../constants";
 interface MarketContext {
   claimId: number;
   mode: CanonicalMode;
+  category?: string;
   address?: string | null;
   surface?: SourceSurface;
 }
@@ -32,10 +33,29 @@ function envelopeFor(ctx: MarketContext) {
   return {
     source_surface: ctx.surface ?? ("vs_detail" as SourceSurface),
     claim_id: ctx.claimId,
+    category: ctx.category,
     subject_type: ctx.mode.subjectType,
     settlement_mode: ctx.mode.settlementMode,
     modifiers: ctx.mode.productModifiers,
   };
+}
+
+/** Records the participant returning to a resolved market to inspect the result. */
+export function useSettlementReturnViewed(
+  ctx: MarketContext,
+  signal: { resolved: boolean; isParticipant: boolean } | null,
+): void {
+  const seen = useRef<number | null>(null);
+  useEffect(() => {
+    if (!signal?.resolved || !signal.isParticipant || seen.current === ctx.claimId) return;
+    seen.current = ctx.claimId;
+    track({
+      event: "settlement_return_viewed",
+      envelope: { ...envelopeFor(ctx), tx_status: "confirmed" },
+      address: ctx.address,
+      idempotencyKey: idempotencyKey(["settlement_return_viewed", ctx.claimId]),
+    });
+  }, [ctx, signal]);
 }
 
 /** Fires `market_viewed` once per claim per mount. */

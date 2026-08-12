@@ -41,6 +41,9 @@ import {
 import { unitsToUsdc, usdcToUnits } from "@/lib/usdc";
 import { toCanonicalMode } from "@/lib/market-modes";
 import { MarketAnalytics } from "@/components/MarketAnalytics";
+import { track } from "@/lib/analytics/client";
+import { idempotencyKey } from "@/lib/analytics/events";
+import { stakeBucket } from "@/lib/analytics/useMarketAnalytics";
 import ReasoningFeed from "@/components/vs/ReasoningFeed";
 import { acquireTxLock } from "@/lib/tx-lock";
 import {
@@ -1223,8 +1226,41 @@ export default function VSDetailPage() {
         return;
       }
 
+      track({
+        event: "stake_started",
+        envelope: {
+          source_surface: "vs_detail",
+          claim_id: vsId,
+          category: liveVS.category,
+          subject_type: canonicalMode.subjectType,
+          settlement_mode: canonicalMode.settlementMode,
+          modifiers: canonicalMode.productModifiers,
+          tx_status: "submitted",
+        },
+        properties: { stake_bucket: stakeBucket(challengeStakeValue) },
+        address,
+      });
+
       const result = await acceptVS(address!, vsId, challengeStakeValue, inviteKey);
       const isPending = "pending" in result && Boolean(result.pending);
+
+      if (!isPending) {
+        track({
+          event: "stake_confirmed",
+          envelope: {
+            source_surface: "vs_detail",
+            claim_id: vsId,
+            category: liveVS.category,
+            subject_type: canonicalMode.subjectType,
+            settlement_mode: canonicalMode.settlementMode,
+            modifiers: canonicalMode.productModifiers,
+            tx_status: "confirmed",
+          },
+          properties: { stake_bucket: stakeBucket(challengeStakeValue) },
+          address,
+          idempotencyKey: idempotencyKey(["stake_confirmed", vsId, result.txHash]),
+        });
+      }
 
       toast.success(
         isPending
@@ -1237,6 +1273,20 @@ export default function VSDetailPage() {
       );
       fetchVS();
     } catch (err: any) {
+      track({
+        event: "stake_failed",
+        envelope: {
+          source_surface: "vs_detail",
+          claim_id: vsId,
+          category: display.category,
+          subject_type: canonicalMode.subjectType,
+          settlement_mode: canonicalMode.settlementMode,
+          modifiers: canonicalMode.productModifiers,
+          tx_status: "failed",
+        },
+        properties: { failure_stage: "submit" },
+        address,
+      });
       toast.error(err.message || t("errorAccepting"));
     }
     });
@@ -1341,6 +1391,7 @@ export default function VSDetailPage() {
       <MarketAnalytics
         claimId={vsId}
         mode={canonicalMode}
+        category={display.category}
         address={address}
         surface="vs_detail"
         preview={
@@ -1354,6 +1405,10 @@ export default function VSDetailPage() {
               }
             : null
         }
+        settlementReturn={{
+          resolved: display.state === "resolved",
+          isParticipant,
+        }}
       />
 
       {/* Verdict Reveal Overlay — finality moment */}

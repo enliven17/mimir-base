@@ -26,6 +26,9 @@ import { acquireTxLock } from "@/lib/tx-lock";
 import { fixedOddsCapacityUnits } from "@/lib/payout";
 import { unitsToUsdc, usdcToUnits } from "@/lib/usdc";
 import { rematchReadiness, type RematchReadiness } from "@/lib/series";
+import { track } from "@/lib/analytics/client";
+import { idempotencyKey } from "@/lib/analytics/events";
+import { stakeBucket } from "@/lib/analytics/useMarketAnalytics";
 
 /**
  * Total-return presets for fixed odds (§6.3). Deliberately labelled "total
@@ -54,6 +57,7 @@ import {
   selectableSettlementModes,
   settlementModeToOddsMode,
   validateMode,
+  type ProductModifier,
   type SettlementMode,
 } from "@/lib/market-modes";
 import type {
@@ -361,6 +365,68 @@ export default function CreatePage() {
     }
     return `${customDeadlineDate}T${customDeadlineTime}`;
   }, [customDeadlineDate, customDeadlineTime]);
+
+  const createStartedTrackedRef = useRef(false);
+  const analyticsModifiers: ProductModifier[] | undefined = rematchId
+    ? ["rematch_ladder"]
+    : undefined;
+
+  useEffect(() => {
+    if (createStartedTrackedRef.current) return;
+    createStartedTrackedRef.current = true;
+    track({
+      event: "create_started",
+      envelope: {
+        source_surface: "vs_create",
+        subject_type: normalizeSupportedMarketType(marketType),
+        settlement_mode: settlementMode,
+      },
+      properties: { is_rematch: rematchId !== null },
+      address,
+    });
+  }, [address, marketType, rematchId, settlementMode]);
+
+  function selectSettlementMode(nextMode: SettlementMode) {
+    setSettlementMode(nextMode);
+    track({
+      event: "create_mode_selected",
+      envelope: {
+        source_surface: "vs_create",
+        subject_type: normalizeSupportedMarketType(marketType),
+        settlement_mode: nextMode,
+      },
+      properties: { is_rematch: rematchId !== null },
+      address,
+    });
+  }
+
+  function trackCreateConfirmed(claimId: number, txHash?: string) {
+    const envelope = {
+      source_surface: "vs_create" as const,
+      claim_id: claimId,
+      category,
+      subject_type: normalizeSupportedMarketType(marketType),
+      settlement_mode: settlementMode,
+      modifiers: analyticsModifiers,
+      tx_status: "confirmed" as const,
+    };
+    track({
+      event: "create_confirmed",
+      envelope,
+      properties: { stake_bucket: stakeBucket(stake), is_rematch: rematchId !== null },
+      address,
+      idempotencyKey: idempotencyKey(["create_confirmed", claimId, txHash]),
+    });
+    if (rematchId) {
+      track({
+        event: "rematch_confirmed",
+        envelope,
+        properties: { parent_claim_id: rematchId, best_of: bestOf ?? undefined },
+        address,
+        idempotencyKey: idempotencyKey(["rematch_confirmed", claimId, txHash]),
+      });
+    }
+  }
 
   useEffect(() => {
     setMinCustomDeadlineDate(formatLocalDateInputValue(new Date()));
@@ -699,6 +765,7 @@ export default function CreatePage() {
 
       removePendingVS(createdId);
       setCreatedPending(false);
+      trackCreateConfirmed(createdId, createdTxHash);
       setShowSealStamp(true);
       toast.success(rematchId ? t("rematchCreatedAndFunded") : t("vsCreatedAndFunded"));
       setTimeout(() => setShowSealStamp(false), SEAL_STAMP_MS);
@@ -711,7 +778,7 @@ export default function CreatePage() {
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [address, created, createdInviteKey, createdPending, rematchId, t]);
+  }, [address, created, createdInviteKey, createdPending, createdTxHash, rematchId, t]);
 
   function prefill(catId: string) {
     const normalizedCategory = normalizeCategoryId(catId);
@@ -1066,6 +1133,19 @@ export default function CreatePage() {
     }
 
     if (isDemoCreate) {
+      track({
+        event: "create_submitted",
+        envelope: {
+          source_surface: "vs_create",
+          category,
+          subject_type: normalizedMarketType,
+          settlement_mode: settlementMode,
+          modifiers: analyticsModifiers,
+          tx_status: "submitted",
+        },
+        properties: { stake_bucket: stakeBucket(stake), is_rematch: rematchId !== null },
+        address,
+      });
       mockFlowTimersRef.current.forEach((id) => window.clearTimeout(id));
       mockFlowTimersRef.current = [];
 
@@ -1106,6 +1186,7 @@ export default function CreatePage() {
         setCreatedTxHash(MOCK_WALLET_TX_HASH);
         setCreatedExplorerTxHash(MOCK_CONSENSUS_TX_HASH);
         setCreatedInviteKey(inviteKey);
+        trackCreateConfirmed(MOCK_CREATED_VS_ID, MOCK_WALLET_TX_HASH);
         if (inviteKey) {
           rememberPrivateInviteKey(MOCK_CREATED_VS_ID, inviteKey);
         }
@@ -1123,6 +1204,28 @@ export default function CreatePage() {
     setLoading(true);
 
     try {
+      const submitEnvelope = {
+        source_surface: "vs_create" as const,
+        category,
+        subject_type: normalizedMarketType,
+        settlement_mode: settlementMode,
+        modifiers: analyticsModifiers,
+        tx_status: "submitted" as const,
+      };
+      track({
+        event: "create_submitted",
+        envelope: submitEnvelope,
+        properties: { stake_bucket: stakeBucket(stake), is_rematch: rematchId !== null },
+        address,
+      });
+      if (rematchId) {
+        track({
+          event: "rematch_started",
+          envelope: submitEnvelope,
+          properties: { parent_claim_id: rematchId, best_of: bestOf ?? undefined },
+          address,
+        });
+      }
       const result =
         rematchId
           ? await createRematch(address!, rematchId, params)
@@ -1136,6 +1239,7 @@ export default function CreatePage() {
             : t("createSuccessHeadline"),
       );
       if (result.claimId) {
+        if (!result.pending) trackCreateConfirmed(result.claimId, result.txHash);
         setCreated(result.claimId);
         setCreatedPending(Boolean(result.pending));
         setCreatedTxHash(result.txHash || "");
@@ -1979,7 +2083,7 @@ export default function CreatePage() {
                           type="button"
                           role="radio"
                           aria-checked={active}
-                          onClick={() => setSettlementMode(policy.mode)}
+                          onClick={() => selectSettlementMode(policy.mode)}
                           className={`rounded-xl border px-4 py-3 text-left transition ${
                             active
                               ? "border-pv-emerald/60 bg-pv-emerald/[0.08]"

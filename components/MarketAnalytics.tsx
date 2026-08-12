@@ -12,6 +12,7 @@
 
 import {
   useMarketViewed,
+  useSettlementReturnViewed,
   useShareAttribution,
   useStakePreviewTracking,
   type StakePreviewSignal,
@@ -22,19 +23,24 @@ import type { SourceSurface } from "@/lib/analytics/events";
 export function MarketAnalytics({
   claimId,
   mode,
+  category,
   address,
   surface,
   preview,
+  settlementReturn,
 }: {
   claimId: number;
   mode: CanonicalMode;
+  category?: string;
   address?: string | null;
   surface?: SourceSurface;
   preview: StakePreviewSignal | null;
+  settlementReturn?: { resolved: boolean; isParticipant: boolean } | null;
 }) {
-  const context = { claimId, mode, address, surface };
+  const context = { claimId, mode, category, address, surface };
   useMarketViewed(context);
   useShareAttribution(context);
   useStakePreviewTracking(context, preview);
+  useSettlementReturnViewed(context, settlementReturn ?? null);
   return null;
 }

@@ -15,6 +15,11 @@ import {
   resolveActor,
 } from "../../lib/analytics/actor";
 import { idempotencyKey } from "../../lib/analytics/events";
+import {
+  PRODUCT_DASHBOARDS,
+  PRODUCT_FUNNELS,
+  analyticsDefinitionErrors,
+} from "../../lib/analytics/insights";
 
 const SALT = "test-salt-not-the-real-one";
 const ADDRESS = "0x1111111111111111111111111111111111111111";
@@ -87,6 +92,7 @@ test("the roadmap's funnel events all exist", () => {
     "stake_started",
     "stake_confirmed",
     "stake_failed",
+    "settlement_return_viewed",
     "payout_preview_seen",
     "low_upside_warning_seen",
     "agent_viewed",
@@ -108,6 +114,21 @@ test("the roadmap's funnel events all exist", () => {
       `missing funnel event '${required}'`,
     );
   }
+});
+
+test("all roadmap funnels and dashboards are reproducible from code", () => {
+  assert.deepEqual(analyticsDefinitionErrors(), []);
+  assert.deepEqual(
+    PRODUCT_FUNNELS.map((funnel) => funnel.id),
+    ["create", "stake", "settlement-return", "follow-to-copy", "share-to-market"],
+  );
+  assert.deepEqual(
+    PRODUCT_DASHBOARDS.flatMap((dashboard) => dashboard.breakdowns).filter(
+      (value, index, all) => all.indexOf(value) === index,
+    ),
+    ["settlement_mode", "category", "actor_type"],
+  );
+  assert.ok(PRODUCT_FUNNELS.every((funnel) => funnel.excludeInternal));
 });
 
 // ── Leak guard: the reason this module exists ─────────────────────────────────
