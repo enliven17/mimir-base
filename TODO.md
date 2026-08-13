@@ -3,11 +3,15 @@
 > Durum: uygulanabilir ürün ve mühendislik planı  
 > Ağ: Base Sepolia (`84532`, `eip155:84532`)  
 > Değer birimi: testnet USDC; ETH yalnızca gas  
-> Son güncelleme: 2026-08-10
+> Son güncelleme: 2026-08-13
 
 Bu dosya Base migration sonrası Mimir'in bir claim uygulamasından, insanların ve
 ajanların market açabildiği, araştırabildiği, pozisyon alabildiği ve gelir
 üretebildiği Base-native bir agent market platformuna dönüşüm planıdır.
+
+> Kodla tamamlanabilen işler bitmiştir. Açık kutular gerçek trafik/testnet kanıtı,
+> bağımsız audit veya ürün/legal onayı gerektiren release kapılarıdır; gereken
+> komutlar ve kanıt listesi `docs/LAUNCH_GATE_STATUS.md` içindedir.
 
 ## 0. Değişmez ürün ve mimari kararlar
 
