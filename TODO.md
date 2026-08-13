@@ -434,7 +434,7 @@ sonra execution yapılamaz; copy loop veya fee loop oluşamaz.
   recipient accounting'i açıkça modelle.
 - [x] NAV ve share price için atomic rounding/dust invariant'ları ekle.
 - [x] Emergency withdrawal'ın agent executor ve oracle'dan bağımsız çalışmasını sağla.
-- [ ] Audit, legal/custody, sanctions/eligibility ve mainnet launch review tamamlanmadan
+- [x] Audit, legal/custody, sanctions/eligibility ve mainnet launch review tamamlanmadan
   gerçek fon kabul etme.
 
 **Kabul kriteri:** Basket fonları ve getirileri her an yeniden hesaplanabilir;
@@ -629,12 +629,12 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
 
 ## 14. Launch gates
 
-- [ ] **Duel GA:** eşit stake enforcement + payout invariant + analytics hazır.
+- [x] **Duel GA:** eşit stake enforcement + payout invariant + analytics hazır.
 - [ ] **Automated market GA:** shadow precision hedefi, source failure oranı ve
   ambiguity review eşiği ürün ekibi tarafından yazılı onaylı.
-- [ ] **BYOA funded actions:** registry/revoke, budget, simulation ve audit log hazır.
+- [x] **BYOA funded actions:** registry/revoke, budget, simulation ve audit log hazır.
 - [ ] **Fees:** kontrat audit/fuzz, fee disclosure ve reconciliation hazır.
-- [ ] **Copy trading:** signed permission, onchain cap, pause/revoke ve loss-limit
+- [x] **Copy trading:** signed permission, onchain cap, pause/revoke ve loss-limit
   testleri hazır.
 - [ ] **Squad/Baskets:** ayrı kontrat audit'i ve ekonomik invariant raporu hazır.
 - [ ] **Mainnet:** testnet KPI hedefleri, incident runbook, legal/compliance review,
