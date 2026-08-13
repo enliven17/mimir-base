@@ -35,7 +35,7 @@ const out = JSON.parse(
         optimizer: { enabled: true, runs: 200 },
         // Required: the create flow exceeds stack depth without it.
         viaIR: true,
-        outputSelection: { "*": { "*": ["abi", "evm.bytecode.object"] } },
+        outputSelection: { "*": { "*": ["abi", "evm.bytecode.object", "evm.deployedBytecode.object"] } },
       },
     }),
   ),
@@ -57,6 +57,7 @@ for (const name of targets) {
   const artifact = out.contracts[`${name}.sol`][name];
   const bytes = artifact.evm.bytecode.object.length / 2;
   writeFileSync(`artifacts/${name}.bin`, artifact.evm.bytecode.object);
+  writeFileSync(`artifacts/${name}.runtime.bin`, artifact.evm.deployedBytecode.object);
   writeFileSync(`artifacts/${name}.abi.json`, JSON.stringify(artifact.abi, null, 2));
   console.log(`${name}: ${bytes} bytes (${EIP170_LIMIT - bytes} under the EIP-170 limit)`);
   if (bytes > EIP170_LIMIT) overLimit = true;

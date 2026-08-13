@@ -15,7 +15,7 @@ import {
 } from "../lib/base";
 import { agentContractWrite, getCreatorWallet, getOracleWallet } from "../lib/agent-wallets";
 import { MIMIR_ABI, STATE } from "../lib/mimir-abi";
-import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
+import { ERC20_ABI, USDC_ADDRESS, formatAtomicUsdc, parseUsdcAtomic } from "../lib/usdc";
 import { fetchDecodedClaim } from "../lib/claim-codec";
 
 function cleanKeys() {
@@ -58,7 +58,7 @@ async function main() {
   }
   console.log("  ✓ oracle + usdc match");
 
-  const stake = usdcToUnits(2);
+  const stake = parseUsdcAtomic("2");
   const deadline = BigInt(Math.floor(Date.now() / 1000) + 3600);
 
   console.log(`\n[2] createClaim (2 USDC)…`);
@@ -113,23 +113,19 @@ async function main() {
   if (!decoded) throw new Error("claim not found after create");
 
   console.log(`  state            = ${decoded.state} (expect ACTIVE=${STATE.ACTIVE})`);
-  console.log(`  creatorStake     = ${unitsToUsdc(decoded.creatorStake)} USDC`);
-  console.log(`  challengerStake  = ${unitsToUsdc(decoded.totalChallengerStake)} USDC`);
+  console.log(`  creatorStake     = ${formatAtomicUsdc(decoded.creatorStake)} USDC`);
+  console.log(`  challengerStake  = ${formatAtomicUsdc(decoded.totalChallengerStake)} USDC`);
   console.log(`  challengerCount  = ${decoded.challengerCount}`);
 
   if (Number(decoded.state) !== STATE.ACTIVE) {
     throw new Error(`expected ACTIVE, got ${decoded.state}`);
   }
-  if (decoded.challengerCount < 1n && Number(decoded.challengerCount) < 1) {
-    // challengerCount might be number or bigint depending on decode
+  if (BigInt(decoded.challengerCount) < 1n) throw new Error("expected at least 1 challenger");
+  if (decoded.creatorStake !== stake) {
+    throw new Error(`creator stake expected 2 USDC, got ${formatAtomicUsdc(decoded.creatorStake)}`);
   }
-  const chCount = Number(decoded.challengerCount);
-  if (chCount < 1) throw new Error("expected at least 1 challenger");
-  if (unitsToUsdc(decoded.creatorStake) !== 2) {
-    throw new Error(`creator stake expected 2 USDC, got ${unitsToUsdc(decoded.creatorStake)}`);
-  }
-  if (unitsToUsdc(decoded.totalChallengerStake) !== 2) {
-    throw new Error(`challenger stake expected 2 USDC, got ${unitsToUsdc(decoded.totalChallengerStake)}`);
+  if (decoded.totalChallengerStake !== stake) {
+    throw new Error(`challenger stake expected 2 USDC, got ${formatAtomicUsdc(decoded.totalChallengerStake)}`);
   }
 
   const pot = (await client.readContract({
@@ -138,8 +134,8 @@ async function main() {
     functionName: "balanceOf",
     args: [contract],
   })) as bigint;
-  console.log(`  contract USDC bal = ${unitsToUsdc(pot)} (expect 4)`);
-  if (unitsToUsdc(pot) < 4) throw new Error("contract should hold 4 USDC pot");
+  console.log(`  contract USDC bal = ${formatAtomicUsdc(pot)} (expect at least 4)`);
+  if (pot < stake * 2n) throw new Error("contract should hold at least the 4 USDC smoke pot");
 
   const creatorEth = await client.getBalance({ address: creator.address });
   const oracleEth = await client.getBalance({ address: oracle.address });
