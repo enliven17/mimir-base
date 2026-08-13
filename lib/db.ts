@@ -1507,6 +1507,25 @@ export async function saveCopyPermission(permission: CopyPermission, at = Date.n
   });
 }
 
+export async function getCopyPermission(permissionId: string): Promise<CopyPermission | null> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: "SELECT policy_json, signed_policy_hash, status FROM copy_permissions WHERE permission_id = ? LIMIT 1",
+    args: [permissionId],
+  });
+  const row = result.rows[0];
+  if (!row) return null;
+  const parsed = JSON.parse(getString(row.policy_json)) as CopyPermission & {
+    spendPermission: CopyPermission["spendPermission"] & { allowanceAtomic: string | bigint };
+  };
+  return {
+    ...parsed,
+    signedPolicyHash: getString(row.signed_policy_hash),
+    status: getString(row.status) as CopyPermission["status"],
+    spendPermission: { ...parsed.spendPermission, allowanceAtomic: BigInt(parsed.spendPermission.allowanceAtomic) },
+  };
+}
+
 export async function insertCopyExecution(record: CopyAuditRecord): Promise<void> {
   const pool = await getDb();
   await execute(pool, {

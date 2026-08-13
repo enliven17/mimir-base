@@ -1,6 +1,6 @@
 /** Copy trading policy and deterministic execution gate. */
 
-import { keccak256, toBytes } from "viem";
+import { isAddress, keccak256, toBytes } from "viem";
 import { parseUsdcAtomic } from "@/lib/usdc";
 
 export interface CopyPermission {
@@ -12,6 +12,8 @@ export interface CopyPermission {
   dailyCapUsdc: number;
   weeklyCapUsdc: number;
   totalOpenExposureUsdc: number;
+  /** Maximum realized loss plus the full principal at risk of the next copy. */
+  maxRealizedLossAtomic: string;
   allowedCategories: string[];
   allowedModes: string[];
   minConfidenceBps: number;
@@ -27,6 +29,7 @@ export interface CopyUsage {
   usedTodayUsdc: number;
   usedThisWeekUsdc: number;
   openExposureUsdc: number;
+  realizedLossAtomic: string;
 }
 
 export interface CopySignal {
@@ -52,7 +55,7 @@ export type CopySkipReason =
   | "market_full" | "liquidity_exhausted" | "category_blocked" | "mode_blocked"
   | "confidence_below_floor" | "payout_below_floor" | "position_cap"
   | "daily_cap" | "weekly_cap" | "open_exposure_cap" | "spend_permission_mismatch"
-  | "simulation_failed";
+  | "loss_limit" | "simulation_failed";
 
 export interface CopyExecutionContext {
   now: number;
@@ -68,6 +71,33 @@ export interface CopyExecutionContext {
 
 export function copyPolicyHash(input: Omit<CopyPermission, "signedPolicyHash">): `0x${string}` {
   return keccak256(toBytes(JSON.stringify(input, (_, value) => typeof value === "bigint" ? value.toString() : value)));
+}
+
+function parseAtomicString(value: string): bigint {
+  if (!/^(0|[1-9]\d*)$/.test(value)) throw new Error("invalid atomic amount");
+  return BigInt(value);
+}
+
+/** Validate the externally supplied, owner-signed policy before storing it. */
+export function validateCopyPermission(input: Omit<CopyPermission, "signedPolicyHash">, now = Date.now()): string | null {
+  if (!input.permissionId.trim() || input.permissionId.length > 128) return "invalid_permission_id";
+  if (!isAddress(input.ownerWallet) || !isAddress(input.spendPermission.token) || !isAddress(input.spendPermission.spender)) return "invalid_address";
+  if (!input.executionAgentId.trim() || !input.signalAgentId.trim() || input.executionAgentId === input.signalAgentId) return "invalid_agent_pair";
+  try {
+    const position = parseUsdcAtomic(input.maxPerPositionUsdc);
+    const daily = parseUsdcAtomic(input.dailyCapUsdc);
+    const weekly = parseUsdcAtomic(input.weeklyCapUsdc);
+    const exposure = parseUsdcAtomic(input.totalOpenExposureUsdc);
+    const loss = parseAtomicString(input.maxRealizedLossAtomic);
+    if (position <= 0n || daily < position || weekly < daily || exposure < position || loss <= 0n) return "invalid_budget";
+  } catch { return "invalid_budget"; }
+  if (input.spendPermission.allowanceAtomic <= 0n || !Number.isSafeInteger(input.spendPermission.periodSeconds) || input.spendPermission.periodSeconds <= 0) return "invalid_spend_permission";
+  if (input.depth !== 1 || input.status !== "active" || !Number.isSafeInteger(input.expiresAt) || input.expiresAt <= now) return "invalid_lifecycle";
+  if (!Number.isInteger(input.minConfidenceBps) || input.minConfidenceBps < 0 || input.minConfidenceBps > 10_000 ||
+      !Number.isInteger(input.minPayoutBps) || input.minPayoutBps < 0) return "invalid_threshold";
+  if (!Array.isArray(input.allowedCategories) || !Array.isArray(input.allowedModes) ||
+      input.allowedCategories.length > 100 || input.allowedModes.length > 10) return "invalid_allowlist";
+  return null;
 }
 
 export function worstCaseCopySpend(permission: CopyPermission): { perPositionUsdc: number; dailyUsdc: number; weeklyUsdc: number; totalOpenUsdc: number } {
@@ -100,6 +130,7 @@ export function evaluateCopy(permission: CopyPermission, signal: CopySignal, con
   if (parseUsdcAtomic(context.usage.usedTodayUsdc) + stakeAtomic > parseUsdcAtomic(permission.dailyCapUsdc)) return { allowed: false, reason: "daily_cap" };
   if (parseUsdcAtomic(context.usage.usedThisWeekUsdc) + stakeAtomic > parseUsdcAtomic(permission.weeklyCapUsdc)) return { allowed: false, reason: "weekly_cap" };
   if (parseUsdcAtomic(context.usage.openExposureUsdc) + stakeAtomic > parseUsdcAtomic(permission.totalOpenExposureUsdc)) return { allowed: false, reason: "open_exposure_cap" };
+  if (parseAtomicString(context.usage.realizedLossAtomic) + stakeAtomic > parseAtomicString(permission.maxRealizedLossAtomic)) return { allowed: false, reason: "loss_limit" };
   const spend = permission.spendPermission;
   const requiredAtomic = stakeAtomic;
   if (spend.token.toLowerCase() !== context.configuredUsdc.toLowerCase() ||
