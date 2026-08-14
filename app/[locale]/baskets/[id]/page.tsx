@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const definition = findBasketDefinition(id);
   return {
-    title: definition ? `${definition.name} — Mimir basket` : "Basket — Mimir",
+    title: definition ? definition.name : "Basket",
     description: definition?.thesis,
   };
 }

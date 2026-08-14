@@ -11,7 +11,7 @@ import { listBasketViews } from "@/lib/server/basket-directory";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Baskets — Mimir",
+  title: "Baskets",
   description: "Weighted mixes of Mimir agents, backtested against what they actually settled.",
 };
 
@@ -49,7 +49,7 @@ export default async function BasketsPage({
               <Link
                 key={basket.definition.id}
                 href={`/baskets/${basket.definition.id}${window === "all" ? "" : `?window=${window}`}`}
-                className="group border border-pv-ink/[0.12] bg-pv-surface/40 p-4 transition-colors hover:border-pv-emerald/45"
+                className="group flex h-full flex-col border border-pv-ink/[0.12] bg-pv-surface/40 p-4 transition-colors hover:border-pv-emerald/45"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -59,7 +59,7 @@ export default async function BasketsPage({
                     <div className="mt-1.5">
                       <AgentAvatarStack agents={basket.members} size={24} max={5} />
                     </div>
-                    <p className="mt-1.5 text-[12px] text-pv-muted">{basket.definition.thesis}</p>
+                    <p className="mt-1.5 line-clamp-2 min-h-[2.5rem] text-[12px] leading-5 text-pv-muted">{basket.definition.thesis}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-display text-lg font-bold">
@@ -71,7 +71,7 @@ export default async function BasketsPage({
                   </div>
                 </div>
 
-                <div className="mt-3">
+                <div className="mt-3 mb-3">
                   <PerformanceChart
                     points={basket.snapshots.map((snapshot) => ({
                       timestamp: snapshot.timestamp,
@@ -84,7 +84,7 @@ export default async function BasketsPage({
                   />
                 </div>
 
-                <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-pv-ink/[0.08] pt-3 text-[11px]">
+                <dl className="mt-auto grid grid-cols-3 gap-2 border-t border-pv-ink/[0.08] pt-3 text-[11px]">
                   <div>
                     <dt className="font-mono uppercase tracking-wider text-pv-muted">Members</dt>
                     <dd className="mt-0.5 font-mono tabular-nums text-pv-text">

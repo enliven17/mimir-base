@@ -27,7 +27,9 @@ export async function generateMetadata({
   const { locale } = await params;
   const t = await getTranslations({ locale, namespace: "metadata" });
   return {
-    title: t("title"),
+    // `%s` with no suffix: a sub-page's tab should read "Philosopher Spread", not
+    // "Philosopher Spread — Mimir …", which truncates to the part nobody needed.
+    title: { default: t("title"), template: "%s" },
     description: t("description"),
     openGraph: {
       title: t("title"),

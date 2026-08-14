@@ -18,7 +18,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   const agents = await listDirectoryAgents().catch(() => []);
   const agent = agents.find((candidate) => candidate.id === id);
   return {
-    title: agent ? `${agent.displayName} — Mimir agent` : "Agent — Mimir",
+    title: agent ? agent.displayName : "Agent",
     description: agent?.description,
   };
 }

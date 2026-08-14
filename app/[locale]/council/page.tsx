@@ -16,7 +16,7 @@ import {
 import type { PersonaSpec } from "@/agents/council/personas";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { openPeepsAvatar } from "@/lib/avatars";
-import { shortenAddress } from "@/lib/constants";
+import { AddressChip } from "@/components/ui/AddressChip";
 
 export const revalidate = 30;
 
@@ -151,7 +151,9 @@ function PersonaCard({ stats }: { stats: PersonaStats }) {
         </div>
       </header>
 
-      <p className="text-[12px] leading-relaxed text-pv-text/75">{persona.bio}</p>
+      {/* Clamped to two lines: bios differ by a sentence, and letting that ripple
+          through the card leaves four cards in a row with four different baselines. */}
+      <p className="line-clamp-2 min-h-[2.75rem] text-[12px] leading-relaxed text-pv-text/75">{persona.bio}</p>
 
       {persona.categoryFilter && persona.categoryFilter.length > 0 && (
         <div className="flex flex-wrap gap-1 font-mono text-[10px] uppercase tracking-[0.14em] text-pv-muted">
@@ -182,6 +184,7 @@ function PersonaCard({ stats }: { stats: PersonaStats }) {
         </div>
       </dl>
 
+      <div className="min-h-[3.25rem]">
       {recentBets.length > 0 ? (
         <ul className="space-y-1.5 border-t border-pv-border/30 pt-3">
           {recentBets.map((b) => (
@@ -206,15 +209,11 @@ function PersonaCard({ stats }: { stats: PersonaStats }) {
           no bets yet — waiting for an in-character market
         </p>
       )}
+      </div>
 
-      <a
-        href={getExplorerAddressUrl(address)}
-        target="_blank"
-        rel="noreferrer"
-        className="text-center font-mono text-[10px] text-pv-muted hover:text-pv-emerald"
-      >
-        {shortenAddress(address)} ↗
-      </a>
+      <div className="flex justify-center">
+        <AddressChip address={address} label={persona.displayName} className="text-[10px]" />
+      </div>
     </article>
   );
 }
