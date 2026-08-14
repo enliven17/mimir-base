@@ -446,7 +446,13 @@ async function callGeminiModel(
     temperature: opts.temperature,
     maxOutputTokens: opts.maxTokens,
   };
-  if (!isGemma) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  // Some text models expose generateContent and structured output but reject
+  // thinkingBudget entirely. Keep them in the quota-spreading pool without
+  // sending a capability they do not advertise.
+  const rejectsThinkingConfig = new Set(["gemini-3.5-flash-lite", "gemini-3.6-flash"]);
+  if (!isGemma && !rejectsThinkingConfig.has(model)) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
   let effectivePrompt = prompt;
   if (opts.jsonOnly) {
     if (isGemma) effectivePrompt = `${prompt}\n\nReturn valid JSON only — no markdown, no code fences.`;

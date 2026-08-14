@@ -22,7 +22,10 @@ const KEYS: Array<{ source: string; key?: string }> = [
 async function probe(apiKey: string, model: string): Promise<string> {
   const isGemma = model.toLowerCase().startsWith("gemma");
   const generationConfig: Record<string, unknown> = { temperature: 0, maxOutputTokens: 16 };
-  if (!isGemma) generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  const rejectsThinkingConfig = new Set(["gemini-3.5-flash-lite", "gemini-3.6-flash"]);
+  if (!isGemma && !rejectsThinkingConfig.has(model)) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
   try {
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
