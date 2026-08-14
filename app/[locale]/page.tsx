@@ -439,6 +439,12 @@ export default function HomePage() {
                   value={rev.settledUsdc > 0 ? rev.settledUsdc : rev.totalUsdc}
                   format={(n) => n.toFixed(2)}
                   label={rev.settledUsdc > 0 ? t("volumeSettled") : t("botEarned")}
+                  // Agents paying agents is the part people do not believe until
+                  // they see the number, so it gets its own line rather than being
+                  // folded into settled volume.
+                  sublabel={rev.totalCalls > 0
+                    ? `${rev.totalUsdc.toFixed(3)} USDC over ${rev.totalCalls} x402 calls`
+                    : undefined}
                   labelPosition="below"
                   size="lg"
                   color="gold"

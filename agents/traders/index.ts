@@ -27,6 +27,8 @@ import { randomUUID } from "node:crypto";
 import { createBasePublicClient, getContractAddress, getExplorerTxUrl, weiToEth } from "../../lib/base";
 import { agentContractWrite, loadAgentWallet, type AgentWallet } from "../../lib/agent-wallets";
 import { callLLM, activeLLMModel, activeLLMProvider, extractJson } from "../../lib/llm";
+import { fetchWithBudget, payingWalletFor } from "../../lib/x402/buyer";
+import { PRICES, priceToUsdcUnits } from "../../lib/x402/config";
 import { MIMIR_ABI } from "../../lib/mimir-abi";
 import { reportingPoll } from "../../lib/ops/heartbeat";
 import { AUTHORITY_LEVELS, defaultLimits, REGISTRY_SCHEMA_VERSION, type AgentRecord } from "../../lib/agents/registry";
@@ -40,6 +42,13 @@ const MAX_STAKES_PER_CYCLE = Number(process.env.TRADER_MAX_STAKES_PER_CYCLE ?? "
 const DRY_RUN = process.env.TRADER_DRY_RUN === "1";
 /** Leave a margin so a trader never spends its last cent of gas mid-cycle. */
 const MIN_GAS_ETH = 0.0008;
+/**
+ * Where to buy a second opinion. Agents paying agents is the point of x402 here:
+ * the trader spends real USDC, the oracle earns it, and the revenue ledger records
+ * a transfer that actually happened rather than a number we made up.
+ */
+const MIMIR_URL = (process.env.MIMIR_URL ?? "").replace(/\/$/, "");
+const BUY_SECOND_OPINION = process.env.TRADER_BUY_ORACLE !== "0";
 
 interface Decision {
   verdict: TraderVerdict;
@@ -122,8 +131,61 @@ Reply with JSON only:
 {"verdict":"AGREE"|"DISAGREE"|"ABSTAIN","confidence":0-100,"reasoning":"one or two sentences in your own voice, naming the specific evidence"}`;
 }
 
-async function decide(persona: TraderPersona, claim: Parameters<typeof decisionPrompt>[1]): Promise<Decision> {
-  const text = await callLLM(decisionPrompt(persona, claim), {
+/**
+ * Buy the oracle's read on a claim over x402.
+ *
+ * Returns null on any failure — a paid call that did not land is a missing input,
+ * not a reason to skip the cycle. The trader then decides on its own, which is
+ * exactly what it would have done before this existed.
+ */
+async function buyOracleOpinion(
+  wallet: AgentWallet,
+  claim: { question: string | null; creator_position: string | null; counter_position: string | null; resolution_url: string | null; settlement_rule: string | null },
+): Promise<string | null> {
+  if (!BUY_SECOND_OPINION || !MIMIR_URL) return null;
+  if (!claim.question || !claim.resolution_url) return null;
+  try {
+    const { response, payment } = await fetchWithBudget(
+      `${MIMIR_URL}/api/oracle`,
+      payingWalletFor(wallet),
+      priceToUsdcUnits(PRICES.oracle),
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          question: claim.question,
+          sideA: claim.creator_position ?? "Yes",
+          sideB: claim.counter_position ?? "No",
+          evidenceUrl: claim.resolution_url,
+          settlementRule: claim.settlement_rule ?? undefined,
+        }),
+      },
+    );
+    if (!response.ok) return null;
+    const verdict = await response.json() as { verdict?: string; confidence?: number; explanation?: string };
+    if (payment?.txHash) {
+      console.log(`[traders]   paid ${PRICES.oracle} for an oracle read — ${payment.txHash.slice(0, 12)}…`);
+    }
+    return `Oracle (paid ${PRICES.oracle}): ${verdict.verdict ?? "?"} at ${verdict.confidence ?? "?"}% — ${String(verdict.explanation ?? "").slice(0, 200)}`;
+  } catch (err) {
+    console.warn("[traders]   oracle purchase failed:", err instanceof Error ? err.message : err);
+    return null;
+  }
+}
+
+async function decide(
+  persona: TraderPersona,
+  claim: Parameters<typeof decisionPrompt>[1],
+  secondOpinion: string | null,
+): Promise<Decision> {
+  const prompt = secondOpinion
+    ? `${decisionPrompt(persona, claim)}
+
+## A second opinion you paid for
+${secondOpinion}
+Weigh it against your own read. Agreeing with it is not automatic.`
+    : decisionPrompt(persona, claim);
+  const text = await callLLM(prompt, {
     maxTokens: 400, jsonOnly: true, temperature: 0.3,
   });
   try {
@@ -184,7 +246,8 @@ async function runTrader(persona: TraderPersona): Promise<void> {
   let staked = 0;
   for (const claim of joinable) {
     if (staked >= MAX_STAKES_PER_CYCLE) break;
-    const decision = await decide(persona, claim);
+    const secondOpinion = await buyOracleOpinion(wallet, claim);
+    const decision = await decide(persona, claim, secondOpinion);
     const take = shouldStake(decision.verdict, decision.confidence, persona);
     console.log(`[traders]   #${claim.id} ${decision.verdict} ${decision.confidence}% ${take ? "→ STAKE" : "→ pass"} · ${decision.reasoning.slice(0, 90)}`);
     if (!take) continue;

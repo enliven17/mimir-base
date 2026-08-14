@@ -25,6 +25,8 @@ interface LiveStatProps {
   /** Optional override for the label typography */
   labelClassName?: string;
   className?: string;
+  /** A second, quieter line under the label. Omitted when there is nothing to say. */
+  sublabel?: string;
 }
 
 const sizeClasses = {
@@ -58,6 +60,7 @@ export default function LiveStat({
   color = "text",
   labelClassName = "",
   className = "",
+  sublabel,
 }: LiveStatProps) {
   const motionValue = useMotionValue(0);
   const [displayValue, setDisplayValue] = useState("0");
@@ -120,6 +123,12 @@ export default function LiveStat({
           className={`font-mono text-[10px] font-bold uppercase tracking-[0.15em] text-pv-muted/60 mt-1 ${labelClassName}`}
         >
           {label}
+        </span>
+      )}
+
+      {sublabel && (
+        <span className="mt-0.5 font-mono text-[9px] uppercase tracking-[0.12em] text-pv-gold/80">
+          {sublabel}
         </span>
       )}
     </div>
