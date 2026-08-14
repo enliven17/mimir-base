@@ -15,6 +15,7 @@
  */
 
 import { reportingPoll } from "../../lib/ops/heartbeat";
+import { reconcileSettlements } from "../../lib/server/settlement-index";
 import { reconcileVsIndex } from "../../lib/server/vs-index";
 
 // Default 5m: the health probe warns when the index is over 300s stale, so a
@@ -26,6 +27,14 @@ async function poll(): Promise<void> {
   console.log(
     `[sync] ── Reconciled at ${new Date().toISOString()} — ` +
       `${summary.synced} synced, ${summary.new} new, ${summary.stateChanges} state change(s)`,
+  );
+
+  // Settlement/fee projection for /revenue. Runs after the claim index so a market
+  // that just resolved is already indexed when its settlement row appears.
+  const fees = await reconcileSettlements();
+  console.log(
+    `[sync]    settlements: ${fees.settlements} market(s), ${fees.accruals} accrual(s), ` +
+      `${fees.claims} claim(s) · blocks ${fees.fromBlock}→${fees.toBlock}`,
   );
 }
 
