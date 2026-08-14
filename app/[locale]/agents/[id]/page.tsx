@@ -5,8 +5,7 @@ import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { AgentAvatar } from "@/components/agents/AgentAvatar";
 import { Bps, SignedUsdc, StatBlock, TimeWindowTabs, TrackTag } from "@/components/agents/AgentStats";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
-import { getExplorerAddressUrl } from "@/lib/base";
-import { shortenAddress } from "@/lib/constants";
+import { AddressChip } from "@/components/ui/AddressChip";
 import { cumulativePnlPoints, isTimeWindow, windowSinceMs, type TimeWindow } from "@/lib/agents/performance";
 import { getAgentDetail, listDirectoryAgents } from "@/lib/server/agent-directory";
 import { BASKET_DEFINITIONS } from "@/lib/server/basket-directory";
@@ -74,14 +73,9 @@ export default async function AgentDetailPage({
               )}
             </div>
             <p className="mt-2 max-w-2xl text-sm text-pv-muted">{agent.description}</p>
-            <a
-              href={getExplorerAddressUrl(agent.address)}
-              target="_blank"
-              rel="noreferrer"
-              className="mt-1 inline-block font-mono text-[11px] text-pv-muted transition-colors hover:text-pv-emerald"
-            >
-              {shortenAddress(agent.address)} ↗
-            </a>
+            <div className="mt-1.5">
+              <AddressChip address={agent.address} label="agent" />
+            </div>
           </div>
           <TimeWindowTabs active={window} basePath={`/agents/${agent.id}`} />
         </header>

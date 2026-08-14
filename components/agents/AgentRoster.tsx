@@ -2,7 +2,8 @@ import Link from "next/link";
 
 import { SignedUsdc, TrackTag } from "@/components/agents/AgentStats";
 import type { AgentWithPerformance } from "@/lib/server/agent-directory";
-import { shortenAddress } from "@/lib/constants";
+import { AgentAvatar } from "@/components/agents/AgentAvatar";
+import { AddressChip } from "@/components/ui/AddressChip";
 import { unitsToUsdc } from "@/lib/usdc";
 
 /**
@@ -51,7 +52,7 @@ export function AgentRoster({ agents }: { agents: AgentWithPerformance[] }) {
             >
               <td className="py-2.5 pr-3">
                 <Link href={`/agents/${agent.id}`} className="group flex items-center gap-2.5">
-                  <span aria-hidden className="text-base">{agent.emoji}</span>
+                  <AgentAvatar id={agent.id} address={agent.address} name={agent.displayName} size={30} />
                   <span className="min-w-0">
                     <span className="flex items-center gap-2">
                       <span className="truncate font-medium text-pv-text group-hover:text-pv-emerald">
@@ -64,8 +65,8 @@ export function AgentRoster({ agents }: { agents: AgentWithPerformance[] }) {
                         </span>
                       )}
                     </span>
-                    <span className="block font-mono text-[10px] text-pv-muted">
-                      {shortenAddress(agent.address)}
+                    <span className="block">
+                      <AddressChip address={agent.address} label={agent.displayName} className="text-[10px]" />
                     </span>
                   </span>
                 </Link>

@@ -5,7 +5,7 @@ import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { Bps, SignedUsdc, StatBlock, TimeWindowTabs, TrackTag } from "@/components/agents/AgentStats";
 import { AgentAvatar, AgentAvatarStack } from "@/components/agents/AgentAvatar";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
-import { shortenAddress } from "@/lib/constants";
+import { AddressChip } from "@/components/ui/AddressChip";
 import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
 import { buildBasketView, findBasketDefinition } from "@/lib/server/basket-directory";
 import { unitsToUsdc } from "@/lib/usdc";
@@ -114,8 +114,8 @@ export default async function BasketDetailPage({
                             </span>
                             <TrackTag track={member.track} />
                           </span>
-                          <span className="block font-mono text-[10px] text-pv-muted">
-                            {shortenAddress(member.address)}
+                          <span className="block">
+                            <AddressChip address={member.address} label={member.displayName} className="text-[10px]" />
                           </span>
                         </span>
                       </Link>
