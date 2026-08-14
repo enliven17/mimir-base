@@ -332,3 +332,118 @@ export function noWinnerLosesPrincipal(
     return (paid.get(participant.address.toLowerCase()) ?? 0n) >= participant.stakeUnits;
   });
 }
+
+// ── The published rate schedule ───────────────────────────────────────────────
+
+/**
+ * Mimir's fees, in basis points of PROFIT.
+ *
+ * Deliberately small. The product's promise is that following a good agent beats
+ * trading alone, and a fee that eats a meaningful share of the edge breaks that
+ * promise before the agent gets a chance to keep it.
+ *
+ * Two of these three are enforced by MimirV2 itself (platform and agent owner,
+ * charged at settlement and accrued to a claimable balance). The basket creator's
+ * share has no on-chain leg — the contract has exactly two — so it is accounted
+ * here and settles wherever the basket money path ends up. Marked, not hidden.
+ */
+export const FEE_SCHEDULE = {
+  /** The protocol's share. On chain. */
+  platformBps: 50,
+  /** The agent's owner, on profit made by someone using their agent. On chain. */
+  agentOwnerBps: 50,
+  /** Whoever composed the basket, on profit made through it. Off chain today. */
+  basketCreatorBps: 25,
+} as const;
+
+export interface AttributedFeeSplit extends FeeSplit {
+  basketCreatorFeeUnits: bigint;
+  /** Legs zeroed because the recipient and the earner are the same party. */
+  waived: Array<"platform" | "agent_owner" | "basket_creator">;
+  /** Everything taken, across all three legs. */
+  totalFeeUnits: bigint;
+}
+
+/**
+ * Split a winner's payout across every party with a claim on the profit.
+ *
+ * ── Nobody pays themselves ───────────────────────────────────────────────────
+ *
+ * If you profit through your OWN agent, the agent-owner leg is zero. Same for a
+ * basket you composed yourself. Charging it would be theatre: the money would
+ * leave one of your pockets and arrive in the other, minus gas, and the fee line
+ * on your settlement would be a number that means nothing.
+ *
+ * This is checked by address, so it holds however the position was opened — the
+ * comparison is the same one the settlement will make.
+ */
+export function splitAttributedFees(args: {
+  principalUnits: bigint;
+  grossPayoutUnits: bigint;
+  outcome: SettlementOutcome;
+  /** Who is being paid — the party whose profit this is. */
+  earner: string;
+  platformRecipient?: string | null;
+  agentOwnerRecipient?: string | null;
+  basketCreatorRecipient?: string | null;
+  schedule?: { platformBps: number; agentOwnerBps: number; basketCreatorBps: number };
+}): AttributedFeeSplit {
+  const schedule = args.schedule ?? FEE_SCHEDULE;
+  const earner = args.earner.toLowerCase();
+  const same = (candidate?: string | null) =>
+    Boolean(candidate) && candidate!.toLowerCase() === earner;
+
+  const waived: AttributedFeeSplit["waived"] = [];
+
+  if (isRefundOutcome(args.outcome)) {
+    return {
+      principalUnits: args.principalUnits,
+      grossProfitUnits: 0n, platformFeeUnits: 0n, agentOwnerFeeUnits: 0n,
+      basketCreatorFeeUnits: 0n, netProfitUnits: 0n,
+      payoutUnits: args.principalUnits, waived, totalFeeUnits: 0n,
+    };
+  }
+
+  const grossProfitUnits = args.grossPayoutUnits > args.principalUnits
+    ? args.grossPayoutUnits - args.principalUnits
+    : 0n;
+
+  const leg = (
+    bps: number,
+    recipient: string | null | undefined,
+    name: AttributedFeeSplit["waived"][number],
+  ): bigint => {
+    // No recipient means no leg — a market with no agent attribution charges no
+    // agent fee, rather than sending it somewhere arbitrary.
+    if (!recipient) return 0n;
+    if (same(recipient)) {
+      waived.push(name);
+      return 0n;
+    }
+    return (grossProfitUnits * BigInt(bps)) / BPS_DIVISOR;
+  };
+
+  const platformFeeUnits = leg(schedule.platformBps, args.platformRecipient, "platform");
+  const agentOwnerFeeUnits = leg(schedule.agentOwnerBps, args.agentOwnerRecipient, "agent_owner");
+  const basketCreatorFeeUnits = leg(schedule.basketCreatorBps, args.basketCreatorRecipient, "basket_creator");
+
+  const totalFeeUnits = platformFeeUnits + agentOwnerFeeUnits + basketCreatorFeeUnits;
+  return {
+    principalUnits: args.principalUnits,
+    grossProfitUnits,
+    platformFeeUnits,
+    agentOwnerFeeUnits,
+    basketCreatorFeeUnits,
+    netProfitUnits: grossProfitUnits - totalFeeUnits,
+    payoutUnits: args.grossPayoutUnits - totalFeeUnits,
+    waived,
+    totalFeeUnits,
+  };
+}
+
+/** Total the schedule can ever take, for the ceiling check and for display. */
+export function scheduleTotalBps(
+  schedule: { platformBps: number; agentOwnerBps: number; basketCreatorBps: number } = FEE_SCHEDULE,
+): number {
+  return schedule.platformBps + schedule.agentOwnerBps + schedule.basketCreatorBps;
+}

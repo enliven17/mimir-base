@@ -76,6 +76,7 @@ import ProvenStamp from "@/components/ProvenStamp";
 import ClaimStrengthCard from "@/components/ClaimStrengthCard";
 import SettlementExplanationCard from "@/components/SettlementExplanationCard";
 import ResolutionTerminal from "@/components/ResolutionTerminal";
+import { ShareMarket } from "@/components/vs/ShareMarket";
 import VsXmtpPanel from "@/components/xmtp/VsXmtpPanel";
 import CouncilVoteWidget from "@/components/council/CouncilVoteWidget";
 import Stage from "@/components/Stage";
@@ -531,7 +532,14 @@ function formatChallengers(vs: VSData): ClaimChallenger[] {
   }));
 }
 
-const CHALLENGERS_PAGE_SIZE = 4;
+/**
+ * Three, and no scroll container.
+ *
+ * The panel used to paginate at four AND scroll inside a fixed height, so a full
+ * page overflowed into a scrollbar in a narrow column and the wallet rows wrapped
+ * to one word per line. A page that fits is the point of paginating.
+ */
+const CHALLENGERS_PAGE_SIZE = 3;
 
 /** Toast options linking to the tx hash, when the write returned one. */
 function txToastOptions(result: {
@@ -629,7 +637,7 @@ function VsChallengersCard({
           </div>
         ) : (
           <div className="rounded-xl border border-pv-ink/[0.1] bg-pv-bg/25 p-2.5 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)] sm:p-3.5">
-            <ul className="min-h-[15.5rem] max-h-[18rem] space-y-2 overflow-y-auto pr-1 sm:space-y-2.5" role="list">
+            <ul className="space-y-2 sm:space-y-2.5" role="list">
               {visibleChallengers.map((challenger, index) => (
                 <li key={`${challenger.address}-${normalizedPage}-${index}`}>
                   <div className="rounded-lg border border-pv-ink/[0.08] bg-gradient-to-br from-pv-fuch/[0.04] via-transparent to-transparent p-2.5 transition-[border-color,background-color] duration-200 hover:border-pv-ink/[0.14] sm:p-3">
@@ -1513,6 +1521,20 @@ export default function VSDetailPage() {
               </div>
             </AnimatedItem>
           </>
+        )}
+
+        {vsId > 0 && (
+          <AnimatedItem>
+            {/* Above the council widget: sharing is what a reader does right after
+                reading the market, not after scrolling past everything else. */}
+            <div className="mb-6 flex justify-end sm:mb-8">
+              <ShareMarket
+                claimId={vsId}
+                question={display.question}
+                creatorPosition={display.creator_position}
+              />
+            </div>
+          </AnimatedItem>
         )}
 
         {vsId > 0 && (
