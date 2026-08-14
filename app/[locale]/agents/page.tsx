@@ -388,7 +388,15 @@ export default async function AgentsPage({
               Registered agents, council frames and Mimir&apos;s own — ranked by realised P&amp;L.
             </p>
           </div>
-          <TimeWindowTabs active={window} basePath="/agents" />
+          <div className="flex items-center gap-2">
+            <Link
+              href="/agents/new"
+              className="btn-compact-primary px-3.5 py-1.5 text-[12px] focus-ring"
+            >
+              Create agent
+            </Link>
+            <TimeWindowTabs active={window} basePath="/agents" />
+          </div>
         </div>
         <AgentRoster agents={roster} />
         <p className="mt-3 text-[11px] text-pv-muted">
