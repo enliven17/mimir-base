@@ -21,6 +21,8 @@
     "council": "tsx --env-file-if-exists=.env.local agents/council/index.ts",
     "agents:create-wallets": "tsx scripts/create-agent-wallets.ts --write",
     "agents:fund": "tsx --env-file-if-exists=.env.local scripts/fund-agents.ts",
+    "agents:distribute": "tsx --env-file-if-exists=.env.local scripts/fund-from-oracle.ts",
+    "agents:funding-plan": "tsx --env-file-if-exists=.env.local scripts/fund-from-oracle.ts --dry-run",
     "agents:balances": "tsx --env-file-if-exists=.env.local scripts/check-agent-balances.ts",
     "workers": "concurrently --names oracle,creator,council --kill-others-on-fail -c blue,magenta,green \"npm:oracle\" \"npm:market-creator\" \"npm:council\"",
     "demo:cycle": "tsx --env-file-if-exists=.env.local scripts/demo-full-cycle.ts",

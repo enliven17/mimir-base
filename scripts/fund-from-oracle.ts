@@ -17,16 +17,22 @@ import {
   listCouncilPersonas,
   personaPrivateKeyEnv,
 } from "../agents/council/personas";
-import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../lib/usdc";
+import { PHILOSOPHER_PERSONAS, philosopherPrivateKeyEnv } from "../agents/council/philosophers";
+import { ERC20_ABI, USDC_ADDRESS, formatAtomicUsdc, parseUsdcAtomic } from "../lib/usdc";
 
 function cleanEnv(name: string): string {
   const raw = process.env[name] ?? "";
   return raw.split(/\s+#/)[0].trim();
 }
 
-const GAS_ETH = parseEther(process.env.FUND_GAS_ETH ?? "0.5");
-const USDC_CREATOR = usdcToUnits(Number(process.env.FUND_AMOUNT_USDC ?? "50"));
-const USDC_COUNCIL = usdcToUnits(Number(process.env.FUND_COUNCIL_AMOUNT_USDC ?? "30"));
+const GAS_ETH = parseEther(process.env.FUND_GAS_ETH ?? "0.01");
+const USDC_CREATOR = parseUsdcAtomic(process.env.FUND_AMOUNT_USDC ?? "20");
+const USDC_COUNCIL = parseUsdcAtomic(process.env.FUND_COUNCIL_AMOUNT_USDC ?? "10");
+const DRY_RUN = process.argv.includes("--dry-run") || process.env.DRY_RUN === "1";
+
+function bigintMin(a: bigint, b: bigint): bigint {
+  return a < b ? a : b;
+}
 
 async function main() {
   const funderKey = cleanEnv("ORACLE_PRIVATE_KEY");
@@ -39,6 +45,7 @@ async function main() {
   for (const name of [
     "CREATOR_PRIVATE_KEY",
     ...listCouncilPersonas().map((p) => personaPrivateKeyEnv(p)),
+    ...PHILOSOPHER_PERSONAS.map((p) => philosopherPrivateKeyEnv(p.slug)),
   ]) {
     const c = cleanEnv(name);
     if (c) process.env[name] = c;
@@ -69,6 +76,10 @@ async function main() {
   for (const persona of listCouncilPersonas()) {
     add(`council:${persona.slug}`, personaPrivateKeyEnv(persona), USDC_COUNCIL);
   }
+  for (const persona of PHILOSOPHER_PERSONAS) {
+    const cycleBudget = parseUsdcAtomic(String(persona.limits.maxStakeUsdc * persona.limits.maxClaimsPerCycle));
+    add(`philosopher:${persona.slug}`, philosopherPrivateKeyEnv(persona.slug), bigintMin(USDC_COUNCIL, cycleBudget));
+  }
 
   const funderEth = await publicClient.getBalance({ address: funder.address });
   const funderUsdc = (await publicClient.readContract({
@@ -80,11 +91,22 @@ async function main() {
 
   console.log(`Funder (oracle): ${funder.address}`);
   console.log(`  ETH  : ${weiToEth(funderEth).toFixed(4)}`);
-  console.log(`  USDC : ${unitsToUsdc(funderUsdc).toFixed(2)}`);
+  console.log(`  USDC : ${formatAtomicUsdc(funderUsdc)}`);
   console.log(`Targets: ${targets.length}`);
   console.log(`Per target gas: ${formatEther(GAS_ETH)} ETH`);
-  console.log(`Creator USDC: ${unitsToUsdc(USDC_CREATOR)}`);
-  console.log(`Council USDC: ${unitsToUsdc(USDC_COUNCIL)}\n`);
+  console.log(`Creator USDC: ${formatAtomicUsdc(USDC_CREATOR)}`);
+  console.log(`Council USDC: ${formatAtomicUsdc(USDC_COUNCIL)}\n`);
+
+  const distributionEth = targets.reduce((total, target) => total + target.gas, 0n);
+  const distributionUsdc = targets.reduce((total, target) => total + target.usdc, 0n);
+  console.log(`Distribution total: ${formatEther(distributionEth)} ETH + ${formatAtomicUsdc(distributionUsdc)} USDC`);
+  if (DRY_RUN) {
+    for (const target of targets) {
+      console.log(`  ${target.label.padEnd(24)} ${target.address}  ${formatEther(target.gas)} ETH + ${formatAtomicUsdc(target.usdc)} USDC`);
+    }
+    console.log("\nDry run only; no transfers sent.");
+    return;
+  }
 
   for (const t of targets) {
     // Gas
@@ -120,9 +142,9 @@ async function main() {
         chain: baseSepolia,
       });
       await publicClient.waitForTransactionReceipt({ hash });
-      console.log(`  ✓ ${t.label.padEnd(24)} +${unitsToUsdc(need).toFixed(2)} USDC  ${getExplorerTxUrl(hash)}`);
+      console.log(`  ✓ ${t.label.padEnd(24)} +${formatAtomicUsdc(need)} USDC  ${getExplorerTxUrl(hash)}`);
     } else {
-      console.log(`  · ${t.label.padEnd(24)} USDC ok (${unitsToUsdc(usdcBal).toFixed(2)})`);
+      console.log(`  · ${t.label.padEnd(24)} USDC ok (${formatAtomicUsdc(usdcBal)})`);
     }
   }
 
