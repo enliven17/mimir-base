@@ -569,14 +569,22 @@ For each candidate, provide:
 
 Return a JSON array of ${MAX_CLAIMS_PER_RUN} candidates. Output JSON only.`;
 
-  const text = await callLLM(prompt, { maxTokens: 2000, jsonOnly: true, model: pickGeminiModel("market-creator") });
+  // Budget scales with the batch size: a candidate is ~11 fields with prose
+  // positions and a settlement rule, and Gemma models spend part of the budget
+  // reasoning before the array. At a flat 2000 the array was truncated mid-object,
+  // so extractJson found nothing balanced and the whole run produced no markets.
+  const maxTokens = 1000 + 800 * MAX_CLAIMS_PER_RUN;
+  const text = await callLLM(prompt, { maxTokens, jsonOnly: true, model: pickGeminiModel("market-creator") });
   let candidates: ClaimCandidate[];
   try {
     const jsonStr = extractJson(text, "[");
     if (!jsonStr) throw new Error("No JSON array in response");
     candidates = JSON.parse(jsonStr) as ClaimCandidate[];
   } catch (err) {
+    // The raw tail is the only way to tell truncation from a model that ignored
+    // the format, and without it this failure is unreproducible after the fact.
     console.warn("[market-creator] Failed to parse candidates:", err);
+    console.warn(`[market-creator]   raw ${text.length} chars, tail: ${JSON.stringify(text.slice(-160))}`);
     return [];
   }
 
