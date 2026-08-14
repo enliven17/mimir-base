@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -16,6 +18,7 @@ import {
 } from "../../lib/ops/health";
 
 const NOW = 1_800_000_000_000;
+const ROOT = path.resolve(import.meta.dirname, "..", "..");
 
 function healthy(overrides: Partial<HealthSnapshot> = {}): HealthSnapshot {
   return {
@@ -292,4 +295,23 @@ test("a corrupt heartbeat decodes to never-reported instead of throwing", () => 
 
 test("an empty error string is dropped rather than reported as an error", () => {
   assert.equal(decodeHeartbeat('{"atMs":1,"error":""}')?.error, undefined);
+});
+
+test("every monitored worker has something that writes its heartbeat", () => {
+  // A name in MONITORED_WORKERS with no writer alarms as "never reported" forever,
+  // which pins /api/health at 503 no matter how healthy the system is. This is
+  // exactly how `sync` shipped: monitored, never beaten.
+  const sources = [
+    "agents/oracle/index.ts",
+    "agents/market-creator/index.ts",
+    "agents/council/index.ts",
+    "app/api/cron/sync/route.ts",
+  ].map((file) => readFileSync(path.join(ROOT, file), "utf8")).join("\n");
+
+  for (const worker of MONITORED_WORKERS) {
+    assert.ok(
+      sources.includes(`beat("${worker}"`) || sources.includes(`reportingPoll("${worker}"`),
+      `no beat("${worker}") or reportingPoll("${worker}") writer found`,
+    );
+  }
 });
