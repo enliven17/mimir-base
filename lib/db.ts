@@ -3,7 +3,9 @@ import ws from "ws";
 
 import type { ChallengeOpportunity } from "@/lib/claimDrafts";
 import type { ClaimChallenger, ClaimData } from "@/lib/contract";
+import type { AgentApiKeyRecord } from "@/lib/agents/api-keys";
 import type { AgentRecord } from "@/lib/agents/registry";
+import type { SpendPermissionRecord } from "@/lib/agents/spend-permissions";
 import type { CopyAuditRecord, CopyPermission } from "@/lib/copy-trading";
 
 // Neon's @neondatabase/serverless uses WebSockets in Node — wire up the ws
@@ -276,6 +278,52 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
     agent_id TEXT NOT NULL,
     consumed_at BIGINT NOT NULL
   )` },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_api_keys (
+    key_id TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    /** SHA-256 of the presented secret. The secret itself is shown once, at issue. */
+    key_hash TEXT NOT NULL,
+    /** First characters, for "which key is this?" without revealing it. */
+    key_prefix TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    created_at BIGINT NOT NULL,
+    last_used_at BIGINT,
+    revoked_at BIGINT,
+    revoked_reason TEXT
+  )` },
+  { sql: "CREATE UNIQUE INDEX IF NOT EXISTS idx_agent_api_keys_hash ON agent_api_keys(key_hash)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_agent_api_keys_agent ON agent_api_keys(agent_id)" },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_spend_permissions (
+    permission_hash TEXT PRIMARY KEY,
+    agent_id TEXT NOT NULL,
+    account TEXT NOT NULL,
+    spender TEXT NOT NULL,
+    token TEXT NOT NULL,
+    allowance_atomic NUMERIC(78,0) NOT NULL,
+    period_seconds BIGINT NOT NULL,
+    start_at BIGINT NOT NULL,
+    end_at BIGINT NOT NULL,
+    salt TEXT NOT NULL DEFAULT '0',
+    extra_data TEXT NOT NULL DEFAULT '0x',
+    signature TEXT NOT NULL,
+    permission_json TEXT NOT NULL,
+    created_at BIGINT NOT NULL,
+    revoked_at BIGINT,
+    revoked_reason TEXT
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_agent_spend_permissions_agent ON agent_spend_permissions(agent_id)" },
+  { sql: `CREATE TABLE IF NOT EXISTS agent_spend_ledger (
+    entry_id TEXT PRIMARY KEY,
+    permission_hash TEXT NOT NULL,
+    agent_id TEXT NOT NULL,
+    amount_atomic NUMERIC(78,0) NOT NULL,
+    /** Start of the permission period this entry counts against. */
+    period_start BIGINT NOT NULL,
+    intent TEXT NOT NULL,
+    transaction_hash TEXT,
+    created_at BIGINT NOT NULL
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_agent_spend_ledger_period ON agent_spend_ledger(permission_hash, period_start)" },
   { sql: `CREATE TABLE IF NOT EXISTS agent_request_audit (
     request_id TEXT PRIMARY KEY,
     agent_id TEXT NOT NULL,
@@ -1889,5 +1937,202 @@ export async function tombstoneReasoningEvent(eventId: string, reason: string): 
       SET tombstoned_at = ?, tombstone_reason = ?, visibility = 'withheld'
       WHERE event_id = ? AND tombstoned_at IS NULL`,
     args: [Date.now(), reason, eventId],
+  });
+}
+
+// ── Agent API keys ────────────────────────────────────────────────────────────
+
+export async function insertAgentApiKey(record: AgentApiKeyRecord): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO agent_api_keys (
+      key_id, agent_id, key_hash, key_prefix, label, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [record.keyId, record.agentId, record.keyHash, record.keyPrefix,
+      record.label, record.createdAt],
+  });
+}
+
+function toApiKeyRecord(row: Record<string, unknown>): AgentApiKeyRecord {
+  return {
+    keyId: getString(row.key_id),
+    agentId: getString(row.agent_id),
+    keyHash: getString(row.key_hash),
+    keyPrefix: getString(row.key_prefix),
+    label: getString(row.label),
+    createdAt: getNumber(row.created_at),
+    lastUsedAt: row.last_used_at == null ? undefined : getNumber(row.last_used_at),
+    revokedAt: row.revoked_at == null ? undefined : getNumber(row.revoked_at),
+    revokedReason: row.revoked_reason == null ? undefined : getString(row.revoked_reason),
+  };
+}
+
+/** Looked up by hash: the plaintext key is never stored, so it cannot be searched. */
+export async function getAgentApiKeyByHash(keyHash: string): Promise<AgentApiKeyRecord | null> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: "SELECT * FROM agent_api_keys WHERE key_hash = ? LIMIT 1",
+    args: [keyHash],
+  });
+  const row = result.rows[0];
+  return row ? toApiKeyRecord(row as Record<string, unknown>) : null;
+}
+
+export async function listAgentApiKeys(agentId: string): Promise<AgentApiKeyRecord[]> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: "SELECT * FROM agent_api_keys WHERE agent_id = ? ORDER BY created_at DESC",
+    args: [agentId],
+  });
+  return result.rows.map((row) => toApiKeyRecord(row as Record<string, unknown>));
+}
+
+/**
+ * Best-effort last-used stamp. Deliberately not awaited by callers on the hot
+ * path: a failed write here must not refuse an otherwise valid request.
+ */
+export async function touchAgentApiKey(keyId: string, at: number): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: "UPDATE agent_api_keys SET last_used_at = ? WHERE key_id = ?",
+    args: [at, keyId],
+  });
+}
+
+export async function revokeAgentApiKey(
+  agentId: string, keyId: string, at: number, reason: string,
+): Promise<boolean> {
+  const pool = await getDb();
+  // RETURNING rather than a row count: `execute` exposes rows only, and a revoke
+  // that reports success without having matched a row is the dangerous direction.
+  const result = await execute(pool, {
+    sql: `UPDATE agent_api_keys SET revoked_at = ?, revoked_reason = ?
+      WHERE key_id = ? AND agent_id = ? AND revoked_at IS NULL
+      RETURNING key_id`,
+    args: [at, reason, keyId, agentId],
+  });
+  return result.rows.length > 0;
+}
+
+// ── Agent spend permissions ───────────────────────────────────────────────────
+
+export async function upsertSpendPermission(record: SpendPermissionRecord): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO agent_spend_permissions (
+      permission_hash, agent_id, account, spender, token, allowance_atomic,
+      period_seconds, start_at, end_at, salt, extra_data, signature,
+      permission_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(permission_hash) DO UPDATE SET
+      agent_id=excluded.agent_id, signature=excluded.signature,
+      permission_json=excluded.permission_json,
+      revoked_at=NULL, revoked_reason=NULL`,
+    args: [record.permissionHash, record.agentId, record.account, record.spender,
+      record.token, record.allowanceAtomic.toString(), record.periodSeconds,
+      record.startAt, record.endAt, record.salt, record.extraData, record.signature,
+      record.permissionJson, record.createdAt],
+  });
+}
+
+function toSpendPermission(row: Record<string, unknown>): SpendPermissionRecord {
+  return {
+    permissionHash: getString(row.permission_hash),
+    agentId: getString(row.agent_id),
+    account: getString(row.account) as `0x${string}`,
+    spender: getString(row.spender) as `0x${string}`,
+    token: getString(row.token) as `0x${string}`,
+    allowanceAtomic: getBigInt(row.allowance_atomic),
+    periodSeconds: getNumber(row.period_seconds),
+    startAt: getNumber(row.start_at),
+    endAt: getNumber(row.end_at),
+    salt: getString(row.salt),
+    extraData: getString(row.extra_data),
+    signature: getString(row.signature) as `0x${string}`,
+    permissionJson: getString(row.permission_json),
+    createdAt: getNumber(row.created_at),
+    revokedAt: row.revoked_at == null ? undefined : getNumber(row.revoked_at),
+    revokedReason: row.revoked_reason == null ? undefined : getString(row.revoked_reason),
+  };
+}
+
+/**
+ * Newest live permission for an agent. Newest wins so re-granting a wider or
+ * narrower budget takes effect without the owner having to revoke the old one first.
+ */
+export async function getActiveSpendPermission(
+  agentId: string, nowSeconds: number,
+): Promise<SpendPermissionRecord | null> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT * FROM agent_spend_permissions
+      WHERE agent_id = ? AND revoked_at IS NULL AND end_at > ?
+      ORDER BY created_at DESC LIMIT 1`,
+    args: [agentId, nowSeconds],
+  });
+  const row = result.rows[0];
+  return row ? toSpendPermission(row as Record<string, unknown>) : null;
+}
+
+export async function revokeSpendPermission(
+  agentId: string, permissionHash: string, at: number, reason: string,
+): Promise<boolean> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `UPDATE agent_spend_permissions SET revoked_at = ?, revoked_reason = ?
+      WHERE permission_hash = ? AND agent_id = ? AND revoked_at IS NULL
+      RETURNING permission_hash`,
+    args: [at, reason, permissionHash, agentId],
+  });
+  return result.rows.length > 0;
+}
+
+/** Spend recorded against the current period. Missing rows mean nothing spent yet. */
+export async function getSpentInPeriod(
+  permissionHash: string, periodStart: number,
+): Promise<bigint> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT COALESCE(SUM(amount_atomic), 0) AS spent FROM agent_spend_ledger
+      WHERE permission_hash = ? AND period_start = ?`,
+    args: [permissionHash, periodStart],
+  });
+  return getBigInt((result.rows[0] as Record<string, unknown> | undefined)?.spent);
+}
+
+/**
+ * Reserve spend BEFORE the chain call, then stamp the tx hash after.
+ *
+ * Recording afterwards would let two concurrent requests each read the same
+ * remaining allowance and both proceed — the classic double-spend on a budget.
+ */
+export async function recordSpendReservation(entry: {
+  entryId: string; permissionHash: string; agentId: string; amountAtomic: bigint;
+  periodStart: number; intent: string; createdAt: number;
+}): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO agent_spend_ledger (
+      entry_id, permission_hash, agent_id, amount_atomic, period_start, intent, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    args: [entry.entryId, entry.permissionHash, entry.agentId, entry.amountAtomic.toString(),
+      entry.periodStart, entry.intent, entry.createdAt],
+  });
+}
+
+export async function settleSpendReservation(entryId: string, transactionHash: string): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: "UPDATE agent_spend_ledger SET transaction_hash = ? WHERE entry_id = ?",
+    args: [transactionHash.toLowerCase(), entryId],
+  });
+}
+
+/** Release a reservation whose chain call never landed, so the budget is not lost. */
+export async function releaseSpendReservation(entryId: string): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: "DELETE FROM agent_spend_ledger WHERE entry_id = ? AND transaction_hash IS NULL",
+    args: [entryId],
   });
 }

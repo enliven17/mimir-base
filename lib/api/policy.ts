@@ -33,6 +33,7 @@ export const ACCESS_TIERS = [
   "public_read",
   "authenticated_user",
   "registered_agent",
+  "api_key_agent",
   "internal_worker",
 ] as const;
 export type AccessTier = (typeof ACCESS_TIERS)[number];
@@ -75,6 +76,23 @@ export const TIER_POLICIES: Record<AccessTier, TierPolicy> = {
     requiresSignature: true,
     requiresWorkerSecret: false,
     limitDimensions: ["agent", "route"],
+  },
+  /**
+   * A registered agent presenting an API key instead of signing every envelope.
+   *
+   * No wallet and no per-request signature: the key is the credential, and what the
+   * key can *spend* is bounded separately by the owner-signed spend permission. A
+   * leaked key therefore costs at most the remaining allowance, not the account.
+   *
+   * Bucketed by agent first — the meaningful key for BYOA, since one developer's
+   * fleet may share an IP and one agent may rotate IPs freely.
+   */
+  api_key_agent: {
+    tier: "api_key_agent",
+    requiresWallet: false,
+    requiresSignature: false,
+    requiresWorkerSecret: false,
+    limitDimensions: ["agent", "ip", "route"],
   },
   internal_worker: {
     tier: "internal_worker",
