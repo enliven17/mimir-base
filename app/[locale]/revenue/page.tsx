@@ -136,7 +136,7 @@ export default function RevenuePage() {
 
           <section className="mt-10">
             <h2 className="label">By endpoint</h2>
-            <div className="card mt-3 divide-y divide-white/[0.08]">
+            <div className="card mt-3 divide-y divide-pv-ink/[0.08]">
               {data.byResource.length === 0 && (
                 <p className="px-4 py-4 text-sm text-pv-muted">No payments yet.</p>
               )}
@@ -153,7 +153,7 @@ export default function RevenuePage() {
 
           <section className="mt-10">
             <h2 className="label">By seller wallet</h2>
-            <div className="card mt-3 divide-y divide-white/[0.08]">
+            <div className="card mt-3 divide-y divide-pv-ink/[0.08]">
               {data.bySeller.length === 0 && (
                 <p className="px-4 py-4 text-sm text-pv-muted">No sellers yet.</p>
               )}
@@ -170,7 +170,7 @@ export default function RevenuePage() {
 
           <section className="mt-10">
             <h2 className="label">Recent payments</h2>
-            <div className="card mt-3 divide-y divide-white/[0.06]">
+            <div className="card mt-3 divide-y divide-pv-ink/[0.06]">
               {data.recent.length === 0 && (
                 <p className="px-4 py-4 text-sm text-pv-muted">
                   Nothing yet — payments appear the moment an agent buys a paid endpoint.
@@ -241,7 +241,7 @@ function RevenueSkeleton() {
       </section>
       <section className="mt-10">
         <Bar className="h-3 w-24" />
-        <div className="card mt-3 divide-y divide-white/[0.08]">
+        <div className="card mt-3 divide-y divide-pv-ink/[0.08]">
           {[0, 1, 2].map((i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3.5">
               <Bar className="h-4 w-40" />
@@ -252,7 +252,7 @@ function RevenueSkeleton() {
       </section>
       <section className="mt-10">
         <Bar className="h-3 w-32" />
-        <div className="card mt-3 divide-y divide-white/[0.06]">
+        <div className="card mt-3 divide-y divide-pv-ink/[0.06]">
           {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="flex items-center justify-between px-4 py-3">
               <Bar className="h-4 w-20" />

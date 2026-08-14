@@ -55,7 +55,7 @@ export default function OppositionLayout({
       {/* Center tension line */}
       <div className="relative z-10 flex items-center justify-center px-2">
         <motion.div
-          className="w-px h-full bg-gradient-to-b from-transparent via-white/30 to-transparent"
+          className="w-px h-full bg-gradient-to-b from-transparent via-pv-ink/30 to-transparent"
           variants={tensionLine}
           initial="idle"
           animate={active ? "active" : "idle"}

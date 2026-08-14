@@ -9,23 +9,33 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        /**
+         * Blueprint palette, resolved through CSS variables so one `data-theme`
+         * attribute flips the whole app. Values live in app/globals.css as
+         * space-separated RGB channels — that form is what lets Tailwind keep
+         * applying its own alpha (`border-pv-border/25`) on top of a variable.
+         *
+         * Legacy token names (cyan/fuch/emerald) stay so existing utility classes
+         * keep working; they all resolve to the one blueprint blue.
+         */
         pv: {
-          // Blueprint palette — pure-white ink + #334FA9 blue on deep navy.
-          bg:       "#0A1E3D",
-          surface:  "#0E2649",
-          surface2: "#133057",
-          border:   "#FFFFFF",
-          text:     "#FFFFFF",
-          muted:    "#A9C0DE",
-          // Accents — single blueprint blue. Legacy token names (cyan/fuch/
-          // emerald) stay so existing utility classes keep working; they all
-          // resolve to #334FA9 now. Gold stays warm so payout figures still
-          // pop against the navy.
-          cyan:     "#334FA9",
-          fuch:     "#334FA9",
-          emerald:  "#334FA9",
-          gold:     "#E0B36A",
-          danger:   "#EF6B6B",
+          bg:       "rgb(var(--pv-bg) / <alpha-value>)",
+          surface:  "rgb(var(--pv-surface) / <alpha-value>)",
+          surface2: "rgb(var(--pv-surface2) / <alpha-value>)",
+          border:   "rgb(var(--pv-border) / <alpha-value>)",
+          text:     "rgb(var(--pv-text) / <alpha-value>)",
+          muted:    "rgb(var(--pv-muted) / <alpha-value>)",
+          /**
+           * Hairlines and tinted panels. Was a literal `white/[0.08]` in 418
+           * places, which is invisible on a light background; as a token it
+           * inverts to navy with the theme.
+           */
+          ink:      "rgb(var(--pv-ink) / <alpha-value>)",
+          cyan:     "rgb(var(--pv-accent) / <alpha-value>)",
+          fuch:     "rgb(var(--pv-accent) / <alpha-value>)",
+          emerald:  "rgb(var(--pv-accent) / <alpha-value>)",
+          gold:     "rgb(var(--pv-gold) / <alpha-value>)",
+          danger:   "rgb(var(--pv-danger) / <alpha-value>)",
         },
       },
       fontFamily: {

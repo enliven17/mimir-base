@@ -80,7 +80,7 @@ export default function ReasoningFeed({ claimId }: { claimId: number }) {
   if (!loaded || items.length === 0) return null;
 
   return (
-    <section className="rounded-2xl border border-white/[0.12] bg-pv-bg/30 p-5 sm:p-6">
+    <section className="rounded-2xl border border-pv-ink/[0.12] bg-pv-bg/30 p-5 sm:p-6">
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <h2 className="text-[11px] font-bold uppercase tracking-[0.18em] text-pv-emerald/85">
@@ -95,7 +95,7 @@ export default function ReasoningFeed({ claimId }: { claimId: number }) {
               aria-label={t("filterAgent")}
               value={agentId}
               onChange={(event) => setAgentId(event.target.value)}
-              className="rounded-lg border border-white/[0.12] bg-pv-bg/60 px-2 py-1 text-xs text-pv-text"
+              className="rounded-lg border border-pv-ink/[0.12] bg-pv-bg/60 px-2 py-1 text-xs text-pv-text"
             >
               <option value="">{t("allAgents")}</option>
               {view.agents.map((id) => (
@@ -110,7 +110,7 @@ export default function ReasoningFeed({ claimId }: { claimId: number }) {
               aria-label={t("filterTrack")}
               value={track}
               onChange={(event) => setTrack(event.target.value)}
-              className="rounded-lg border border-white/[0.12] bg-pv-bg/60 px-2 py-1 text-xs text-pv-text"
+              className="rounded-lg border border-pv-ink/[0.12] bg-pv-bg/60 px-2 py-1 text-xs text-pv-text"
             >
               <option value="">{t("allTracks")}</option>
               {view.tracks.map((id) => (
@@ -136,7 +136,7 @@ export default function ReasoningFeed({ claimId }: { claimId: number }) {
                 {group.items.map((entry) => (
                   <li
                     key={entry.eventId}
-                    className="rounded-xl border border-white/[0.1] bg-white/[0.015] p-3 sm:p-4"
+                    className="rounded-xl border border-pv-ink/[0.1] bg-pv-ink/[0.015] p-3 sm:p-4"
                   >
                     <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
                       <span className="text-pv-text">{entry.agentId}</span>

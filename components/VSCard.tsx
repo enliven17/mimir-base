@@ -157,8 +157,8 @@ export default function VSCard({
         />
 
         {canonicalMode.settlementMode === "pool" ? (
-          <div className="mt-3 overflow-hidden rounded-lg border border-white/[0.08] bg-pv-bg/25">
-            <div className="grid grid-cols-3 divide-x divide-white/[0.07]">
+          <div className="mt-3 overflow-hidden rounded-lg border border-pv-ink/[0.08] bg-pv-bg/25">
+            <div className="grid grid-cols-3 divide-x divide-pv-ink/[0.07]">
               <div className="min-w-0 px-2.5 py-2">
                 <div className="truncate text-[9px] font-bold uppercase tracking-[0.12em] text-pv-muted">{t("creatorPool")}</div>
                 <div className="mt-1 truncate font-mono text-xs font-bold tabular-nums text-pv-cyan">{formatAmount(creatorPool)}</div>
@@ -172,7 +172,7 @@ export default function VSCard({
                 <div className="mt-1 truncate font-mono text-xs font-bold tabular-nums text-pv-gold">{formatAmount(pool)}</div>
               </div>
             </div>
-            <div className="border-t border-white/[0.07] px-2.5 py-2">
+            <div className="border-t border-pv-ink/[0.07] px-2.5 py-2">
               <div
                 className="flex h-1.5 overflow-hidden rounded-full bg-pv-fuch/50"
                 title={t("poolImbalance", {

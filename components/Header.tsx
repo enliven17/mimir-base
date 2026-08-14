@@ -8,6 +8,7 @@ import { useWallet } from "@/lib/wallet";
 import { shortenAddress } from "@/lib/constants";
 import { getExplorerAddressUrl } from "@/lib/base";
 import { Copy, ExternalLink, LogOut, Menu, X } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
 import { isXmtpFeatureEnabled } from "@/lib/xmtp/config";
 
 function WalletAccountMenu({
@@ -66,7 +67,7 @@ function WalletAccountMenu({
             transition={{ duration: 0.15 }}
             className="absolute right-0 top-[calc(100%+4px)] z-[60] min-w-[240px] overflow-hidden rounded-2xl border border-pv-border/40 bg-pv-surface/95 p-2 shadow-[0_22px_60px_-20px_rgba(51,79,169,0.22)] backdrop-blur-xl"
           >
-            <div className="mb-1 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3.5 py-3">
+            <div className="mb-1 rounded-xl border border-pv-ink/[0.08] bg-pv-ink/[0.03] px-3.5 py-3">
               <p className="font-display text-[13px] font-bold tracking-tight text-pv-text">
                 {shortenAddress(address)}
               </p>
@@ -95,7 +96,7 @@ function WalletAccountMenu({
               <ExternalLink className={iconClass} aria-hidden />
               <span>{t("viewOnExplorer")}</span>
             </a>
-            <div className="my-2 h-px bg-white/[0.08]" aria-hidden />
+            <div className="my-2 h-px bg-pv-ink/[0.08]" aria-hidden />
             <button
               type="button"
               role="menuitem"
@@ -103,7 +104,7 @@ function WalletAccountMenu({
                 onDisconnect();
                 onOpenChange(false);
               }}
-              className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3.5 py-3 text-left text-[13px] font-medium text-pv-muted transition-[background-color,border-color,color] hover:border-white/[0.08] hover:bg-white/[0.04] hover:text-pv-text"
+              className="group flex w-full items-center gap-3 rounded-xl border border-transparent px-3.5 py-3 text-left text-[13px] font-medium text-pv-muted transition-[background-color,border-color,color] hover:border-pv-ink/[0.08] hover:bg-pv-ink/[0.04] hover:text-pv-text"
             >
               <LogOut
                 className="h-4 w-4 shrink-0 text-pv-muted transition-colors group-hover:text-pv-text"
@@ -230,6 +231,7 @@ export default function Header() {
             >
               {t("launchApp")}
             </Link>
+            <ThemeToggle className="focus-ring" />
           </div>
         ) : (
           <>
@@ -245,14 +247,16 @@ export default function Header() {
                       item.accent
                         ? "border-pv-emerald bg-pv-emerald font-bold text-white hover:brightness-110"
                         : isActive
-                        ? "border-white/[0.32] bg-white/[0.06] text-pv-text"
-                        : "text-pv-muted hover:border-white/[0.22] hover:text-pv-text"
+                        ? "border-pv-ink/[0.32] bg-pv-ink/[0.06] text-pv-text"
+                        : "text-pv-muted hover:border-pv-ink/[0.22] hover:text-pv-text"
                     }`}
                   >
                     {item.label}
                   </Link>
                 );
               })}
+
+              <ThemeToggle className="focus-ring" />
 
               {isConnected && address ? (
                 <WalletAccountMenu
@@ -277,6 +281,7 @@ export default function Header() {
 
             {/* Mobile */}
             <div className="flex items-center gap-2 md:hidden">
+              <ThemeToggle className="focus-ring" />
               {isConnected && address ? (
                 <WalletAccountMenu
                   address={address}
@@ -319,7 +324,7 @@ export default function Header() {
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden border-t border-b border-white/[0.08] bg-pv-surface/95 backdrop-blur-xl md:hidden"
+            className="overflow-hidden border-t border-b border-pv-ink/[0.08] bg-pv-surface/95 backdrop-blur-xl md:hidden"
           >
             <LayoutGroup id="mobile-header-nav">
               <nav

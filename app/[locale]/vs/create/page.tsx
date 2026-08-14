@@ -1385,13 +1385,13 @@ export default function CreatePage() {
             glass
             noPad
             glow="none"
-            className="!rounded-2xl border border-white/[0.12] w-full overflow-hidden"
+            className="!rounded-2xl border border-pv-ink/[0.12] w-full overflow-hidden"
           >
             <button
               type="button"
               onClick={() => setSourceDraftOpen((value) => !value)}
               aria-expanded={sourceDraftOpen}
-              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.02] sm:px-8 sm:py-6"
+              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-pv-ink/[0.02] sm:px-8 sm:py-6"
             >
               <div className="flex min-w-0 gap-3">
                 <span
@@ -1437,7 +1437,7 @@ export default function CreatePage() {
               className={`overflow-hidden ${!sourceDraftOpen ? "pointer-events-none" : ""}`}
               aria-hidden={!sourceDraftOpen}
             >
-              <div className="space-y-5 border-t border-white/[0.08] px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-6">
+              <div className="space-y-5 border-t border-pv-ink/[0.08] px-6 pb-6 pt-6 sm:px-8 sm:pb-8 sm:pt-6">
                 <div className="space-y-2">
                   <label className="block text-[10px] font-bold uppercase tracking-[0.16em] text-pv-muted">
                     {t("sourceDraftInputLabel")}
@@ -1458,7 +1458,7 @@ export default function CreatePage() {
                       onClick={handleGenerateFromSource}
                       loading={draftLoading}
                       disabled={!normalizedSourceUrl || draftLoading}
-                      className="w-full shrink-0 self-start rounded-xl px-5 py-3 font-display text-[11px] font-bold uppercase tracking-[0.16em] transition-[background-color,border-color,color,box-shadow,transform,filter] duration-200 ease-out sm:w-auto sm:self-center !border-white/[0.22] !bg-white/[0.06] !text-pv-text/90 enabled:hover:-translate-y-px enabled:hover:!border-transparent enabled:hover:!bg-pv-emerald enabled:hover:!text-pv-bg enabled:hover:!brightness-[1.06] enabled:hover:!shadow-[0_6px_20px_-4px_rgba(51,79,169,0.32)] enabled:active:translate-y-0 enabled:active:scale-[0.98] enabled:active:!shadow-none focus-visible:!outline-none enabled:focus-visible:!ring-2 enabled:focus-visible:!ring-pv-emerald/40 enabled:focus-visible:!ring-offset-2 enabled:focus-visible:!ring-offset-pv-bg disabled:hover:!translate-y-0 disabled:hover:!border-white/[0.22] disabled:hover:!bg-white/[0.06] disabled:hover:!text-pv-text/90 disabled:hover:!brightness-100 disabled:hover:!shadow-none"
+                      className="w-full shrink-0 self-start rounded-xl px-5 py-3 font-display text-[11px] font-bold uppercase tracking-[0.16em] transition-[background-color,border-color,color,box-shadow,transform,filter] duration-200 ease-out sm:w-auto sm:self-center !border-pv-ink/[0.22] !bg-pv-ink/[0.06] !text-pv-text/90 enabled:hover:-translate-y-px enabled:hover:!border-transparent enabled:hover:!bg-pv-emerald enabled:hover:!text-pv-bg enabled:hover:!brightness-[1.06] enabled:hover:!shadow-[0_6px_20px_-4px_rgba(51,79,169,0.32)] enabled:active:translate-y-0 enabled:active:scale-[0.98] enabled:active:!shadow-none focus-visible:!outline-none enabled:focus-visible:!ring-2 enabled:focus-visible:!ring-pv-emerald/40 enabled:focus-visible:!ring-offset-2 enabled:focus-visible:!ring-offset-pv-bg disabled:hover:!translate-y-0 disabled:hover:!border-pv-ink/[0.22] disabled:hover:!bg-pv-ink/[0.06] disabled:hover:!text-pv-text/90 disabled:hover:!brightness-100 disabled:hover:!shadow-none"
                     >
                       {draftLoading ? t("sourceDraftGenerating") : t("sourceDraftGenerate")}
                     </Button>
@@ -1476,7 +1476,7 @@ export default function CreatePage() {
 
                 {draftResult ? (
                   <div className="space-y-4">
-                    <div className="rounded-xl border border-white/[0.08] bg-pv-bg/60 p-4">
+                    <div className="rounded-xl border border-pv-ink/[0.08] bg-pv-bg/60 p-4">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="rounded-full border border-pv-emerald/20 bg-pv-emerald/[0.1] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-emerald">
                           {t(`sourceDraftSourceTypes.${draftResult.sourceType}`)}
@@ -1498,7 +1498,7 @@ export default function CreatePage() {
                         return (
                           <div
                             key={`${candidate.claimText}-${index}`}
-                            className="rounded-2xl border border-white/[0.08] bg-pv-surface2 p-4 sm:p-5"
+                            className="rounded-2xl border border-pv-ink/[0.08] bg-pv-surface2 p-4 sm:p-5"
                           >
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                               <div className="min-w-0">
@@ -1506,7 +1506,7 @@ export default function CreatePage() {
                                   <span className="rounded-full border border-pv-cyan/25 bg-pv-cyan/[0.1] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-cyan">
                                     {tCat(normalizeCategoryId(candidate.category))}
                                   </span>
-                                  <span className="rounded-full border border-white/[0.1] bg-white/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-muted">
+                                  <span className="rounded-full border border-pv-ink/[0.1] bg-pv-ink/[0.04] px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-pv-muted">
                                     {candidate.confidenceScore}/100
                                   </span>
                                 </div>
@@ -1526,7 +1526,7 @@ export default function CreatePage() {
                             </div>
 
                             <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                              <div className="rounded-xl border border-white/[0.08] bg-pv-bg/60 p-3">
+                              <div className="rounded-xl border border-pv-ink/[0.08] bg-pv-bg/60 p-3">
                                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
                                   {t("sourceDraftSideA")}
                                 </div>
@@ -1534,7 +1534,7 @@ export default function CreatePage() {
                                   {candidate.sideA}
                                 </div>
                               </div>
-                              <div className="rounded-xl border border-white/[0.08] bg-pv-bg/60 p-3">
+                              <div className="rounded-xl border border-pv-ink/[0.08] bg-pv-bg/60 p-3">
                                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
                                   {t("sourceDraftSideB")}
                                 </div>
@@ -1545,7 +1545,7 @@ export default function CreatePage() {
                             </div>
 
                             <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-                              <div className="rounded-xl border border-white/[0.08] bg-pv-bg/60 p-3">
+                              <div className="rounded-xl border border-pv-ink/[0.08] bg-pv-bg/60 p-3">
                                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
                                   {t("sourceDraftDeadline")}
                                 </div>
@@ -1561,7 +1561,7 @@ export default function CreatePage() {
                                     : candidate.deadlineAt}
                                 </div>
                               </div>
-                              <div className="rounded-xl border border-white/[0.08] bg-pv-bg/60 p-3">
+                              <div className="rounded-xl border border-pv-ink/[0.08] bg-pv-bg/60 p-3">
                                 <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
                                   {t("sourceDraftPrimarySource")}
                                 </div>
@@ -1571,7 +1571,7 @@ export default function CreatePage() {
                               </div>
                             </div>
 
-                            <div className="mt-4 rounded-xl border border-white/[0.08] bg-pv-bg/60 p-3">
+                            <div className="mt-4 rounded-xl border border-pv-ink/[0.08] bg-pv-bg/60 p-3">
                               <div className="text-[10px] font-bold uppercase tracking-[0.14em] text-pv-muted">
                                 {t("sourceDraftSettlementRule")}
                               </div>
@@ -1608,7 +1608,7 @@ export default function CreatePage() {
           glass
           noPad
           glow="none"
-          className="!rounded-2xl border border-white/[0.12] w-full"
+          className="!rounded-2xl border border-pv-ink/[0.12] w-full"
         >
           <div className="space-y-6 p-6 sm:p-8">
             <div className="mb-2 flex items-center gap-3">
@@ -1631,7 +1631,7 @@ export default function CreatePage() {
               <textarea
                 id={challengeQuestionFieldId}
                 rows={5}
-                className="min-h-[160px] w-full resize-none rounded-2xl border border-white/[0.12] bg-pv-bg/40 p-6 sm:p-8 font-display text-xl leading-snug tracking-tight text-pv-text outline-none transition-all placeholder:text-pv-muted/30 focus:border-pv-emerald/50 focus:ring-1 focus:ring-pv-emerald/30 focus:shadow-glow-emerald sm:text-2xl md:text-[26px]"
+                className="min-h-[160px] w-full resize-none rounded-2xl border border-pv-ink/[0.12] bg-pv-bg/40 p-6 sm:p-8 font-display text-xl leading-snug tracking-tight text-pv-text outline-none transition-all placeholder:text-pv-muted/30 focus:border-pv-emerald/50 focus:ring-1 focus:ring-pv-emerald/30 focus:shadow-glow-emerald sm:text-2xl md:text-[26px]"
                 placeholder={challengePlaceholder}
                 aria-labelledby={challengeQuestionHeadingId}
                 value={question}
@@ -1652,7 +1652,7 @@ export default function CreatePage() {
                 type="button"
                 onClick={autofillOutcomeSidesFromQuestion}
                 disabled={question.trim().length === 0}
-                className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-md border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-pv-text/90 transition-colors hover:border-white/[0.16] hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/[0.1] disabled:hover:bg-white/[0.04] sm:max-w-[min(100%,15rem)]"
+                className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-md border border-pv-ink/[0.1] bg-pv-ink/[0.04] px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-pv-text/90 transition-colors hover:border-pv-ink/[0.16] hover:bg-pv-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-pv-ink/[0.1] disabled:hover:bg-pv-ink/[0.04] sm:max-w-[min(100%,15rem)]"
                 aria-label={t("outcomeAutofillAction")}
                 title={t("outcomeAutofillHint")}
               >
@@ -1667,7 +1667,7 @@ export default function CreatePage() {
             {/* Opposition split — Side A (cyan/left) vs Side B (fuchsia/right) */}
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:gap-0">
               {/* Side A — Creator / Cyan */}
-              <div className="relative flex flex-col gap-4 md:pr-4 md:border-r md:border-white/[0.06]">
+              <div className="relative flex flex-col gap-4 md:pr-4 md:border-r md:border-pv-ink/[0.06]">
                 <div className="absolute inset-0 pointer-events-none rounded-xl opacity-60" style={{ background: creatorPos ? "radial-gradient(ellipse 80% 60% at 0% 50%, rgba(51,79,169,0.06), transparent 70%)" : "none" }} />
                 <div className="relative flex items-center gap-2.5">
                   <span
@@ -1726,7 +1726,7 @@ export default function CreatePage() {
           glass
           noPad
           glow="none"
-          className="!rounded-2xl border border-white/[0.12] w-full"
+          className="!rounded-2xl border border-pv-ink/[0.12] w-full"
           role="group"
           aria-label={t("visibility")}
         >
@@ -1757,7 +1757,7 @@ export default function CreatePage() {
                     className={`flex-1 rounded-lg px-6 py-2.5 font-display text-[11px] font-bold uppercase tracking-[0.18em] transition-[color,background-color,border-color,box-shadow,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pv-emerald/40 focus-visible:ring-offset-2 focus-visible:ring-offset-pv-bg sm:tracking-[0.2em] md:flex-none md:min-w-[9.5rem] ${
                       selected
                         ? "bg-pv-emerald text-pv-bg shadow-[0_0_22px_-6px_rgba(51,79,169,0.35)] hover:brightness-[1.05] active:scale-[0.98]"
-                        : "border border-white/[0.12] bg-pv-surface text-pv-muted hover:border-white/[0.2] hover:text-pv-text active:scale-[0.98]"
+                        : "border border-pv-ink/[0.12] bg-pv-surface text-pv-muted hover:border-pv-ink/[0.2] hover:text-pv-text active:scale-[0.98]"
                     }`}
                   >
                     {t(labelKey)}
@@ -1774,7 +1774,7 @@ export default function CreatePage() {
             glass
             noPad
             glow="none"
-            className="!rounded-2xl border border-white/[0.12] w-full"
+            className="!rounded-2xl border border-pv-ink/[0.12] w-full"
           >
             <div className="space-y-3 p-6 sm:p-8">
               <h3 className="flex items-center gap-2.5 font-display text-xs font-bold uppercase tracking-[0.18em] text-pv-text sm:tracking-[0.2em]">
@@ -1799,7 +1799,7 @@ export default function CreatePage() {
                     className={`min-w-0 rounded-lg border px-1.5 py-2 font-display text-[11px] font-bold leading-tight transition-[border-color,background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pv-emerald/35 focus-visible:ring-offset-2 focus-visible:ring-offset-pv-bg sm:px-2 sm:py-2.5 sm:text-xs ${
                       stake === amount && presetStakeHighlight
                         ? "border-pv-emerald bg-pv-emerald/[0.12] text-pv-emerald shadow-[0_0_16px_-8px_rgba(51,79,169,0.3)]"
-                        : "border border-white/[0.12] bg-pv-surface text-pv-muted hover:border-pv-emerald/35 hover:text-pv-emerald"
+                        : "border border-pv-ink/[0.12] bg-pv-surface text-pv-muted hover:border-pv-emerald/35 hover:text-pv-emerald"
                     }`}
                   >
                     {amount} USDC
@@ -1809,7 +1809,7 @@ export default function CreatePage() {
                   className={`flex min-h-[2.75rem] w-full min-w-0 items-center justify-center rounded-lg border px-1.5 py-1.5 transition-[border-color,background-color,color,box-shadow] sm:min-h-[3.25rem] sm:px-2 sm:py-2 ${
                     customStakeFocused || !isPresetStakeAmount(stake)
                       ? "border-pv-emerald bg-pv-emerald/[0.12] text-pv-emerald shadow-[0_0_16px_-8px_rgba(51,79,169,0.3)]"
-                      : "border border-white/[0.12] bg-pv-surface text-pv-muted"
+                      : "border border-pv-ink/[0.12] bg-pv-surface text-pv-muted"
                   }`}
                 >
                   <div className="inline-flex max-w-full items-center justify-center gap-0.5 sm:gap-1">
@@ -1874,7 +1874,7 @@ export default function CreatePage() {
             glass
             noPad
             glow="none"
-            className="!rounded-2xl border border-white/[0.12] w-full"
+            className="!rounded-2xl border border-pv-ink/[0.12] w-full"
             role="group"
             aria-label={t("deadline")}
           >
@@ -1902,7 +1902,7 @@ export default function CreatePage() {
                       className={`min-w-0 rounded-lg border px-1.5 py-2 font-display text-[11px] font-bold leading-tight transition-[border-color,background-color,color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pv-emerald/35 focus-visible:ring-offset-2 focus-visible:ring-offset-pv-bg sm:px-2 sm:py-2.5 sm:text-xs ${
                         selected
                           ? "border-pv-emerald bg-pv-emerald/[0.12] text-pv-emerald shadow-[0_0_16px_-8px_rgba(51,79,169,0.3)]"
-                          : "border border-white/[0.12] bg-pv-surface text-pv-muted hover:border-pv-emerald/35 hover:text-pv-emerald"
+                          : "border border-pv-ink/[0.12] bg-pv-surface text-pv-muted hover:border-pv-emerald/35 hover:text-pv-emerald"
                       }`}
                     >
                       {preset.label}
@@ -1947,7 +1947,7 @@ export default function CreatePage() {
             glass
             noPad
             glow="none"
-            className="!rounded-2xl border border-white/[0.12] w-full"
+            className="!rounded-2xl border border-pv-ink/[0.12] w-full"
             role="group"
             aria-label={t("verificationSourceSectionTitle")}
           >
@@ -1984,7 +1984,7 @@ export default function CreatePage() {
                 {sourceNeedsWork ? t("qualitySource") : t("sourceStrengthHint")}
               </p>
 
-              <div className="space-y-3 rounded-xl border border-white/[0.08] bg-pv-bg/70 p-4 sm:p-5">
+              <div className="space-y-3 rounded-xl border border-pv-ink/[0.08] bg-pv-bg/70 p-4 sm:p-5">
                 <h4 className="text-[11px] font-bold uppercase tracking-[0.16em] text-pv-emerald/85">
                   {t("verificationGuidanceTitle")}
                 </h4>
@@ -1997,7 +1997,7 @@ export default function CreatePage() {
                       key={example}
                       type="button"
                       onClick={() => setUrl(example)}
-                      className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[10px] font-medium text-pv-muted/70 transition-colors hover:border-white/[0.14] hover:text-pv-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pv-emerald/30 focus-visible:ring-offset-2 focus-visible:ring-offset-pv-bg"
+                      className="rounded-full border border-pv-ink/[0.08] bg-pv-ink/[0.03] px-3 py-1.5 font-mono text-[10px] font-medium text-pv-muted/70 transition-colors hover:border-pv-ink/[0.14] hover:text-pv-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pv-emerald/30 focus-visible:ring-offset-2 focus-visible:ring-offset-pv-bg"
                     >
                       {example}
                     </button>
@@ -2018,13 +2018,13 @@ export default function CreatePage() {
             glass
             noPad
             glow="none"
-            className="!rounded-2xl border border-white/[0.12] w-full overflow-hidden"
+            className="!rounded-2xl border border-pv-ink/[0.12] w-full overflow-hidden"
           >
             <button
               type="button"
               onClick={() => setAdvancedOpen((value) => !value)}
               aria-expanded={advancedOpen}
-              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-white/[0.02] sm:px-8 sm:py-6"
+              className="flex w-full items-center justify-between gap-4 px-6 py-5 text-left transition-colors hover:bg-pv-ink/[0.02] sm:px-8 sm:py-6"
             >
               <div className="flex min-w-0 gap-3">
                 <span
@@ -2070,7 +2070,7 @@ export default function CreatePage() {
               className={`overflow-hidden ${!advancedOpen ? "pointer-events-none" : ""}`}
               aria-hidden={!advancedOpen}
             >
-              <div className="space-y-8 border-t border-white/[0.08] px-6 pb-6 pt-6 sm:px-8 sm:pb-8">
+              <div className="space-y-8 border-t border-pv-ink/[0.08] px-6 pb-6 pt-6 sm:px-8 sm:pb-8">
                 {/* Settlement mode — how the money moves. Options and copy come
                     from the registry so this screen, the detail page and the
                     market-creator cannot disagree about a mode's rules. */}
@@ -2240,7 +2240,7 @@ export default function CreatePage() {
                       onClick={() =>
                         setSettlementRule(recommendedSettlementTemplate)
                       }
-                      className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-md border border-white/[0.1] bg-white/[0.04] px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-pv-text/90 transition-colors hover:border-white/[0.16] hover:bg-white/[0.07] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-white/[0.1] disabled:hover:bg-white/[0.04] sm:max-w-[min(100%,14rem)] sm:self-auto"
+                      className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-md border border-pv-ink/[0.1] bg-pv-ink/[0.04] px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-pv-text/90 transition-colors hover:border-pv-ink/[0.16] hover:bg-pv-ink/[0.07] disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-pv-ink/[0.1] disabled:hover:bg-pv-ink/[0.04] sm:max-w-[min(100%,14rem)] sm:self-auto"
                       aria-label={t("useRecommendedRule")}
                     >
                       <Wand2
@@ -2262,12 +2262,12 @@ export default function CreatePage() {
                   glass
                   glow="none"
                   noPad
-                  className="!rounded-2xl !border-2 !border-dashed !border-white/[0.18] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
+                  className="!rounded-2xl !border-2 !border-dashed !border-pv-ink/[0.18] shadow-[inset_0_1px_0_0_rgba(255,255,255,0.03)]"
                 >
                   <div className="p-5 sm:p-6">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-4">
                       <span
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-white/[0.1] bg-white/[0.03] text-pv-muted"
+                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-pv-ink/[0.1] bg-pv-ink/[0.03] text-pv-muted"
                         aria-hidden
                       >
                         <FlaskConical size={18} strokeWidth={2} />
@@ -2277,7 +2277,7 @@ export default function CreatePage() {
                           <h3 className="font-display text-xs font-bold uppercase tracking-[0.18em] text-pv-text sm:tracking-[0.2em]">
                             {tVsDetail("sampleModeTitle")}
                           </h3>
-                          <span className="inline-flex shrink-0 rounded border border-white/[0.12] bg-white/[0.04] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-pv-muted sm:text-[10px] sm:tracking-[0.22em]">
+                          <span className="inline-flex shrink-0 rounded border border-pv-ink/[0.12] bg-pv-ink/[0.04] px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-[0.2em] text-pv-muted sm:text-[10px] sm:tracking-[0.22em]">
                             {tVsDetail("sampleModeDemoBadge")}
                           </span>
                         </div>
@@ -2335,9 +2335,9 @@ export default function CreatePage() {
                   }
                 />
                 {CLAIM_MODERATION_ENABLED ? (
-                  <div className="relative overflow-hidden rounded-2xl border border-white/[0.10] bg-gradient-to-br from-white/[0.04] via-white/[0.015] to-transparent px-3 py-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] sm:px-4">
+                  <div className="relative overflow-hidden rounded-2xl border border-pv-ink/[0.10] bg-gradient-to-br from-pv-ink/[0.04] via-pv-ink/[0.015] to-transparent px-3 py-3 shadow-[inset_0_1px_0_0_rgba(255,255,255,0.05)] sm:px-4">
                     <div
-                      className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/15 to-transparent"
+                      className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-pv-ink/15 to-transparent"
                       aria-hidden
                     />
                     <div className="flex min-w-0 flex-row flex-wrap items-center justify-center gap-5 sm:gap-8">
@@ -2347,7 +2347,7 @@ export default function CreatePage() {
                         onClick={() => void runClaimModeration()}
                         disabled={!moderationInputReady || moderationLoading}
                         loading={moderationLoading}
-                        className="shrink-0 rounded-lg px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] !border-white/[0.10] !bg-white/[0.03] !text-pv-muted/95 enabled:hover:!border-white/[0.14] enabled:hover:!bg-white/[0.05] enabled:hover:!text-pv-text/85 disabled:!opacity-50"
+                        className="shrink-0 rounded-lg px-3.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] !border-pv-ink/[0.10] !bg-pv-ink/[0.03] !text-pv-muted/95 enabled:hover:!border-pv-ink/[0.14] enabled:hover:!bg-pv-ink/[0.05] enabled:hover:!text-pv-text/85 disabled:!opacity-50"
                       >
                         {t("moderationRunCheck")}
                       </Button>

@@ -21,7 +21,7 @@ export default function EmergingNarrativesClient() {
             </div>
           </div>
 
-          <div className="card border-white/[0.12] bg-pv-surface/60 p-10 text-center shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] sm:p-12">
+          <div className="card border-pv-ink/[0.12] bg-pv-surface/60 p-10 text-center shadow-[inset_0_1px_0_0_rgba(255,255,255,0.04)] sm:p-12">
             <div className="font-display text-xl font-bold uppercase tracking-[0.08em] text-pv-text sm:text-2xl">
               {t("comingSoon")}
             </div>

@@ -9,12 +9,53 @@
 
 @layer base {
   /**
+   * Theme tokens as RGB channels — Tailwind wraps them in rgb(… / <alpha-value>)
+   * so utilities keep their own opacity. Dark is the default and the design's
+   * native form; light is the same blueprint inverted onto paper.
+   *
+   * Never give a colour its only definition inside the light block: an unmatched
+   * token would fall back to nothing and paint transparent.
+   */
+  :root {
+    --pv-bg: 10 30 61;
+    --pv-surface: 14 38 73;
+    --pv-surface2: 19 48 87;
+    --pv-border: 255 255 255;
+    --pv-text: 255 255 255;
+    --pv-muted: 169 192 222;
+    --pv-ink: 255 255 255;
+    --pv-accent: 51 79 169;
+    --pv-gold: 224 179 106;
+    --pv-danger: 239 107 107;
+    --pv-vignette: 3 11 26;
+    --pv-grain-opacity: 0.025;
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --pv-bg: 244 247 252;
+    --pv-surface: 255 255 255;
+    --pv-surface2: 234 240 249;
+    /* Ink, not white: every hairline and tinted panel derives from this. */
+    --pv-border: 10 30 61;
+    --pv-text: 10 30 61;
+    --pv-muted: 74 100 140;
+    --pv-ink: 10 30 61;
+    /* Darkened so accent text clears AA contrast on white. */
+    --pv-accent: 43 68 148;
+    --pv-gold: 150 100 20;
+    --pv-danger: 176 42 42;
+    --pv-vignette: 148 168 196;
+    --pv-grain-opacity: 0.015;
+    color-scheme: light;
+  }
+
+  /**
    * Evita scroll horizontal en mobile (elementos 100vw, márgenes negativos, etc.).
    * Aplicar en html + body es el patrón habitual; el contenido sigue scrolleando en Y.
    */
   html {
     @apply antialiased overflow-x-hidden;
-    color-scheme: dark;
   }
 
   body {
@@ -32,7 +73,7 @@
     inset: 0;
     z-index: 9999;
     pointer-events: none;
-    opacity: 0.025;
+    opacity: var(--pv-grain-opacity);
     background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
     background-repeat: repeat;
     background-size: 256px 256px;
@@ -48,13 +89,13 @@
     background: radial-gradient(
       ellipse at 50% 50%,
       transparent 55%,
-      rgba(3, 11, 26, 0.55) 100%
+      rgb(var(--pv-vignette) / 0.55) 100%
     );
   }
 
   ::selection {
-    background: rgba(51,79,169, 0.35);
-    color: #FFFFFF;
+    background: rgb(var(--pv-accent) / 0.35);
+    color: rgb(var(--pv-text));
   }
 
   /**
@@ -83,9 +124,9 @@
 
   .btn-ghost {
     @apply w-full py-4 px-6 rounded font-display font-bold text-base
-           bg-transparent text-pv-muted border border-white/[0.15]
+           bg-transparent text-pv-muted border border-pv-ink/[0.15]
            transition-[transform,box-shadow,border-color,color,background-color] duration-200 ease-out
-           hover:-translate-y-px hover:border-white/[0.28] hover:text-pv-text
+           hover:-translate-y-px hover:border-pv-ink/[0.28] hover:text-pv-text
            hover:shadow-[0_4px_18px_-6px_rgba(0,0,0,0.45)]
            active:translate-y-0 active:scale-[0.98]
            disabled:cursor-not-allowed disabled:opacity-40;
@@ -165,7 +206,7 @@
 
   /* ── Form elements ── */
   .input {
-    @apply w-full px-4 py-3.5 rounded bg-pv-surface2 border border-white/[0.1]
+    @apply w-full px-4 py-3.5 rounded bg-pv-surface2 border border-pv-ink/[0.1]
            text-pv-text placeholder:text-pv-muted font-body text-[15px]
            focus:border-pv-emerald/60 focus:border
            transition-colors duration-150 outline-none;
@@ -186,13 +227,15 @@
    * Selects de Market type / Odds mode: mismo sistema que `.form-field-pv` + chevron + altura táctil y hover suave.
    */
   .select-field-pv {
-    @apply w-full min-h-[3.25rem] cursor-pointer appearance-none rounded-xl border border-white/[0.12]
+    @apply w-full min-h-[3.25rem] cursor-pointer appearance-none rounded-xl border border-pv-ink/[0.12]
            bg-pv-bg/90 bg-no-repeat px-4 py-3 pr-11 font-body text-sm font-medium tracking-tight
            text-pv-text antialiased outline-none transition-[border-color,box-shadow,background-color]
-           duration-200 hover:border-white/[0.22] hover:bg-pv-surface/[0.4]
+           duration-200 hover:border-pv-ink/[0.22] hover:bg-pv-surface/[0.4]
            focus-visible:border-pv-emerald/50 focus-visible:ring-1 focus-visible:ring-pv-emerald/25
            focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50;
-    color-scheme: dark;
+    /* Inherited from :root so the native option list follows the active theme;
+       pinning it to dark left a black dropdown on a white page. */
+    color-scheme: inherit;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='20' height='20' viewBox='0 0 24 24' fill='none'%3E%3Cpath stroke='%23A8A4B8' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round' d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
     background-position: right 0.75rem center;
     background-size: 1.125rem 1.125rem;
@@ -203,7 +246,7 @@
    * `rounded-xl`, borde blanco suave, foco con anillo fino (sin duplicar borde verde grueso de `.input`).
    */
   .form-field-pv {
-    @apply w-full rounded-xl border border-white/[0.12] bg-pv-bg/90 px-4 py-3.5
+    @apply w-full rounded-xl border border-pv-ink/[0.12] bg-pv-bg/90 px-4 py-3.5
            font-body text-sm text-pv-text
            placeholder:text-pv-muted/50
            outline-none transition-[border-color,box-shadow]
@@ -216,7 +259,7 @@
   }
 
   .chip {
-    @apply px-3.5 py-1.5 rounded border border-white/[0.15] bg-transparent
+    @apply px-3.5 py-1.5 rounded border border-pv-ink/[0.15] bg-transparent
            text-sm font-semibold cursor-pointer transition-all duration-150;
   }
 

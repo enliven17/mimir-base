@@ -623,7 +623,7 @@ export default function HomePage() {
                       </p>
                     </div>
                   </div>
-                  <div className="relative z-10 hidden h-12 w-px shrink-0 bg-white/[0.1] md:block" aria-hidden />
+                  <div className="relative z-10 hidden h-12 w-px shrink-0 bg-pv-ink/[0.1] md:block" aria-hidden />
                   <div className="relative z-10 flex shrink-0 flex-col items-start gap-1 md:items-end md:text-right">
                     <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-pv-muted">
                       Settlement

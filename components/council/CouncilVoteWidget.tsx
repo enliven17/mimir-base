@@ -113,7 +113,7 @@ export default function CouncilVoteWidget({ claimId }: { claimId: number }) {
             }`}
           >
             <div className="flex min-w-0 items-center gap-2">
-              <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-white/[0.1] bg-pv-surface2" aria-hidden>
+              <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-full border border-pv-ink/[0.1] bg-pv-surface2" aria-hidden>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={openPeepsAvatar(`council-${v.slug}`)}

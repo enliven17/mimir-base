@@ -93,7 +93,7 @@ export default function CreateSuccessScreen({
                 glass
                 noPad
                 glow="none"
-                className="!rounded-2xl border border-white/[0.12]"
+                className="!rounded-2xl border border-pv-ink/[0.12]"
               >
                 <div className="space-y-3 p-5 sm:p-6">
                   <label
@@ -151,7 +151,7 @@ export default function CreateSuccessScreen({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-white/[0.08] bg-pv-bg/35 px-4 py-3.5 sm:px-5">
+              <div className="rounded-xl border border-pv-ink/[0.08] bg-pv-bg/35 px-4 py-3.5 sm:px-5">
                 <div className="space-y-2 text-left text-xs text-pv-muted">
                   {isMockSuccess && (
                     <p className="text-[11px] leading-relaxed text-pv-muted/90">

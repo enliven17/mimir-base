@@ -15,6 +15,22 @@ export default function RootLayout({
     <html
       className={`${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable}`}
     >
+      <head>
+        {/**
+         * Applies the theme before first paint. In a <script> rather than React
+         * state because any render-time decision happens after the browser has
+         * already painted the default palette — which is a full-page flash on
+         * every load for anyone who chose light.
+         */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('mimir-theme');" +
+              "if(!t)t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';" +
+              "if(t==='light')document.documentElement.dataset.theme='light';}catch(e){}})();",
+          }}
+        />
+      </head>
       <body className="overflow-x-hidden">
         <NextTopLoader
           color="#22D3EE"
@@ -31,10 +47,12 @@ export default function RootLayout({
               position="bottom-center"
               theme="dark"
               toastOptions={{
+                // Themed tokens rather than fixed hex: a near-black toast on the
+                // light palette read as a rendering bug.
                 style: {
-                  background: "#18181B",
-                  border: "1px solid #27272A",
-                  color: "#FAFAFA",
+                  background: "rgb(var(--pv-surface))",
+                  border: "1px solid rgb(var(--pv-ink) / 0.14)",
+                  color: "rgb(var(--pv-text))",
                   borderRadius: 16,
                   fontFamily: "var(--font-body)",
                 },
