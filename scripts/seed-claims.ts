@@ -275,7 +275,7 @@ async function main(): Promise<void> {
         contractAddress: CONTRACT_ADDRESS,
         abi: MIMIR_ABI,
         functionName: "createClaim",
-        args: [
+        args: [[
           seed.question,
           seed.creatorPosition,
           seed.counterPosition,
@@ -292,7 +292,9 @@ async function main(): Promise<void> {
           BigInt(100),
           false,
           "",
-        ],
+          `0x${"00".repeat(32)}`,
+          "0x0000000000000000000000000000000000000000",
+        ]],
         amountUsdc: String(STAKE_USDC),
       });
 

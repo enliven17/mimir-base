@@ -47,7 +47,7 @@ async function main(): Promise<void> {
     contractAddress,
     abi:             MIMIR_ABI,
     functionName:    "createClaim",
-    args: [
+    args: [[
       "Mimir demo — is the Bitcoin price > $100,000 USD?",
       "Yes, BTC > $100k",
       "No, BTC ≤ $100k",
@@ -58,7 +58,9 @@ async function main(): Promise<void> {
       0n, "binary", "pool", 0n, "",
       "Settle from CoinGecko BTC USD spot price at deadline",
       100n, false, "",
-    ],
+      `0x${"00".repeat(32)}`,
+      "0x0000000000000000000000000000000000000000",
+    ]],
     amountUsdc: String(STAKE_USDC),
   });
   console.log(`  create tx: ${getExplorerTxUrl(createTx)}`);

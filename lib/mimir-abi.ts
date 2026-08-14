@@ -1,5 +1,5 @@
 /**
- * Mimir.sol ABI — generated from contracts/Mimir.sol
+ * MimirV2.sol ABI — generated from contracts/MimirV2.sol
  */
 
 /** Basis-point divisor used by Mimir.sol fixed-odds math: 10_000 bps = 100%. */
@@ -55,6 +55,9 @@ export const MIMIR_ABI = [
     inputs: [
       { name: "_oracle", type: "address" },
       { name: "_usdc",   type: "address" },
+      { name: "_platformFeeBps", type: "uint16" },
+      { name: "_agentOwnerFeeBps", type: "uint16" },
+      { name: "_platformRecipient", type: "address" },
     ],
     stateMutability: "nonpayable",
   },
@@ -64,22 +67,30 @@ export const MIMIR_ABI = [
     name: "createClaim",
     stateMutability: "nonpayable",
     inputs: [
-      { name: "question",             type: "string"  },
-      { name: "creatorPosition",      type: "string"  },
-      { name: "counterPosition",      type: "string"  },
-      { name: "resolutionUrl",        type: "string"  },
-      { name: "deadline",             type: "uint256" },
-      { name: "stakeAmount",          type: "uint256" },
-      { name: "category",             type: "string"  },
-      { name: "parentId",             type: "uint256" },
-      { name: "marketType",           type: "string"  },
-      { name: "oddsMode",             type: "string"  },
-      { name: "challengerPayoutBps",  type: "uint256" },
-      { name: "handicapLine",         type: "string"  },
-      { name: "settlementRule",       type: "string"  },
-      { name: "maxChallengers",       type: "uint256" },
-      { name: "isPrivate",            type: "bool"    },
-      { name: "inviteKey",            type: "string"  },
+      {
+        name: "params",
+        type: "tuple",
+        components: [
+          { name: "question",             type: "string"  },
+          { name: "creatorPosition",      type: "string"  },
+          { name: "counterPosition",      type: "string"  },
+          { name: "resolutionUrl",        type: "string"  },
+          { name: "deadline",             type: "uint256" },
+          { name: "stakeAmount",          type: "uint256" },
+          { name: "category",             type: "string"  },
+          { name: "parentId",             type: "uint256" },
+          { name: "marketType",           type: "string"  },
+          { name: "oddsMode",             type: "string"  },
+          { name: "challengerPayoutBps",  type: "uint256" },
+          { name: "handicapLine",         type: "string"  },
+          { name: "settlementRule",       type: "string"  },
+          { name: "maxChallengers",       type: "uint256" },
+          { name: "isPrivate",            type: "bool"    },
+          { name: "inviteKey",            type: "string"  },
+          { name: "contextHash",          type: "bytes32" },
+          { name: "agentOwnerRecipient",  type: "address" },
+        ],
+      },
     ],
     outputs: [{ name: "id", type: "uint256" }],
   },
@@ -239,6 +250,8 @@ export const MIMIR_ABI = [
       { name: "totalClaims", type: "uint256" },
       { name: "resolved",    type: "uint256" },
       { name: "balance",     type: "uint256" },
+      { name: "feesAccrued", type: "uint256" },
+      { name: "feesClaimed", type: "uint256" },
     ],
   },
   {

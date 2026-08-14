@@ -1,5 +1,5 @@
 /**
- * Quick read of every Mimir agent wallet on ETH Chain Testnet.
+ * Quick read of every Mimir agent wallet on Base Sepolia.
  * Shows native ETH (gas) and USDC (stake) balances.
  *
  * Run: npx tsx --env-file-if-exists=.env.local scripts/check-agent-balances.ts
@@ -18,6 +18,19 @@ function addressFromKeyEnv(keyEnv: string): `0x${string}` | null {
   const key = process.env[keyEnv]?.trim();
   if (!key || !/^0x[0-9a-fA-F]{64}$/.test(key)) return null;
   return privateKeyToAccount(key as `0x${string}`).address;
+}
+
+async function withRpcRetry<T>(read: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    try {
+      return await read();
+    } catch (error) {
+      lastError = error;
+      if (attempt < 4) await new Promise((resolve) => setTimeout(resolve, 500 * 2 ** attempt));
+    }
+  }
+  throw lastError;
 }
 
 async function main(): Promise<void> {
@@ -49,8 +62,8 @@ async function main(): Promise<void> {
   console.log("Base Sepolia balances (gas ETH + stake USDC):\n");
   console.log(`USDC token: ${USDC_ADDRESS}\n`);
   for (const row of rows) {
-    const bot = await client.getBalance({ address: row.address });
-    const usdc = (await client.readContract({
+    const bot = await withRpcRetry(() => client.getBalance({ address: row.address }));
+    const usdc = await withRpcRetry(() => client.readContract({
       address: USDC_ADDRESS,
       abi: ERC20_ABI,
       functionName: "balanceOf",

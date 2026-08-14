@@ -8,6 +8,9 @@
  *   npx tsx --env-file=.env.local scripts/onchain-smoke.ts
  */
 import {
+  decodeEventLog,
+} from "viem";
+import {
   createBasePublicClient,
   getContractAddress,
   getExplorerTxUrl,
@@ -67,7 +70,7 @@ async function main() {
     contractAddress: contract,
     abi: MIMIR_ABI,
     functionName: "createClaim",
-    args: [
+    args: [[
       "Onchain smoke — will this claim be challengeable?",
       "Yes",
       "No",
@@ -84,17 +87,38 @@ async function main() {
       100n,
       false,
       "",
-    ],
+      `0x${"00".repeat(32)}`,
+      "0x0000000000000000000000000000000000000000",
+    ]],
     amountUsdc: "2",
   });
   console.log(`  create: ${getExplorerTxUrl(createTx)}`);
 
-  const newCount = (await client.readContract({
-    address: contract,
-    abi: MIMIR_ABI,
-    functionName: "claimCount",
-  })) as bigint;
-  const claimId = Number(newCount);
+  const receipt = await client.getTransactionReceipt({ hash: createTx });
+  const createdEvent = receipt.logs
+    .map((log) => {
+      try {
+        return decodeEventLog({ abi: MIMIR_ABI, eventName: "ClaimCreated", data: log.data, topics: log.topics });
+      } catch {
+        return null;
+      }
+    })
+    .find(Boolean);
+  if (!createdEvent || !("id" in createdEvent.args)) throw new Error("ClaimCreated event missing from create receipt");
+  const claimId = Number(createdEvent.args.id);
+
+  // Public Base RPCs can briefly serve a stale read immediately after a receipt.
+  // Wait until the exact claim is visible before simulating the dependent write.
+  for (let attempt = 0; attempt < 15; attempt += 1) {
+    const visibleCount = (await client.readContract({
+      address: contract,
+      abi: MIMIR_ABI,
+      functionName: "claimCount",
+    })) as bigint;
+    if (visibleCount >= BigInt(claimId)) break;
+    if (attempt === 14) throw new Error(`claim #${claimId} not visible after create receipt`);
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
   console.log(`  claimId = #${claimId}`);
 
   console.log(`\n[3] challengeClaim (2 USDC from oracle)…`);
@@ -109,7 +133,11 @@ async function main() {
   console.log(`  challenge: ${getExplorerTxUrl(challengeTx)}`);
 
   console.log(`\n[4] read claim…`);
-  const decoded = await fetchDecodedClaim(client, contract, claimId);
+  let decoded = await fetchDecodedClaim(client, contract, claimId);
+  for (let attempt = 0; attempt < 15 && decoded && Number(decoded.state) !== STATE.ACTIVE; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+    decoded = await fetchDecodedClaim(client, contract, claimId);
+  }
   if (!decoded) throw new Error("claim not found after create");
 
   console.log(`  state            = ${decoded.state} (expect ACTIVE=${STATE.ACTIVE})`);

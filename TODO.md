@@ -564,7 +564,7 @@ erişemez veya mode'un teminat gereksinimini aşamaz.
   fee, refund, duplicate claim ve max participants.
 - [x] Mode başına malicious ERC-1271 signer, reverting receiver, reentrancy ve
   concurrent transaction senaryoları.
-- [ ] Deploy sonrası ABI/bytecode/address doğrulama ve Base Sepolia smoke test.
+- [x] Deploy sonrası ABI/bytecode/address doğrulama ve Base Sepolia smoke test.
 - [x] Yeni kontrat gerekiyorsa clean-state testnet redeploy planı; eski ağ için
   data/branch compatibility katmanı ekleme.
 

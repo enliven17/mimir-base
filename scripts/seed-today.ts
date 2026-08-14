@@ -215,10 +215,11 @@ async function main() {
         contractAddress: CONTRACT,
         abi: MIMIR_ABI,
         functionName: "createClaim",
-        args: [
+        args: [[
           s.question, s.a, s.b, s.url, deadline, stake, s.category,
           BigInt(0), "binary", "pool", BigInt(0), "", s.rule, BigInt(100), false, "",
-        ],
+          `0x${"00".repeat(32)}`, "0x0000000000000000000000000000000000000000",
+        ]],
         amountUsdc: String(STAKE_USDC),
       });
       created++;

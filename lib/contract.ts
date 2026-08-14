@@ -431,7 +431,7 @@ export async function getPlatformStats(): Promise<{
     address:      CONTRACT_ADDRESS,
     abi:          MIMIR_ABI,
     functionName: "getPlatformStats",
-  })) as [bigint, bigint, bigint];
+  })) as readonly [bigint, bigint, bigint, bigint, bigint];
   return {
     total_claims:   Number(totalClaims),
     total_resolved: Number(resolved),
@@ -907,7 +907,7 @@ export async function executeDemoWrite(
 
 // ── Helper: build createClaim args tuple ──────────────────────────────────────
 function buildCreateArgs(p: CreateClaimParams): unknown[] {
-  return [
+  return [[
     p.question,
     p.creator_position,
     p.counter_position,
@@ -924,7 +924,9 @@ function buildCreateArgs(p: CreateClaimParams): unknown[] {
     BigInt(p.max_challengers ?? 0),
     p.visibility === "private",
     p.invite_key ?? "",
-  ];
+    `0x${"00".repeat(32)}`,
+    ZERO_ADDRESS,
+  ]];
 }
 
 // ── Demo mode helpers ─────────────────────────────────────────────────────────
