@@ -346,7 +346,7 @@ export function healthHttpStatus(status: Severity): number {
 // ── Heartbeat storage ─────────────────────────────────────────────────────────
 
 /** Workers expected to report. A worker missing from a snapshot cannot alarm. */
-export const MONITORED_WORKERS = ["oracle", "market_creator", "council", "sync"] as const;
+export const MONITORED_WORKERS = ["oracle", "market_creator", "council", "sync", "traders"] as const;
 export type MonitoredWorker = (typeof MONITORED_WORKERS)[number];
 
 /**

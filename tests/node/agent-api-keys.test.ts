@@ -60,8 +60,9 @@ test("anything that is not a key parses to null rather than to a lookup", () => 
 });
 
 test("a revoked key is refused, and a missing one is not confused with it", () => {
-  assert.equal(checkApiKeyRecord(null).ok, false);
-  assert.equal(checkApiKeyRecord(null).ok === false && checkApiKeyRecord(null).reason, "not_found");
+  const missing = checkApiKeyRecord(null);
+  assert.equal(missing.ok, false);
+  assert.equal(missing.ok === false && missing.reason, "not_found");
   const revoked = checkApiKeyRecord(record({ revokedAt: 1_700_000_100_000 }));
   assert.equal(revoked.ok, false);
   assert.equal(revoked.ok === false && revoked.reason, "revoked");

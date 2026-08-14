@@ -69,3 +69,50 @@ export function assetsForRedemption(sharesAtomic: bigint, totalAssetsAtomic: big
   if (sharesAtomic <= 0n || totalSharesAtomic <= 0n) throw new Error("invalid redemption");
   return (sharesAtomic * totalAssetsAtomic) / totalSharesAtomic;
 }
+
+const DAY_MS = 86_400_000;
+
+/** One agent's settled result, as the basket engine needs to see it. */
+export interface BasketAgentResult {
+  agentId: string;
+  /** Milliseconds. */
+  settledAt: number;
+  pnlAtomic: bigint;
+  stakeAtomic: bigint;
+}
+
+/**
+ * Daily return per agent, in basis points of what that agent staked that day.
+ *
+ * Weighted by stake rather than counting trades: a 10 USDC decision and a 1 USDC one
+ * are not two equal votes, and averaging them as if they were flatters whoever bets
+ * small and often.
+ *
+ * Days with no settlement produce no point at all, so an idle agent contributes a
+ * flat line rather than a zero that drags the basket's average down.
+ */
+export function dailyReturnPoints(results: readonly BasketAgentResult[]): BasketReturnPoint[] {
+  const byDay = new Map<number, Map<string, { pnl: bigint; stake: bigint }>>();
+
+  for (const result of results) {
+    if (result.stakeAtomic <= 0n) continue;
+    const day = Math.floor(result.settledAt / DAY_MS) * DAY_MS;
+    const agents = byDay.get(day) ?? new Map<string, { pnl: bigint; stake: bigint }>();
+    const running = agents.get(result.agentId) ?? { pnl: 0n, stake: 0n };
+    agents.set(result.agentId, {
+      pnl: running.pnl + result.pnlAtomic,
+      stake: running.stake + result.stakeAtomic,
+    });
+    byDay.set(day, agents);
+  }
+
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a - b)
+    .map(([timestamp, agents]) => {
+      const returnsBps: Record<string, number> = {};
+      for (const [agentId, { pnl, stake }] of agents) {
+        returnsBps[agentId] = stake === 0n ? 0 : Number((pnl * 10_000n) / stake);
+      }
+      return { timestamp, returnsBps };
+    });
+}

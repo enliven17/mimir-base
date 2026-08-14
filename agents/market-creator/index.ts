@@ -701,7 +701,11 @@ async function createClaim(candidate: ClaimCandidate): Promise<string | null> {
       contractAddress: CONTRACT_ADDRESS,
       abi:             MIMIR_ABI,
       functionName:    "createClaim",
-      args: [
+      // One tuple, not 16 loose values: MimirV2 takes a single CreateParams struct.
+      // Flat args encoded against a one-parameter function, which viem rejects before
+      // it ever reaches the chain — invisible until autonomous mode was first enabled,
+      // because shadow mode never reached this call.
+      args: [[
         candidate.question,
         candidate.creatorPosition,
         candidate.counterPosition,
@@ -718,7 +722,9 @@ async function createClaim(candidate: ClaimCandidate): Promise<string | null> {
         BigInt(100),                 // maxChallengers
         false,                       // isPrivate
         "",                          // inviteKey
-      ],
+        `0x${"00".repeat(32)}`,      // contextHash — no off-chain context pack
+        "0x0000000000000000000000000000000000000000", // agentOwnerRecipient: none
+      ]],
       amountUsdc: String(CREATOR_STAKE_USDC),
     });
     return txHash;

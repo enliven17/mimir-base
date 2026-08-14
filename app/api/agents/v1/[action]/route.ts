@@ -25,6 +25,7 @@ import {
 } from "@/lib/agents/registry";
 import { auditAgentRequest, consumeNonce, loadAgent, loadIdempotentResponse, saveAgent, saveIdempotentResponse } from "@/lib/agents/store";
 import { buildAgentDryRun } from "@/lib/agents/dry-run";
+import { isFeatureEnabled } from "@/lib/ops/flags";
 import { ERC20_ABI, USDC_ADDRESS, usdcToUnits } from "@/lib/usdc";
 import { parseUsdcAtomic } from "@/lib/usdc";
 import { getAgentEarningsSummary } from "@/lib/db";
@@ -48,7 +49,17 @@ async function audit(request: SignedAgentRequest, outcome: string, reason?: stri
   });
 }
 
+/**
+ * Actions that put an owner's USDC at risk. Gated on byoa_funded_actions so the
+ * launch-gate document and the code agree: until an operator enables it, an agent
+ * can register, read and dry-run but cannot move money.
+ */
+const FUNDED_ACTIONS: readonly AgentApiAction[] = ["createMarket", "stake", "vote"];
+
 async function register(request: SignedAgentRequest<Record<string, any>>): Promise<Response> {
+  if (!isFeatureEnabled("byoa_registry")) {
+    return json({ error: { message: "agent registration is not enabled" } }, 403);
+  }
   const body = request.body;
   const owner = String(body.ownerWallet ?? "").toLowerCase();
   const operator = String(body.operatorWallet ?? "").toLowerCase();
@@ -147,6 +158,15 @@ export async function POST(req: Request, context: { params: Promise<{ action: st
   if (agent.status === "revoked" && !["heartbeat", "listPositions", "listEarnings", "listKeys", "spendStatus"].includes(action)) {
     await audit(request, "rejected", "agent_revoked");
     return json({ error: { message: "agent is revoked" } }, 403);
+  }
+  if (FUNDED_ACTIONS.includes(action) && !isFeatureEnabled("byoa_funded_actions")) {
+    await audit(request, "rejected", "feature_disabled");
+    return json({
+      error: {
+        message: "byoa funded actions are not enabled",
+        detail: "dryRun and proposeMarket work meanwhile; they move no money.",
+      },
+    }, 403);
   }
   const prior = await loadIdempotentResponse(agent.agentId, action, request.idempotencyKey);
   if (prior) return json(prior.body, prior.status);

@@ -17,6 +17,10 @@ import {
   getPersonaForAddress,
 } from "@/lib/council-resolver";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
+import { AgentRoster } from "@/components/agents/AgentRoster";
+import { TimeWindowTabs } from "@/components/agents/AgentStats";
+import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
+import { listAgentsWithPerformance } from "@/lib/server/agent-directory";
 import { openPeepsAvatar } from "@/lib/avatars";
 import { shortenAddress } from "@/lib/constants";
 import { cachedFor } from "@/lib/server/ttl-cache";
@@ -303,14 +307,19 @@ function parseFilter(raw: string | string[] | undefined): string {
 export default async function AgentsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ filter?: string | string[] }>;
+  searchParams?: Promise<{ filter?: string | string[]; window?: string | string[] }>;
 }) {
   const [events, agentInfo, sp] = await Promise.all([
     fetchEvents(),
     fetchAgentAddresses(),
-    searchParams ?? Promise.resolve({} as { filter?: string | string[] }),
+    searchParams ?? Promise.resolve({} as { filter?: string | string[]; window?: string | string[] }),
   ]);
   const filter = parseFilter(sp?.filter);
+  const rawWindow = Array.isArray(sp?.window) ? sp.window[0] : sp?.window;
+  const window: TimeWindow = rawWindow && isTimeWindow(rawWindow) ? rawWindow : "all";
+  // Never let a roster query take the whole page down: the event feed below is the
+  // page's older, independent half and still renders without a database.
+  const roster = await listAgentsWithPerformance(window).catch(() => []);
   const councilPersonas = getActiveCouncilPersonas();
   const streaks = deriveStreaks(events);
 
@@ -370,6 +379,25 @@ export default async function AgentsPage({
     <div className="pb-10">
       <BlueprintHeading>AI agents and humans, side by side</BlueprintHeading>
       <div className="mx-auto max-w-[1100px] px-4 pt-6 sm:px-6 lg:px-8">
+
+      <section className="mb-10">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-display text-lg font-bold text-pv-text">Roster</h3>
+            <p className="text-[12px] text-pv-muted">
+              Registered agents, council frames and Mimir&apos;s own — ranked by realised P&amp;L.
+            </p>
+          </div>
+          <TimeWindowTabs active={window} basePath="/agents" />
+        </div>
+        <AgentRoster agents={roster} />
+        <p className="mt-3 text-[11px] text-pv-muted">
+          Realised P&amp;L counts settled markets only; open stakes are shown as exposure.
+          Build a weighted mix of these agents on the{" "}
+          <Link href="/baskets" className="text-pv-emerald hover:underline">baskets page</Link>.
+        </p>
+      </section>
+
       <header className="mb-8 space-y-1.5">
         <p className="mx-auto max-w-2xl text-center text-sm text-pv-muted">
           Every row is a real on-chain transaction. Agents sign with local worker keys

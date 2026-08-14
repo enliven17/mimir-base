@@ -4,6 +4,7 @@ import ws from "ws";
 import type { ChallengeOpportunity } from "@/lib/claimDrafts";
 import type { ClaimChallenger, ClaimData } from "@/lib/contract";
 import type { AgentApiKeyRecord } from "@/lib/agents/api-keys";
+import type { AgentTradeRow } from "@/lib/agents/performance";
 import type { AgentRecord } from "@/lib/agents/registry";
 import type { SpendPermissionRecord } from "@/lib/agents/spend-permissions";
 import type { CopyAuditRecord, CopyPermission } from "@/lib/copy-trading";
@@ -2134,5 +2135,109 @@ export async function releaseSpendReservation(entryId: string): Promise<void> {
   await execute(pool, {
     sql: "DELETE FROM agent_spend_ledger WHERE entry_id = ? AND transaction_hash IS NULL",
     args: [entryId],
+  });
+}
+
+// ── Agent performance ─────────────────────────────────────────────────────────
+
+/**
+ * Every market an address has money in, on either side.
+ *
+ * One query per role rather than a UNION: the two sides carry different figures
+ * (a creator faces a pooled stake, a challenger has its own computed payout) and
+ * flattening them into one row shape in SQL only hides that.
+ */
+export async function getAgentTradeRows(address: string): Promise<AgentTradeRow[]> {
+  const pool = await getDb();
+  const wallet = address.toLowerCase();
+  const [created, challenged] = await Promise.all([
+    execute(pool, {
+      sql: `SELECT id, creator_stake, total_challenger_stake, state, winner_side,
+        updated_at, category, question
+        FROM claims WHERE LOWER(creator) = ? ORDER BY id DESC`,
+      args: [wallet],
+    }),
+    execute(pool, {
+      sql: `SELECT c.id, ch.stake, ch.potential_payout, c.state, c.winner_side,
+        c.updated_at, c.category, c.question
+        FROM challengers ch JOIN claims c ON c.id = ch.claim_id
+        WHERE LOWER(ch.address) = ? ORDER BY c.id DESC`,
+      args: [wallet],
+    }),
+  ]);
+
+  const rows: AgentTradeRow[] = [];
+  for (const raw of created.rows) {
+    const row = raw as Record<string, unknown>;
+    rows.push({
+      claimId: getNumber(row.id), role: "creator",
+      stake: getNumber(row.creator_stake),
+      opposingStake: getNumber(row.total_challenger_stake),
+      potentialPayout: 0,
+      state: getString(row.state), winnerSide: getString(row.winner_side),
+      settledAt: getNumber(row.updated_at),
+      category: getString(row.category), question: getString(row.question),
+    });
+  }
+  for (const raw of challenged.rows) {
+    const row = raw as Record<string, unknown>;
+    rows.push({
+      claimId: getNumber(row.id), role: "challenger",
+      stake: getNumber(row.stake), opposingStake: 0,
+      potentialPayout: getNumber(row.potential_payout),
+      state: getString(row.state), winnerSide: getString(row.winner_side),
+      settledAt: getNumber(row.updated_at),
+      category: getString(row.category), question: getString(row.question),
+    });
+  }
+  return rows;
+}
+
+/** Registry listing for the agents page. Revoked agents are shown, not hidden. */
+export async function listAgentRecords(limit = 100): Promise<AgentRecord[]> {
+  const pool = await getDb();
+  const [records, capabilities] = await Promise.all([
+    execute(pool, {
+      sql: "SELECT * FROM agent_registry ORDER BY created_at ASC LIMIT ?",
+      args: [limit],
+    }),
+    execute(pool, {
+      sql: "SELECT agent_id, capability FROM agent_capabilities WHERE revoked_at IS NULL",
+    }),
+  ]);
+
+  const byAgent = new Map<string, string[]>();
+  for (const raw of capabilities.rows) {
+    const row = raw as Record<string, unknown>;
+    const id = getString(row.agent_id);
+    byAgent.set(id, [...(byAgent.get(id) ?? []), getString(row.capability)]);
+  }
+
+  return records.rows.map((raw) => {
+    const row = raw as Record<string, unknown>;
+    const agentId = getString(row.agent_id);
+    let limits: AgentRecord["limits"];
+    try { limits = JSON.parse(getString(row.limits_json) || "{}"); }
+    catch { limits = {} as AgentRecord["limits"]; }
+    return {
+      schemaVersion: getNumber(row.schema_version),
+      agentId,
+      ownerWallet: getString(row.owner_wallet),
+      operatorWallet: getString(row.operator_wallet),
+      payoutWallet: getString(row.payout_wallet),
+      displayName: getString(row.display_name),
+      description: getString(row.description),
+      metadataUri: row.metadata_uri == null ? undefined : getString(row.metadata_uri),
+      metadataHash: row.metadata_hash == null ? undefined : getString(row.metadata_hash),
+      capabilities: (byAgent.get(agentId) ?? []) as AgentRecord["capabilities"],
+      authorityLevel: getNumber(row.authority_level) as AgentRecord["authorityLevel"],
+      limits,
+      status: getString(row.status) as AgentRecord["status"],
+      reputationBps: getNumber(row.reputation_bps),
+      createdAt: getNumber(row.created_at),
+      updatedAt: getNumber(row.updated_at),
+      revokedAt: row.revoked_at == null ? undefined : getNumber(row.revoked_at),
+      revokedReason: row.revoked_reason == null ? undefined : getString(row.revoked_reason),
+    };
   });
 }
