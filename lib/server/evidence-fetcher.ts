@@ -18,6 +18,9 @@
  * evidence came via Jina rather than a structured API).
  */
 
+import { domainPolicyFromEnv } from "@/lib/research/ssrf";
+import { validateHop } from "@/lib/research/gateway";
+
 const DEFAULT_TIMEOUT_MS = 15_000;
 const DEFAULT_MAX_CHARS = 14_000;
 const COINGECKO_API_BASE = "https://api.coingecko.com/api/v3";
@@ -107,6 +110,16 @@ export async function fetchEvidence(
     throw new EvidenceFetchError("Unsupported URL protocol");
   }
 
+  // SSRF guard. The URL reaching here is attacker-chosen in both callers: a claim's
+  // resolutionUrl is whatever the creator wrote on chain, and the draft route takes
+  // one straight from a request body. Without this the oracle — the process holding
+  // every agent key — could be pointed at cloud metadata or a neighbour service and
+  // would echo what it read into the public resolution summary.
+  const hop = await validateHop(parsed.toString(), domainPolicyFromEnv());
+  if (!hop.allowed) {
+    throw new EvidenceFetchError(`Refused to fetch this URL (${hop.reason})`);
+  }
+
   const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
 
   if (host === "coingecko.com") {
@@ -171,13 +184,20 @@ interface DirectFetchResult {
   statusCode?: number;
 }
 
+function isRedirect(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
+}
+
+/** A public host that 302s to 169.254.169.254 defeats an entry-only check. */
+const MAX_REDIRECTS = 5;
+
 async function tryDirectFetch(
   url: URL,
   args: { timeoutMs: number; userAgent: string },
 ): Promise<DirectFetchResult> {
-  const finalUrl = url.toString();
+  let finalUrl = url.toString();
   try {
-    const response = await fetch(finalUrl, {
+    let response = await fetch(finalUrl, {
       method: "GET",
       headers: {
         "User-Agent": args.userAgent,
@@ -185,9 +205,40 @@ async function tryDirectFetch(
         "Accept-Language": "en-US,en;q=0.8",
       },
       cache: "no-store",
-      redirect: "follow",
+      // Manual, so every hop is validated the way the first one was. `follow`
+      // would let the redirect chain reach an address the guard just refused.
+      redirect: "manual",
       signal: AbortSignal.timeout(args.timeoutMs),
     });
+
+    for (let hops = 0; isRedirect(response.status) && hops < MAX_REDIRECTS; hops++) {
+      const location = response.headers.get("location");
+      if (!location) break;
+      const next = new URL(location, finalUrl);
+      if (next.protocol !== "https:" && next.protocol !== "http:") {
+        return { ok: false, body: "", finalUrl, statusCode: response.status };
+      }
+      const hop = await validateHop(next.toString(), domainPolicyFromEnv());
+      if (!hop.allowed) {
+        return { ok: false, body: "", finalUrl, statusCode: response.status };
+      }
+      finalUrl = next.toString();
+      response = await fetch(finalUrl, {
+        method: "GET",
+        headers: {
+          "User-Agent": args.userAgent,
+          Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.8",
+        },
+        cache: "no-store",
+        redirect: "manual",
+        signal: AbortSignal.timeout(args.timeoutMs),
+      });
+    }
+
+    if (isRedirect(response.status)) {
+      return { ok: false, body: "", finalUrl, statusCode: response.status };
+    }
 
     const contentType = response.headers.get("content-type") || "";
     const isTexty = /text\/html|application\/xhtml\+xml|text\/plain|application\/json/i.test(contentType);
