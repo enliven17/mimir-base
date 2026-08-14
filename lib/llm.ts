@@ -85,9 +85,21 @@ export function extractJson(text: string, prefer?: "{" | "["): string | null {
   return null;
 }
 
-/** Stable model assignment for an agent/persona seed → spreads load deterministically. */
+/**
+ * Stable model assignment for an agent/persona seed → spreads load deterministically.
+ *
+ * Gemma is excluded from *assignment*. Every caller of this function asks for
+ * strict JSON on a tight output budget, and Gemma reasons in prose first: on the
+ * council's 512-token verdicts the array/object never finishes, and on the
+ * market-creator's larger batch it does not finish inside the 60s request timeout
+ * either. Both failures are silent (an unparsable verdict abstains, an unparsable
+ * batch creates no markets), so a hashed Gemma assignment quietly retires whichever
+ * agent it lands on. Gemma stays in the pool as a quota-exhaustion fallback —
+ * callGemini borrows across the whole pool — it is just never the first choice.
+ */
 export function pickGeminiModel(seed: string): string {
-  const pool = geminiModelPool();
+  const pool = geminiModelPool().filter((m) => !m.toLowerCase().startsWith("gemma"));
+  if (pool.length === 0) return DEFAULT_GEMINI_MODEL;
   let hash = 0;
   for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) >>> 0;
   return pool[hash % pool.length];
