@@ -1,15 +1,22 @@
 "use client";
 
 /**
- * Wallet context and connect modal — powered by wagmi v3.
+ * Wallet context and connect modal.
  *
- * Supports Base Account, MetaMask, Coinbase Wallet, any EIP-6963 injected wallet,
- * and WalletConnect QR when NEXT_PUBLIC_WC_PROJECT_ID is set.
+ * Two doors, not a list of twelve:
  *
- * Hand-rolled rather than ConnectKit/RainbowKit: both pin wagmi 2.x as a peer, and
- * dropping to wagmi 2 would cost the `baseAccount` connector — the only one that can
- * batch approve(USDC) + createClaim into a single confirmation (EIP-5792). The
- * ordering and dedupe rules live in lib/wallet-connectors.ts so they stay testable.
+ *   Privy        for anyone without a wallet — email, Google or Farcaster, and an
+ *                embedded wallet is created for them. Also carries the long tail of
+ *                injected wallets through its own picker.
+ *   Base Account for anyone who has one, and the only connector that can batch
+ *                approve(USDC) + the stake into a single confirmation (EIP-5792).
+ *
+ * A wall of connectors is a decision the user cannot make: most people do not know
+ * which of eight names is the thing they have. Two named paths answer "do you
+ * already have a wallet?", which they can answer.
+ *
+ * The remaining connectors stay reachable behind "more wallets" rather than being
+ * deleted — someone with only Rainbow installed still needs a way in.
  */
 import React, {
   createContext,
@@ -26,7 +33,9 @@ import {
   useDisconnect,
   useSwitchChain,
 } from "wagmi";
+import { PrivyOption } from "@/components/wallet/PrivyOption";
 import { baseSepolia } from "./base";
+import { isPrivyConfigured } from "./wagmi-providers";
 import {
   labelFor,
   shapeConnectors,
@@ -174,8 +183,11 @@ function ConnectorPickerModal({
 
   if (!open) return null;
 
-  const [featured, ...rest] = connectors;
-  const isFeatured = featured?.kind === "baseAccount";
+  const baseAccount = connectors.find((c) => c.kind === "baseAccount");
+  // Privy's own picker already covers the injected long tail, so the rest are a
+  // fallback for someone whose wallet Privy did not surface.
+  const others = connectors.filter((c) => c.kind !== "baseAccount");
+  const privyConfigured = isPrivyConfigured();
 
   return (
     <div
@@ -206,30 +218,35 @@ function ConnectorPickerModal({
           Base Sepolia · 84532
         </p>
 
-        {connectors.length === 0 ? (
-          <p className="text-sm text-pv-muted">
-            No wallet detected. Install MetaMask or Coinbase Wallet, or open this page in
-            a wallet browser.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {featured && (
-              <ConnectorRow connector={featured} isPending={isPending} featured={isFeatured} />
-            )}
-            {isFeatured && rest.length > 0 && (
-              <div className="flex items-center gap-3 py-1" aria-hidden>
-                <span className="h-px flex-1 bg-pv-ink/[0.12]" />
-                <span className="font-mono text-[9px] uppercase tracking-wider text-pv-muted">
-                  or
-                </span>
-                <span className="h-px flex-1 bg-pv-ink/[0.12]" />
+        {/* Two doors first. Everything else is a disclosure below them, so the
+            common case is a choice between two things rather than a list. */}
+        <div className="space-y-2">
+          {privyConfigured && <PrivyOption onOpened={onClose} />}
+
+          {baseAccount && (
+            <ConnectorRow connector={baseAccount} isPending={isPending} featured />
+          )}
+
+          {connectors.length === 0 && !privyConfigured && (
+            <p className="text-sm text-pv-muted">
+              No wallet detected. Install MetaMask or Coinbase Wallet, or open this page
+              in a wallet browser.
+            </p>
+          )}
+
+          {others.length > 0 && (
+            <details className="group">
+              <summary className="cursor-pointer list-none border border-pv-ink/[0.12] px-4 py-2.5 text-center font-mono text-[11px] uppercase tracking-wider text-pv-muted transition-colors hover:border-pv-ink/[0.25] hover:text-pv-text">
+                More wallets ({others.length})
+              </summary>
+              <div className="mt-2 space-y-2">
+                {others.map((c) => (
+                  <ConnectorRow key={c.id} connector={c} isPending={isPending} featured={false} />
+                ))}
               </div>
-            )}
-            {rest.map((c) => (
-              <ConnectorRow key={c.id} connector={c} isPending={isPending} featured={false} />
-            ))}
-          </div>
-        )}
+            </details>
+          )}
+        </div>
 
         {error && (
           <p className="mt-3 text-xs text-pv-danger">

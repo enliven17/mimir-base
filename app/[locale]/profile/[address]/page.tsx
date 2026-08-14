@@ -7,21 +7,15 @@ import { Bps, SignedUsdc, StatBlock, TimeWindowTabs, TrackTag } from "@/componen
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { AddressChip } from "@/components/ui/AddressChip";
 import { cumulativePnlPoints, isTimeWindow, windowSinceMs, type TimeWindow } from "@/lib/agents/performance";
-import { getAgentDetail, listDirectoryAgents } from "@/lib/server/agent-directory";
-import { findAgentOwner } from "@/lib/server/profile";
-import { BASKET_DEFINITIONS } from "@/lib/server/basket-directory";
+import { buildProfile } from "@/lib/server/profile";
 import { unitsToUsdc } from "@/lib/usdc";
+import { shortenAddress } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
 
-export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const agents = await listDirectoryAgents().catch(() => []);
-  const agent = agents.find((candidate) => candidate.id === id);
-  return {
-    title: agent ? agent.displayName : "Agent",
-    description: agent?.description,
-  };
+export async function generateMetadata({ params }: { params: Promise<{ address: string }> }) {
+  const { address } = await params;
+  return { title: shortenAddress(address), description: `Mimir activity for ${address}` };
 }
 
 const OUTCOME_TONE: Record<string, string> = {
@@ -31,73 +25,71 @@ const OUTCOME_TONE: Record<string, string> = {
   open: "text-pv-gold",
 };
 
-export default async function AgentDetailPage({
+export default async function ProfilePage({
   params, searchParams,
 }: {
-  params: Promise<{ id: string }>;
+  params: Promise<{ address: string }>;
   searchParams?: Promise<{ window?: string | string[] }>;
 }) {
-  const [{ id }, sp] = await Promise.all([
+  const [{ address }, sp] = await Promise.all([
     params,
     searchParams ?? Promise.resolve({} as { window?: string | string[] }),
   ]);
   const rawWindow = Array.isArray(sp?.window) ? sp.window[0] : sp?.window;
   const window: TimeWindow = rawWindow && isTimeWindow(rawWindow) ? rawWindow : "all";
 
-  const [detail, owner] = await Promise.all([
-    getAgentDetail(id, window).catch(() => null),
-    findAgentOwner(id).catch(() => null),
-  ]);
-  if (!detail) notFound();
-  const { agent, performance, results } = detail;
+  const profile = await buildProfile(address, window).catch(() => null);
+  if (!profile) notFound();
 
+  const { performance, results, ownedAgents, agent } = profile;
   const decided = performance.wins + performance.losses;
-  const memberOf = BASKET_DEFINITIONS.filter((basket) =>
-    basket.members.some((member) => member.agentId === agent.id));
+  const title = agent ? agent.displayName : shortenAddress(profile.address);
 
   return (
     <div className="pb-12">
-      <BlueprintHeading>{agent.displayName}</BlueprintHeading>
+      <BlueprintHeading>{title}</BlueprintHeading>
       <div className="mx-auto max-w-[1000px] px-4 pt-6 sm:px-6 lg:px-8">
 
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2.5">
-              <AgentAvatar id={agent.id} address={agent.address} name={agent.displayName} size={40} />
-              <TrackTag track={agent.track} />
-              {agent.status && agent.status !== "active" && (
-                <span className="border border-pv-danger/40 px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-pv-danger">
-                  {agent.status}
-                </span>
-              )}
-              {typeof agent.authorityLevel === "number" && (
-                <span className="border border-pv-ink/[0.14] px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-pv-muted">
-                  authority {agent.authorityLevel}
+              {agent
+                ? <AgentAvatar id={agent.id} address={agent.address} name={agent.displayName} size={40} />
+                : <AgentAvatar id="human" address={profile.address} name="Trader" size={40} />}
+              {agent
+                ? <TrackTag track={agent.track} />
+                : (
+                  <span className="border border-pv-ink/[0.14] px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-pv-muted">
+                    Trader
+                  </span>
+                )}
+              {ownedAgents.length > 0 && (
+                <span className="border border-pv-emerald/40 px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-pv-emerald">
+                  {ownedAgents.length} agent{ownedAgents.length === 1 ? "" : "s"}
                 </span>
               )}
             </div>
-            <p className="mt-2 max-w-2xl text-sm text-pv-muted">{agent.description}</p>
-            <dl className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-1 text-[11px]">
-              <div className="flex items-center gap-1.5">
-                <dt className="font-mono uppercase tracking-wider text-pv-muted">Agent wallet</dt>
-                <dd><AddressChip address={agent.address} label="agent wallet" /></dd>
-              </div>
-              {owner && (
-                <div className="flex items-center gap-1.5">
-                  {/* Who made it, so an agent is attributable to a person rather than
-                      being an anonymous address with a P&L. */}
-                  <dt className="font-mono uppercase tracking-wider text-pv-muted">Created by</dt>
-                  <dd><AddressChip address={owner} label="owner" /></dd>
-                </div>
-              )}
-            </dl>
+            {agent && <p className="mt-2 max-w-2xl text-sm text-pv-muted">{agent.description}</p>}
+            <div className="mt-1.5">
+              <AddressChip address={profile.address} label="wallet" linkToProfile={false} />
+            </div>
+            {agent && (
+              <p className="mt-2 text-[12px] text-pv-muted">
+                This is an agent&apos;s own wallet.{" "}
+                <Link href={`/agents/${agent.id}`} className="text-pv-emerald hover:underline">
+                  See its agent page →
+                </Link>
+              </p>
+            )}
           </div>
-          <TimeWindowTabs active={window} basePath={`/agents/${agent.id}`} />
+          <TimeWindowTabs active={window} basePath={`/profile/${profile.address}`} />
         </header>
 
         <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatBlock label="Realised P&L" hint={`${performance.settled} settled`}>
-            <SignedUsdc atomic={performance.realisedPnlAtomic} />
+          <StatBlock label="Own P&L" hint={`${performance.settled} settled`}>
+            {performance.settled === 0
+              ? <span className="text-pv-muted">—</span>
+              : <SignedUsdc atomic={performance.realisedPnlAtomic} />}
           </StatBlock>
           <StatBlock label="Win rate" hint={decided > 0 ? `${performance.wins}W / ${performance.losses}L` : "no decisions yet"}>
             {decided > 0 ? <Bps bps={performance.winRateBps} /> : <span className="text-pv-muted">—</span>}
@@ -105,8 +97,13 @@ export default async function AgentDetailPage({
           <StatBlock label="Open exposure" hint={`${performance.open} live`}>
             <span className="font-mono tabular-nums">{unitsToUsdc(performance.openExposureAtomic).toFixed(2)}</span>
           </StatBlock>
-          <StatBlock label="Volume" hint="all stakes ever placed">
-            <span className="font-mono tabular-nums">{unitsToUsdc(performance.volumeAtomic).toFixed(2)}</span>
+          <StatBlock
+            label="Agents' P&L"
+            hint={ownedAgents.length > 0 ? `${profile.agentsSettled} settled by ${ownedAgents.length}` : "no agents"}
+          >
+            {ownedAgents.length === 0
+              ? <span className="text-pv-muted">—</span>
+              : <SignedUsdc atomic={profile.agentsRealisedPnlAtomic} />}
           </StatBlock>
         </section>
 
@@ -117,33 +114,36 @@ export default async function AgentDetailPage({
           <PerformanceChart
             points={cumulativePnlPoints(results, { sinceMs: windowSinceMs(window, Date.now()) })}
             baseline={0}
-            label={`${agent.displayName} cumulative P&L`}
-            emptyMessage="Nothing settled in this window yet — the curve starts at the first settlement."
+            label={`${title} cumulative P&L`}
+            emptyMessage="Nothing settled in this window yet."
           />
         </section>
 
-        {performance.settled > 0 && (
-          <section className="mt-3 grid grid-cols-2 gap-3">
-            <StatBlock label="Best market">
-              <SignedUsdc atomic={performance.bestPnlAtomic} />
-            </StatBlock>
-            <StatBlock label="Worst market">
-              <SignedUsdc atomic={performance.worstPnlAtomic} />
-            </StatBlock>
-          </section>
-        )}
-
-        {memberOf.length > 0 && (
-          <section className="mt-6">
-            <h3 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-pv-muted">In baskets</h3>
-            <div className="flex flex-wrap gap-2">
-              {memberOf.map((basket) => (
+        {ownedAgents.length > 0 && (
+          <section className="mt-8">
+            <h3 className="mb-3 font-display text-lg font-bold text-pv-text">Agents created</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {ownedAgents.map((owned) => (
                 <Link
-                  key={basket.id}
-                  href={`/baskets/${basket.id}`}
-                  className="border border-pv-ink/[0.12] px-2.5 py-1 text-[12px] text-pv-muted transition-colors hover:border-pv-emerald/45 hover:text-pv-text"
+                  key={owned.id}
+                  href={`/agents/${owned.id}`}
+                  className="group flex items-center gap-3 border border-pv-ink/[0.12] bg-pv-surface/40 p-3 transition-colors hover:border-pv-emerald/45"
                 >
-                  {basket.emoji} {basket.name}
+                  <AgentAvatar id={owned.id} address={owned.address} name={owned.displayName} size={32} />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-2">
+                      <span className="truncate text-sm text-pv-text group-hover:text-pv-emerald">
+                        {owned.displayName}
+                      </span>
+                      <TrackTag track={owned.track} />
+                    </span>
+                    <span className="block font-mono text-[10px] text-pv-muted">
+                      {owned.performance.settled} settled
+                    </span>
+                  </span>
+                  {owned.performance.settled === 0
+                    ? <span className="font-mono text-[11px] text-pv-muted">—</span>
+                    : <SignedUsdc atomic={owned.performance.realisedPnlAtomic} className="text-[13px]" />}
                 </Link>
               ))}
             </div>
@@ -154,7 +154,7 @@ export default async function AgentDetailPage({
           <h3 className="mb-3 font-display text-lg font-bold text-pv-text">Positions</h3>
           {results.length === 0 ? (
             <p className="border border-pv-ink/[0.1] bg-pv-surface/40 px-4 py-6 text-sm text-pv-muted">
-              This agent has not taken a position yet.
+              This wallet has not taken a position yet.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -195,12 +195,6 @@ export default async function AgentDetailPage({
             </div>
           )}
         </section>
-
-        <div className="mt-8">
-          <Link href="/agents" className="text-sm text-pv-muted transition-colors hover:text-pv-text">
-            ← All agents
-          </Link>
-        </div>
       </div>
     </div>
   );

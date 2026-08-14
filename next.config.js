@@ -8,7 +8,12 @@ const nextConfig = {
     return [{
       source: "/:path*",
       headers: [
-        { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests" },
+        // frame-src is listed explicitly. Without it these fall back to default-src
+        // 'self', which blocks the wallet iframes Privy and Base Account open — the
+        // connect flow failed with a generic "could not connect" and nothing in the
+        // network tab, because the frame never loaded. Named origins rather than
+        // https:, so a compromised third-party script still cannot frame anything.
+        { key: "Content-Security-Policy", value: "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self' https: wss:; frame-src 'self' https://auth.privy.io https://*.privy.io https://keys.coinbase.com https://*.walletconnect.com https://*.walletconnect.org https://verify.walletconnect.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests" },
         { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
         { key: "X-Frame-Options", value: "DENY" },
         { key: "X-Content-Type-Options", value: "nosniff" },
@@ -29,6 +34,10 @@ const nextConfig = {
       // resolves the dynamic import statically and fails the build. Stub it
       // instead of installing the whole Solana SDK for dead code.
       "@x402/svm/exact/client": { browser: "./lib/x402/svm-stub.ts", default: "./lib/x402/svm-stub.ts" },
+      // @privy-io/react-auth imports Stripe for card funding, which Mimir does not
+      // offer. Same reasoning as above: stub the dead path instead of installing a
+      // payments SDK to satisfy it.
+      "@stripe/stripe-js": { browser: "./lib/stripe-stub.ts", default: "./lib/stripe-stub.ts" },
     },
   },
 };

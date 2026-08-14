@@ -77,6 +77,7 @@ import ClaimStrengthCard from "@/components/ClaimStrengthCard";
 import SettlementExplanationCard from "@/components/SettlementExplanationCard";
 import ResolutionTerminal from "@/components/ResolutionTerminal";
 import { ShareMarket } from "@/components/vs/ShareMarket";
+import { ProfileLink } from "@/components/ui/AddressChip";
 import VsXmtpPanel from "@/components/xmtp/VsXmtpPanel";
 import CouncilVoteWidget from "@/components/council/CouncilVoteWidget";
 import Stage from "@/components/Stage";
@@ -657,9 +658,10 @@ function VsChallengersCard({
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
-                          <span className="break-words font-semibold text-[12px] leading-tight text-pv-text sm:text-[13px]">
-                            {shortenAddress(challenger.address)}
-                          </span>
+                          <ProfileLink
+                            address={challenger.address}
+                            className="break-words font-semibold text-[12px] leading-tight text-pv-text sm:text-[13px]"
+                          />
                           {address &&
                             challenger.address.toLowerCase() ===
                               address.toLowerCase() && (
@@ -1597,7 +1599,7 @@ export default function VSDetailPage() {
                       </div>
                     </div>
                     <div className="text-sm font-semibold">
-                      {shortenAddress(display.creator)}
+                      <ProfileLink address={display.creator} />
                       {isCreator && (
                         <span className="text-pv-emerald text-[10px] ml-1">{t("you")}</span>
                       )}
@@ -1634,7 +1636,7 @@ export default function VSDetailPage() {
                           </div>
                         </div>
                         <div className="text-sm font-semibold">
-                          {shortenAddress(display.opponent)}
+                          <ProfileLink address={display.opponent} />
                           {isOpponent && (
                             <span className="text-pv-emerald text-[10px] ml-1">{t("you")}</span>
                           )}
