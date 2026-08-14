@@ -9,12 +9,15 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * This route *is* the `sync` worker the health probe monitors, so it reports the
- * heartbeat. Must match the cron schedule in vercel.json: the probe derives its
- * staleness thresholds from the declared interval, and a value shorter than the
- * real cadence would alarm on a healthy cron.
+ * Manual/external trigger for the same reconcile the `sync` worker runs on its own
+ * interval (agents/sync/index.ts), so it reports the same heartbeat — an operator
+ * kicking the index by hand is a real sync, and the probe should see it.
+ *
+ * Keep in step with SYNC_POLL_INTERVAL_MS: the probe derives its staleness
+ * thresholds from the declared interval, and a value shorter than the real cadence
+ * would alarm on a healthy worker.
  */
-const SYNC_INTERVAL_SEC = 300;
+const SYNC_INTERVAL_SEC = Number(process.env.SYNC_POLL_INTERVAL_MS ?? "300000") / 1000;
 
 /**
  * Worker-tier authorization, delegated to lib/api/policy.ts.

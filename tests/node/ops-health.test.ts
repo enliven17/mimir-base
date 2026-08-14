@@ -305,7 +305,7 @@ test("every monitored worker has something that writes its heartbeat", () => {
     "agents/oracle/index.ts",
     "agents/market-creator/index.ts",
     "agents/council/index.ts",
-    "app/api/cron/sync/route.ts",
+    "agents/sync/index.ts",
   ].map((file) => readFileSync(path.join(ROOT, file), "utf8")).join("\n");
 
   for (const worker of MONITORED_WORKERS) {

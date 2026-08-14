@@ -9,12 +9,6 @@
       "maxDuration": 30
     }
   },
-  "crons": [
-    {
-      "path": "/api/cron/sync",
-      "schedule": "*/5 * * * *"
-    }
-  ],
   "github": {
     "silent": true
   }
