@@ -18,6 +18,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          # This job only reads the tree — it never pushes. Leaving the token in
+          # .git/config lets any later step (or an uploaded artifact) carry a
+          # credential that nothing here needs.
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22
