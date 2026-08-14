@@ -159,7 +159,8 @@
     "manifestPillar2Title": "No arguments",
     "manifestPillar2Body": "Outcomes are tied to explicit terms and proof sources, not opinion battles after the fact.",
     "manifestPillar3Title": "No waiting",
-    "manifestPillar3Body": "When conditions resolve, settlement executes immediately and payouts are distributed automatically."
+    "manifestPillar3Body": "When conditions resolve, settlement executes immediately and payouts are distributed automatically.",
+    "volumeSettled": "USDC Settled"
   },
   "create": {
     "challengeSectionTitle": "WHAT WILL HAPPEN?",

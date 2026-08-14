@@ -161,3 +161,35 @@ export function windowSinceMs(window: TimeWindow, nowMs: number): number | undef
   const hours = window === "24h" ? 24 : window === "7d" ? 24 * 7 : window === "30d" ? 24 * 30 : 0;
   return hours === 0 ? undefined : nowMs - hours * 3_600_000;
 }
+
+export interface PnlPoint {
+  timestamp: number;
+  /** Running realised P&L in display USDC. */
+  value: number;
+}
+
+/**
+ * Cumulative realised P&L over time, one point per settled market.
+ *
+ * Running total rather than per-trade bars: the question a P&L curve answers is
+ * "is this agent up or down", and a bar chart of individual results makes the
+ * reader do the addition.
+ *
+ * Refunds are included as flat points. They are part of the sequence even though
+ * they move nothing, and dropping them would make an idle stretch look like a gap.
+ */
+export function cumulativePnlPoints(
+  results: readonly AgentTradeResult[],
+  window: PerformanceWindow = {},
+): PnlPoint[] {
+  const since = window.sinceMs ?? 0;
+  const settled = results
+    .filter((result) => result.outcome !== "open" && result.settledAt >= since)
+    .sort((a, b) => a.settledAt - b.settledAt);
+
+  let running = 0n;
+  return settled.map((result) => {
+    running += result.pnlAtomic;
+    return { timestamp: result.settledAt, value: Number(running) / 1_000_000 };
+  });
+}

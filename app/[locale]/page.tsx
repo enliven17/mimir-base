@@ -203,7 +203,7 @@ function AnimatedStatNumber({
 export default function HomePage() {
   const [allVS, setAllVS]     = useState<VSData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [rev, setRev] = useState<{ totalCalls: number; totalUsdc: number; uniqueSellers: number } | null>(null);
+  const [rev, setRev] = useState<{ totalCalls: number; totalUsdc: number; uniqueSellers: number; settledUsdc: number; settledMarkets: number } | null>(null);
   const t  = useTranslations("home");
   const tStamp = useTranslations("stamp");
 
@@ -230,7 +230,14 @@ export default function HomePage() {
   useEffect(() => {
     fetch("/api/payments/revenue")
       .then((r) => r.json())
-      .then((s) => setRev({ totalCalls: s.totalCalls, totalUsdc: s.totalUsdc, uniqueSellers: s.uniqueSellers }))
+      .then((s) => setRev({
+        totalCalls: s.totalCalls, totalUsdc: s.totalUsdc, uniqueSellers: s.uniqueSellers,
+        // x402 service revenue is zero until someone pays for a priced endpoint,
+        // while settlement volume is real from the first resolved market. Showing
+        // only the former made a working system read as a dead one.
+        settledUsdc: s.market?.grossVolumeUsdc ?? 0,
+        settledMarkets: s.market?.settledMarkets ?? 0,
+      }))
       .catch(() => setRev(null));
   }, []);
 
@@ -324,7 +331,9 @@ export default function HomePage() {
                   </motion.span>
                   <motion.span
                     variants={kineticLetter}
-                    className="inline-block italic text-white drop-shadow-[0_0_18px_rgba(51,79,169,0.5)]"
+                    // Themed, not white: this sits on the page background, where a
+                    // hard white wordmark disappears entirely on the light palette.
+                    className="inline-block italic text-pv-text drop-shadow-[0_0_18px_rgba(51,79,169,0.5)]"
                   >
                     Mimir.
                   </motion.span>
@@ -427,9 +436,9 @@ export default function HomePage() {
               </div>
               <div className="p-5 sm:p-6 text-center bg-pv-bg">
                 <LiveStat
-                  value={rev.totalUsdc}
+                  value={rev.settledUsdc > 0 ? rev.settledUsdc : rev.totalUsdc}
                   format={(n) => n.toFixed(2)}
-                  label={t("botEarned")}
+                  label={rev.settledUsdc > 0 ? t("volumeSettled") : t("botEarned")}
                   labelPosition="below"
                   size="lg"
                   color="gold"

@@ -3,7 +3,8 @@ import { notFound } from "next/navigation";
 
 import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { Bps, SignedUsdc, StatBlock, TimeWindowTabs, TrackTag } from "@/components/agents/AgentStats";
-import { NavCurve } from "@/components/baskets/NavCurve";
+import { AgentAvatar, AgentAvatarStack } from "@/components/agents/AgentAvatar";
+import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { shortenAddress } from "@/lib/constants";
 import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
 import { buildBasketView, findBasketDefinition } from "@/lib/server/basket-directory";
@@ -47,8 +48,8 @@ export default async function BasketDetailPage({
 
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <span aria-hidden className="text-xl">{definition.emoji}</span>
-            <p className="mt-2 max-w-2xl text-sm text-pv-muted">{definition.thesis}</p>
+            <AgentAvatarStack agents={basket.members} size={34} max={8} />
+            <p className="mt-2.5 max-w-2xl text-sm text-pv-muted">{definition.thesis}</p>
           </div>
           <TimeWindowTabs active={window} basePath={`/baskets/${definition.id}`} />
         </header>
@@ -76,12 +77,14 @@ export default async function BasketDetailPage({
           <h3 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-pv-muted">
             NAV curve
           </h3>
-          <NavCurve
-            snapshots={basket.snapshots.map((snapshot) => ({
+          <PerformanceChart
+            points={basket.snapshots.map((snapshot) => ({
               timestamp: snapshot.timestamp,
-              nav: unitsToUsdc(snapshot.navAtomic),
+              value: unitsToUsdc(snapshot.navAtomic),
             }))}
-            initialNav={unitsToUsdc(basket.initialNavAtomic)}
+            baseline={unitsToUsdc(basket.initialNavAtomic)}
+            label={`${definition.name} NAV`}
+            emptyMessage="No settled results in this window yet — the curve starts once members settle a market."
           />
         </section>
 
@@ -103,7 +106,7 @@ export default async function BasketDetailPage({
                   <tr key={member.id} className="border-b border-pv-ink/[0.06]">
                     <td className="py-2.5 pr-3">
                       <Link href={`/agents/${member.id}`} className="group flex items-center gap-2.5">
-                        <span aria-hidden>{member.emoji}</span>
+                        <AgentAvatar id={member.id} address={member.address} name={member.displayName} size={28} />
                         <span className="min-w-0">
                           <span className="flex items-center gap-2">
                             <span className="truncate text-pv-text group-hover:text-pv-emerald">

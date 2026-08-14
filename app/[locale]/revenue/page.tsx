@@ -127,6 +127,24 @@ export default function RevenuePage() {
           <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-pv-muted">
             {data.market.settledMarkets} settled markets · {data.market.dustUsdc.toFixed(6)} USDC recorded dust · {data.totalCalls} paid calls · {data.uniquePayers} payers / {data.uniqueSellers} sellers
           </p>
+
+          {/* A bare row of zeros reads as "broken", when in fact these are two
+              different kinds of nothing: no fee policy is set, and nobody has paid
+              for an x402 call yet. Say which. */}
+          {(data.market.platformFeeUsdc === 0 && data.market.agentOwnerFeeUsdc === 0) && (
+            <p className="mt-2 text-[12px] text-pv-muted">
+              Fees read zero because the deployed fee policy is 0 bps on both legs — settlement
+              pays winners in full. They start accruing here the moment a non-zero policy is
+              queued and executed on chain.
+            </p>
+          )}
+          {data.totalCalls === 0 && (
+            <p className="mt-1.5 text-[12px] text-pv-muted">
+              x402 service revenue is zero because no agent has paid for a priced endpoint yet
+              (oracle verdicts, council reasoning, premium price). Market settlement above is
+              independent of it.
+            </p>
+          )}
           {(data.baselineCalls > 0 || data.baselineUsdc > 0) && (
             <p className="mt-3 font-mono text-[11px] uppercase tracking-[0.12em] text-pv-muted">
               includes {data.baselineCalls} calls / {data.baselineUsdc.toFixed(6)} USDC carried

@@ -2,6 +2,9 @@ import Link from "next/link";
 
 import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { Bps, SignedUsdc, TimeWindowTabs } from "@/components/agents/AgentStats";
+import { AgentAvatarStack } from "@/components/agents/AgentAvatar";
+import { PerformanceChart } from "@/components/charts/PerformanceChart";
+import { unitsToUsdc } from "@/lib/usdc";
 import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
 import { listBasketViews } from "@/lib/server/basket-directory";
 
@@ -51,9 +54,12 @@ export default async function BasketsPage({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h3 className="font-display text-base font-bold text-pv-text group-hover:text-pv-emerald">
-                      {basket.definition.emoji} {basket.definition.name}
+                      {basket.definition.name}
                     </h3>
-                    <p className="mt-1 text-[12px] text-pv-muted">{basket.definition.thesis}</p>
+                    <div className="mt-1.5">
+                      <AgentAvatarStack agents={basket.members} size={24} max={5} />
+                    </div>
+                    <p className="mt-1.5 text-[12px] text-pv-muted">{basket.definition.thesis}</p>
                   </div>
                   <div className="shrink-0 text-right">
                     <div className="font-display text-lg font-bold">
@@ -63,6 +69,19 @@ export default async function BasketsPage({
                       NAV
                     </div>
                   </div>
+                </div>
+
+                <div className="mt-3">
+                  <PerformanceChart
+                    points={basket.snapshots.map((snapshot) => ({
+                      timestamp: snapshot.timestamp,
+                      value: unitsToUsdc(snapshot.navAtomic),
+                    }))}
+                    baseline={unitsToUsdc(basket.initialNavAtomic)}
+                    label={`${basket.definition.name} NAV`}
+                    height={72}
+                    emptyMessage="No settled results yet."
+                  />
                 </div>
 
                 <dl className="mt-3 grid grid-cols-3 gap-2 border-t border-pv-ink/[0.08] pt-3 text-[11px]">

@@ -230,7 +230,7 @@ export default async function CouncilPage() {
 
   return (
     <div className="pb-10">
-      <BlueprintHeading>Ten AI personas. Ten local wallets. One market.</BlueprintHeading>
+      <BlueprintHeading>Twenty AI frames. Twenty local wallets. One market.</BlueprintHeading>
       <div className="mx-auto max-w-[1200px] px-4 pt-6 sm:px-6 lg:px-8">
       <header className="mb-10 space-y-1.5">
         <p className="mx-auto max-w-2xl text-center text-sm text-pv-muted">

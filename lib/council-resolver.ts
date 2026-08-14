@@ -15,6 +15,19 @@ import {
   personaAddressEnv,
   type PersonaSpec,
 } from "../agents/council/personas";
+import { PHILOSOPHER_PERSONAS } from "../agents/council/philosophers";
+
+/**
+ * Every seat on the council: the ten classic frames plus the ten philosopher ones.
+ *
+ * listCouncilPersonas() returns only the classic set — the philosophers live in
+ * their own module and were therefore invisible to every page that resolves an
+ * address, even though the council worker has been running and staking them all
+ * along. They share PersonaSpec, so nothing downstream has to know the difference.
+ */
+function allCouncilPersonas(): PersonaSpec[] {
+  return [...listCouncilPersonas(), ...PHILOSOPHER_PERSONAS];
+}
 
 export type ActorKind =
   | { kind: "oracle"; address: string }
@@ -26,7 +39,7 @@ let cachedPersonaByAddress: Map<string, PersonaSpec> | null = null;
 
 function buildPersonaIndex(): Map<string, PersonaSpec> {
   const map = new Map<string, PersonaSpec>();
-  for (const p of listCouncilPersonas()) {
+  for (const p of allCouncilPersonas()) {
     const addr = process.env[personaAddressEnv(p)]?.toLowerCase();
     if (addr) map.set(addr, p);
   }
@@ -50,7 +63,7 @@ export function getActiveCouncilPersonas(): Array<{
   address: string;
 }> {
   const out: Array<{ persona: PersonaSpec; address: string }> = [];
-  for (const p of listCouncilPersonas()) {
+  for (const p of allCouncilPersonas()) {
     const addr = process.env[personaAddressEnv(p)];
     if (addr) out.push({ persona: p, address: addr });
   }

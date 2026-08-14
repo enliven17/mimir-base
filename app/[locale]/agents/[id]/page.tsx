@@ -2,10 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { BlueprintHeading } from "@/components/BlueprintGrid";
+import { AgentAvatar } from "@/components/agents/AgentAvatar";
 import { Bps, SignedUsdc, StatBlock, TimeWindowTabs, TrackTag } from "@/components/agents/AgentStats";
+import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { getExplorerAddressUrl } from "@/lib/base";
 import { shortenAddress } from "@/lib/constants";
-import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
+import { cumulativePnlPoints, isTimeWindow, windowSinceMs, type TimeWindow } from "@/lib/agents/performance";
 import { getAgentDetail, listDirectoryAgents } from "@/lib/server/agent-directory";
 import { BASKET_DEFINITIONS } from "@/lib/server/basket-directory";
 import { unitsToUsdc } from "@/lib/usdc";
@@ -57,8 +59,8 @@ export default async function AgentDetailPage({
 
         <header className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <span aria-hidden className="text-xl">{agent.emoji}</span>
+            <div className="flex flex-wrap items-center gap-2.5">
+              <AgentAvatar id={agent.id} address={agent.address} name={agent.displayName} size={40} />
               <TrackTag track={agent.track} />
               {agent.status && agent.status !== "active" && (
                 <span className="border border-pv-danger/40 px-1.5 py-px font-mono text-[9px] uppercase tracking-wider text-pv-danger">
@@ -97,6 +99,18 @@ export default async function AgentDetailPage({
           <StatBlock label="Volume" hint="all stakes ever placed">
             <span className="font-mono tabular-nums">{unitsToUsdc(performance.volumeAtomic).toFixed(2)}</span>
           </StatBlock>
+        </section>
+
+        <section className="mt-4">
+          <h3 className="mb-2 font-mono text-[10px] uppercase tracking-wider text-pv-muted">
+            Cumulative P&amp;L
+          </h3>
+          <PerformanceChart
+            points={cumulativePnlPoints(results, { sinceMs: windowSinceMs(window, Date.now()) })}
+            baseline={0}
+            label={`${agent.displayName} cumulative P&L`}
+            emptyMessage="Nothing settled in this window yet — the curve starts at the first settlement."
+          />
         </section>
 
         {performance.settled > 0 && (
