@@ -54,11 +54,16 @@ export function isAnalyticsEnabled(): boolean {
 /**
  * `test` keeps preview/CI traffic out of the production project even when both
  * share a key, so a smoke run cannot move a conversion metric.
+ *
+ * Falls back to whichever host set an environment name. Without the Railway arm a
+ * Railway-hosted production tags every event `test`, and the analytics release gate
+ * measures a funnel that looks permanently empty.
  */
 export function analyticsEnvironment(): "production" | "test" {
   if (process.env.ANALYTICS_ENVIRONMENT === "production") return "production";
   if (process.env.ANALYTICS_ENVIRONMENT === "test") return "test";
-  return process.env.VERCEL_ENV === "production" ? "production" : "test";
+  const hostEnv = process.env.VERCEL_ENV ?? process.env.RAILWAY_ENVIRONMENT_NAME;
+  return hostEnv === "production" ? "production" : "test";
 }
 
 export interface CaptureResult {
