@@ -35,30 +35,37 @@ function normalizeImmutables(code: `0x${string}`, ranges: Array<{ start: number;
   return `0x${chars.join("")}`;
 }
 
-const client = createPublicClient({ chain: baseSepolia, transport: http(getBaseRpcUrl()) });
-const chainId = await client.getChainId();
-if (chainId !== baseSepolia.id) throw new Error(`wrong chain ${chainId}`);
-const code = await client.getCode({ address });
-if (!code || code === "0x") throw new Error("deployment has no bytecode");
-const { runtime, immutableRanges } = compileRuntime();
-const expectedHash = keccak256(normalizeImmutables(runtime, immutableRanges));
-const deployedHash = keccak256(normalizeImmutables(code, immutableRanges));
-if (deployedHash !== expectedHash) throw new Error(`runtime bytecode mismatch: deployed=${deployedHash} expected=${expectedHash}`);
+async function main(): Promise<void> {
+  const client = createPublicClient({ chain: baseSepolia, transport: http(getBaseRpcUrl()) });
+  const chainId = await client.getChainId();
+  if (chainId !== baseSepolia.id) throw new Error(`wrong chain ${chainId}`);
+  const code = await client.getCode({ address });
+  if (!code || code === "0x") throw new Error("deployment has no bytecode");
+  const { runtime, immutableRanges } = compileRuntime();
+  const expectedHash = keccak256(normalizeImmutables(runtime, immutableRanges));
+  const deployedHash = keccak256(normalizeImmutables(code, immutableRanges));
+  if (deployedHash !== expectedHash) throw new Error(`runtime bytecode mismatch: deployed=${deployedHash} expected=${expectedHash}`);
 
-const abi = parseAbi(["function owner() view returns (address)", "function oracle() view returns (address)", "function usdc() view returns (address)"]);
-const [owner, oracle, usdc] = await Promise.all([
-  client.readContract({ address, abi, functionName: "owner" }),
-  client.readContract({ address, abi, functionName: "oracle" }),
-  client.readContract({ address, abi, functionName: "usdc" }),
-]);
-if (usdc.toLowerCase() !== USDC_ADDRESS.toLowerCase()) throw new Error(`unexpected USDC ${usdc}`);
-for (const [label, actual, configured] of [
-  ["owner", owner, process.env.EXPECTED_OWNER_ADDRESS],
-  ["oracle", oracle, process.env.ORACLE_ADDRESS],
-] as const) {
-  if (configured && (!isAddress(configured) || actual.toLowerCase() !== configured.toLowerCase())) {
-    throw new Error(`${label} mismatch: deployed=${actual} expected=${configured}`);
+  const abi = parseAbi(["function owner() view returns (address)", "function oracle() view returns (address)", "function usdc() view returns (address)"]);
+  const [owner, oracle, usdc] = await Promise.all([
+    client.readContract({ address, abi, functionName: "owner" }),
+    client.readContract({ address, abi, functionName: "oracle" }),
+    client.readContract({ address, abi, functionName: "usdc" }),
+  ]);
+  if (usdc.toLowerCase() !== USDC_ADDRESS.toLowerCase()) throw new Error(`unexpected USDC ${usdc}`);
+  for (const [label, actual, configured] of [
+    ["owner", owner, process.env.EXPECTED_OWNER_ADDRESS],
+    ["oracle", oracle, process.env.ORACLE_ADDRESS],
+  ] as const) {
+    if (configured && (!isAddress(configured) || actual.toLowerCase() !== configured.toLowerCase())) {
+      throw new Error(`${label} mismatch: deployed=${actual} expected=${configured}`);
+    }
   }
+  console.log(JSON.stringify({ chainId, contractName, address, bytecodeBytes: (code.length - 2) / 2,
+    normalizedRuntimeHash: deployedHash, owner, oracle, usdc }, null, 2));
 }
-console.log(JSON.stringify({ chainId, contractName, address, bytecodeBytes: (code.length - 2) / 2,
-  normalizedRuntimeHash: deployedHash, owner, oracle, usdc }, null, 2));
+
+main().catch((error) => {
+  console.error(error instanceof Error ? error.message : error);
+  process.exit(1);
+});
