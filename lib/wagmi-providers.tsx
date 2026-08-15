@@ -29,8 +29,27 @@ const queryClient = new QueryClient();
 /** Unset in local checkouts and previews; the app must still boot without Privy. */
 const PRIVY_APP_ID = process.env.NEXT_PUBLIC_PRIVY_APP_ID?.trim();
 
+/**
+ * Optional gas sponsorship for Base Account.
+ *
+ * NOT a bundler: the Base Account SDK submits through the wallet's own
+ * infrastructure and takes no bundler URL at all — it forwards this as the
+ * ERC-5792 `paymasterService` capability. Without it a sub account simply pays
+ * its own gas in ETH, which works; with it, a user who holds only USDC can still
+ * transact.
+ *
+ * CDP issues one from portal.cdp.coinbase.com. Left unset until then rather than
+ * pointing at a guess: a wrong paymaster URL fails the call it was meant to help.
+ */
+const PAYMASTER_URL = process.env.NEXT_PUBLIC_PAYMASTER_URL?.trim();
+
 export function isPrivyConfigured(): boolean {
   return Boolean(PRIVY_APP_ID);
+}
+
+/** Chain-keyed, because that is the shape createBaseAccountSDK expects. */
+export function paymasterUrls(): Record<number, string> | undefined {
+  return PAYMASTER_URL ? { [baseSepolia.id]: PAYMASTER_URL } : undefined;
 }
 
 export function WagmiProviders({ children }: { children: React.ReactNode }) {
