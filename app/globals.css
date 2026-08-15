@@ -93,6 +93,18 @@
     );
   }
 
+  /* The contents rail arrives rather than appearing: it is a companion to the
+     article, and a panel that pops in at full opacity reads as a layout shift. */
+  @keyframes docs-toc-in {
+    from { opacity: 0; transform: translateX(0.5rem); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    /* Someone who asked for less motion still needs the rail, just not the slide. */
+    [class*="docs-toc-in"] { animation: none !important; }
+  }
+
   ::selection {
     background: rgb(var(--pv-accent) / 0.35);
     color: rgb(var(--pv-text));

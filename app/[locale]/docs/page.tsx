@@ -1027,9 +1027,9 @@ function DocsToc() {
           <a
             href={`#${id}`}
             aria-current={active === id ? "true" : undefined}
-            className={`block border-l-2 py-1 pl-3 text-[13px] transition-colors ${
+            className={`block border-l-2 py-1 pl-3 text-[13px] transition-[color,border-color,transform,background-color] duration-200 ease-out ${
               active === id
-                ? "border-pv-emerald font-semibold text-pv-text"
+                ? "translate-x-0.5 border-pv-emerald bg-pv-emerald/[0.06] font-semibold text-pv-text"
                 : "border-pv-border/30 text-pv-muted hover:border-pv-emerald/60 hover:text-pv-text"
             }`}
           >
@@ -1049,9 +1049,23 @@ function DocsToc() {
         </summary>
         <div className="mt-3">{list}</div>
       </details>
+      {/*
+        Three layouts, because "beside the article" only exists at some widths:
+
+          < lg          the collapsible panel above — no room for a rail at all
+          lg → 1760px   a sticky rail in the flow, to the RIGHT of the article
+          ≥ 1760px      fixed in the right margin, clear of the blueprint rules
+
+        1760px is where the margin outside the 1200px column finally exceeds the
+        rail's own width; below that, escaping the column would put the contents
+        on top of the text it indexes.
+      */}
       <nav
         aria-label="Table of contents"
-        className="sticky top-24 hidden max-h-[calc(100vh-7rem)] overflow-y-auto pb-4 pr-2 lg:block"
+        className="sticky top-24 hidden max-h-[calc(100vh-7rem)] w-60 overflow-y-auto overscroll-contain pb-4 pl-2
+                   animate-[docs-toc-in_400ms_ease-out_both]
+                   lg:block
+                   min-[1760px]:fixed min-[1760px]:right-[max(1.5rem,calc((100vw-1200px)/2-16rem))] min-[1760px]:top-28"
       >
         <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.22em] text-pv-muted">Contents</p>
         {list}
@@ -1066,7 +1080,9 @@ export default function DocsPage() {
     <div className="pb-10">
       <BlueprintHeading>How Mimir works</BlueprintHeading>
       <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 lg:flex lg:items-start lg:gap-10 lg:px-8">
-      <aside className="lg:w-60 lg:shrink-0">
+      {/* order-last: the contents read as a companion to the article, not a
+          precondition for it — and a screen reader still meets the prose first. */}
+      <aside className="lg:order-last lg:w-60 lg:shrink-0 min-[1760px]:w-0">
         <DocsToc />
       </aside>
       <article className="min-w-0 flex-1 space-y-14">
