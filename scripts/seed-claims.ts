@@ -2,7 +2,7 @@
  * Seed Claims Script — Creates 15 demo claims across all categories
  *
  * These claims are designed to be immediately resolvable by the oracle agent,
- * demonstrating real traction on ETH Chain Testnet.
+ * demonstrating real traction on Base Sepolia.
  *
  * Run AFTER deploying the contract:
  *   DEPLOYER_PRIVATE_KEY=0x... npx tsx scripts/seed-claims.ts

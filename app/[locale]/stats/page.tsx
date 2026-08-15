@@ -47,7 +47,7 @@ interface ClaimRow {
   confidence:           number;
 }
 
-// Concurrency cap for the per-claim getClaim fan-out. Public ETH Chain RPCs can
+// Concurrency cap for the per-claim getClaim fan-out. Public Base Sepolia RPCs can
 // throttle (HTTP 429) when slammed with `Promise.all` over 100+ IDs. Workers keep
 // the burst small while still finishing a large page quickly. Reads go through
 // viem's batch transport (RPC_BATCH_SIZE), so this is in-flight reads, not raw POSTs.
@@ -396,7 +396,7 @@ export default async function StatsPage() {
       <div className="mx-auto max-w-[1100px] px-4 pt-6 sm:px-6 lg:px-8">
       <header className="mb-8">
         <p className="text-center text-sm text-pv-muted">
-          Every number on this page is read directly from the Mimir contract on ETH Chain Testnet.
+          Every number on this page is read directly from the Mimir contract on Base Sepolia.
         </p>
       </header>
 
@@ -426,7 +426,7 @@ export default async function StatsPage() {
         <div className="rounded-2xl border border-pv-border/30 bg-pv-surface/70 p-5 sm:p-6">
           <h2 className="mb-1 font-display text-base font-bold tracking-tight text-pv-text">Agent vault</h2>
           <p className="mb-5 text-xs text-pv-muted">
-            Local EOA wallets that the oracle and market-creator sign with on ETH Chain.
+            Local EOA wallets that the oracle and market-creator sign with on Base Sepolia.
           </p>
           {agentInfo ? (
             <div className="space-y-4 text-sm">

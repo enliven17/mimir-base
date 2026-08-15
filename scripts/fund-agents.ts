@@ -7,7 +7,7 @@
  *   - native ETH for gas (FUND_GAS_ETH, default 1)
  *   - USDC for stakes (FUND_AMOUNT_USDC / FUND_COUNCIL_AMOUNT_USDC, defaults 20 / 10)
  *
- * The funder must hold both tBOT (faucet) and test USDC on ETH Chain Testnet.
+ * The funder must hold both Base Sepolia ETH (faucet) and test USDC.
  * USDC: 0x75edC9335175Fc0552D51D48439F229c10420fe3
  */
 

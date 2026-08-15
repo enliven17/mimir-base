@@ -1,5 +1,5 @@
 /**
- * End-to-end demo of the full Mimir cycle on ETH Chain Testnet with an LLM
+ * End-to-end demo of the full Mimir cycle on Base Sepolia with an LLM
  * settling. Stakes are USDC (ERC-20); gas is native ETH.
  *
  *   1. market-creator wallet  → createClaim (2 USDC stake, 150s deadline)

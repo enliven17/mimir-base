@@ -14,8 +14,15 @@
 
 import { useCallback, useEffect, useState } from "react";
 
+import { encodeFunctionData } from "viem";
+
 import { useWallet } from "@/lib/wallet";
-import { challengeClaim } from "@/lib/contract";
+import { challengeClaim, CONTRACT_ADDRESS } from "@/lib/contract";
+import { MIMIR_ABI } from "@/lib/mimir-abi";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits } from "@/lib/usdc";
+import {
+  enableOneTapMirroring, readSubAccount, sendFromSubAccount, type SubAccountState,
+} from "@/lib/base-subaccount";
 
 interface Mirror {
   basketId: string;
@@ -37,6 +44,10 @@ export function PendingMirrors() {
   const [busyId, setBusyId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<Record<number, string>>({});
+  const [subAccount, setSubAccount] = useState<SubAccountState | null>(null);
+  const [enabling, setEnabling] = useState(false);
+
+  useEffect(() => { setSubAccount(readSubAccount()); }, []);
 
   const load = useCallback(async () => {
     if (!address) return;
@@ -54,12 +65,49 @@ export function PendingMirrors() {
 
   useEffect(() => { void load(); }, [load]);
 
+  async function enable() {
+    setEnabling(true);
+    setError(null);
+    try {
+      setSubAccount(await enableOneTapMirroring());
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(/user rejected|denied/i.test(message) ? "Setup cancelled in your wallet." : message);
+    } finally {
+      setEnabling(false);
+    }
+  }
+
   async function mirror(item: Mirror) {
     setBusyId(item.claimId);
     setError(null);
     try {
-      const result = await challengeClaim(address!, item.claimId, item.mirrorUsdc);
-      setDone((current) => ({ ...current, [item.claimId]: result.txHash ?? "sent" }));
+      let reference: string;
+      if (subAccount) {
+        // Approve then stake in one batch. Two separate confirmations is what the
+        // sub account exists to avoid, and an approve without its stake leaves an
+        // allowance nobody asked for.
+        const units = usdcToUnits(item.mirrorUsdc);
+        reference = await sendFromSubAccount([
+          {
+            to: USDC_ADDRESS,
+            data: encodeFunctionData({
+              abi: ERC20_ABI, functionName: "approve", args: [CONTRACT_ADDRESS, units],
+            }),
+          },
+          {
+            to: CONTRACT_ADDRESS,
+            data: encodeFunctionData({
+              abi: MIMIR_ABI, functionName: "challengeClaim",
+              args: [BigInt(item.claimId), units, ""],
+            }),
+          },
+        ]);
+      } else {
+        const result = await challengeClaim(address!, item.claimId, item.mirrorUsdc);
+        reference = result.txHash ?? "sent";
+      }
+      setDone((current) => ({ ...current, [item.claimId]: reference }));
       // Refresh rather than splice: the queue is derived from chain state, and the
       // authoritative answer to "is it still pending" is the server's.
       void load();
@@ -76,14 +124,27 @@ export function PendingMirrors() {
 
   return (
     <section className="border border-pv-emerald/35 bg-pv-emerald/[0.05] p-4">
-      <div className="mb-2">
-        <h3 className="font-mono text-[10px] uppercase tracking-wider text-pv-emerald">
-          Waiting to mirror
-        </h3>
-        <p className="text-[11px] text-pv-muted">
-          Baskets you follow took these positions. Each one is a stake you sign — no
-          funds are held on your behalf.
-        </p>
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h3 className="font-mono text-[10px] uppercase tracking-wider text-pv-emerald">
+            Waiting to mirror
+          </h3>
+          <p className="text-[11px] text-pv-muted">
+            {subAccount
+              ? "One tap each — your sub account signs, and it stays yours."
+              : "Baskets you follow took these positions. Each one is a stake you sign — no funds are held on your behalf."}
+          </p>
+        </div>
+        {!subAccount && (
+          <button
+            type="button"
+            onClick={enable}
+            disabled={enabling}
+            className="shrink-0 border border-pv-emerald/45 px-2.5 py-1 font-mono text-[10px] uppercase tracking-wider text-pv-emerald transition-colors hover:bg-pv-emerald/[0.1] disabled:opacity-40"
+          >
+            {enabling ? "Setting up…" : "Skip the popups"}
+          </button>
+        )}
       </div>
 
       {loading && mirrors.length === 0 && (
@@ -119,6 +180,12 @@ export function PendingMirrors() {
       </ul>
 
       {error && <p className="mt-2 text-[12px] text-pv-danger">{error}</p>}
+
+      <p className="mt-3 text-[11px] text-pv-muted">
+        {subAccount
+          ? "Signed by a sub account your Base Account owns and can revoke. Mimir holds no key for it on any server, so mirrors only fire while this tab is open — anything missed waits here."
+          : "Enable one-tap signing to skip a wallet prompt per mirror. The key stays in this browser; it is never sent to Mimir."}
+      </p>
     </section>
   );
 }

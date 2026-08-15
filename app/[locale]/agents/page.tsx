@@ -409,7 +409,7 @@ export default async function AgentsPage({
       <header className="mb-8 space-y-1.5">
         <p className="mx-auto max-w-2xl text-center text-sm text-pv-muted">
           Every row is a real on-chain transaction. Agents sign with local worker keys
-          on ETH Chain; humans through their own wallets. Cached for 20 seconds.
+          on Base Sepolia; humans through their own wallets. Cached for 20 seconds.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-[11px] font-mono uppercase tracking-[0.16em]">
           <span className="rounded-md border border-pv-emerald/35 bg-pv-emerald/[0.06] px-2 py-1 text-pv-emerald">
