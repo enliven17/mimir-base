@@ -3,6 +3,7 @@ import Link from "next/link";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { Bps, SignedUsdc, TimeWindowTabs } from "@/components/agents/AgentStats";
 import { AgentAvatarStack } from "@/components/agents/AgentAvatar";
+import { BasketLeaderboard } from "@/components/baskets/BasketLeaderboard";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { unitsToUsdc } from "@/lib/usdc";
 import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
@@ -18,13 +19,33 @@ export const metadata = {
 export default async function BasketsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ window?: string | string[] }>;
+  searchParams?: Promise<{ window?: string | string[]; q?: string | string[] }>;
 }) {
-  const sp = await (searchParams ?? Promise.resolve({} as { window?: string | string[] }));
+  const sp = await (searchParams ?? Promise.resolve({} as { window?: string | string[]; q?: string | string[] }));
   const rawWindow = Array.isArray(sp?.window) ? sp.window[0] : sp?.window;
   const window: TimeWindow = rawWindow && isTimeWindow(rawWindow) ? rawWindow : "all";
+  const query = (Array.isArray(sp?.q) ? sp.q[0] : sp?.q ?? "").trim();
 
-  const baskets = await listBasketViews(window).catch(() => []);
+  const all = await listBasketViews(window).catch(() => []);
+
+  // Leaderboards read the full set, not the filtered one: "top earning" means top
+  // overall, and recomputing it per search would make the ranking meaningless.
+  const topEarning = [...all]
+    .filter((basket) => basket.settled > 0)
+    .sort((a, b) => (b.realisedPnlAtomic > a.realisedPnlAtomic ? 1 : -1))
+    .slice(0, 3);
+  const topFollowed = [...all]
+    .filter((basket) => (basket.definition.subscriberCount ?? 0) > 0)
+    .sort((a, b) => (b.definition.subscriberCount ?? 0) - (a.definition.subscriberCount ?? 0))
+    .slice(0, 3);
+
+  const term = query.toLowerCase();
+  const baskets = term
+    ? all.filter((basket) =>
+        basket.definition.name.toLowerCase().includes(term)
+        || basket.definition.thesis.toLowerCase().includes(term)
+        || basket.members.some((member) => member.displayName.toLowerCase().includes(term)))
+    : all;
 
   return (
     <div className="pb-12">
@@ -36,8 +57,60 @@ export default async function BasketsPage({
             A basket is a weighted mix of agents. Each curve is built from what its members
             actually settled on chain — no funds are pooled and nothing is deposited.
           </p>
-          <TimeWindowTabs active={window} basePath="/baskets" />
+          <div className="flex items-center gap-2">
+            <Link href="/baskets/new" className="btn-compact-primary px-3.5 py-1.5 text-[12px] focus-ring">
+              Create basket
+            </Link>
+            <TimeWindowTabs active={window} basePath="/baskets" />
+          </div>
         </header>
+
+        {(topEarning.length > 0 || topFollowed.length > 0) && (
+          <section className="mb-6 grid gap-3 sm:grid-cols-2">
+            <BasketLeaderboard
+              title="Top earning"
+              hint="realised P&L across members"
+              baskets={topEarning}
+              window={window}
+              render={(basket) => <SignedUsdc atomic={basket.realisedPnlAtomic} />}
+            />
+            <BasketLeaderboard
+              title="Most followed"
+              hint="wallets mirroring this basket"
+              baskets={topFollowed}
+              window={window}
+              render={(basket) => (
+                <span className="font-mono tabular-nums text-pv-text">
+                  {basket.definition.subscriberCount ?? 0}
+                </span>
+              )}
+            />
+          </section>
+        )}
+
+        {/* GET form: a search you can bookmark and share, and one that works with
+            JavaScript off. */}
+        <form method="GET" action="/baskets" className="mb-5 flex gap-2">
+          {window !== "all" && <input type="hidden" name="window" value={window} />}
+          <input
+            type="search"
+            name="q"
+            defaultValue={query}
+            placeholder="Search baskets by name, thesis or member"
+            aria-label="Search baskets"
+            className="w-full border border-pv-ink/[0.14] bg-pv-surface2/60 px-3 py-2 text-sm text-pv-text outline-none transition-colors placeholder:text-pv-muted focus:border-pv-emerald/50"
+          />
+          <button type="submit" className="border border-pv-ink/[0.14] px-3 py-2 font-mono text-[11px] uppercase tracking-wider text-pv-muted transition-colors hover:text-pv-text">
+            Search
+          </button>
+        </form>
+
+        {query && (
+          <p className="mb-3 text-[12px] text-pv-muted">
+            {baskets.length} basket{baskets.length === 1 ? "" : "s"} matching “{query}”.{" "}
+            <Link href="/baskets" className="text-pv-emerald hover:underline">Clear</Link>
+          </p>
+        )}
 
         {baskets.length === 0 ? (
           <p className="border border-pv-ink/[0.1] bg-pv-surface/40 px-4 py-6 text-sm text-pv-muted">

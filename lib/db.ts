@@ -325,6 +325,26 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
     created_at BIGINT NOT NULL
   )` },
   { sql: "CREATE INDEX IF NOT EXISTS idx_agent_spend_ledger_period ON agent_spend_ledger(permission_hash, period_start)" },
+  { sql: `CREATE TABLE IF NOT EXISTS user_baskets (
+    basket_id TEXT PRIMARY KEY,
+    creator_wallet TEXT NOT NULL,
+    name TEXT NOT NULL,
+    thesis TEXT NOT NULL DEFAULT '',
+    /** [{ agentId, weightBps }] — validated before insert, stored verbatim. */
+    members_json TEXT NOT NULL,
+    created_at BIGINT NOT NULL
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_user_baskets_creator ON user_baskets(creator_wallet)" },
+  { sql: `CREATE TABLE IF NOT EXISTS basket_subscriptions (
+    basket_id TEXT NOT NULL,
+    subscriber TEXT NOT NULL,
+    /** What the subscriber mirrors per market, in display USDC. */
+    per_market_usdc NUMERIC NOT NULL DEFAULT 0,
+    created_at BIGINT NOT NULL,
+    revoked_at BIGINT,
+    PRIMARY KEY(basket_id, subscriber)
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_basket_subs_basket ON basket_subscriptions(basket_id)" },
   { sql: `CREATE TABLE IF NOT EXISTS agent_request_audit (
     request_id TEXT PRIMARY KEY,
     agent_id TEXT NOT NULL,
@@ -2240,4 +2260,110 @@ export async function listAgentRecords(limit = 100): Promise<AgentRecord[]> {
       revokedReason: row.revoked_reason == null ? undefined : getString(row.revoked_reason),
     };
   });
+}
+
+// ── User-created baskets ──────────────────────────────────────────────────────
+
+export interface StoredBasket {
+  basketId: string;
+  creatorWallet: string;
+  name: string;
+  thesis: string;
+  membersJson: string;
+  createdAt: number;
+  subscriberCount?: number;
+}
+
+export async function insertBasket(basket: StoredBasket): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO user_baskets (
+      basket_id, creator_wallet, name, thesis, members_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [basket.basketId, basket.creatorWallet.toLowerCase(), basket.name,
+      basket.thesis, basket.membersJson, basket.createdAt],
+  });
+}
+
+function toBasket(row: Record<string, unknown>): StoredBasket {
+  return {
+    basketId: getString(row.basket_id),
+    creatorWallet: getString(row.creator_wallet),
+    name: getString(row.name),
+    thesis: getString(row.thesis),
+    membersJson: getString(row.members_json),
+    createdAt: getNumber(row.created_at),
+    subscriberCount: row.subscriber_count == null ? 0 : getNumber(row.subscriber_count),
+  };
+}
+
+/**
+ * Baskets with their subscriber counts.
+ *
+ * Counted by join rather than a denormalised column: a counter that can drift is
+ * a leaderboard that lies, and the table is small enough that the join is free.
+ */
+export async function listBaskets(limit = 100): Promise<StoredBasket[]> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT b.*, COALESCE(s.subscribers, 0) AS subscriber_count
+      FROM user_baskets b
+      LEFT JOIN (
+        SELECT basket_id, COUNT(*) AS subscribers
+        FROM basket_subscriptions WHERE revoked_at IS NULL GROUP BY basket_id
+      ) s ON s.basket_id = b.basket_id
+      ORDER BY b.created_at DESC LIMIT ?`,
+    args: [limit],
+  });
+  return result.rows.map((row) => toBasket(row as Record<string, unknown>));
+}
+
+export async function getBasket(basketId: string): Promise<StoredBasket | null> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT b.*, COALESCE(s.subscribers, 0) AS subscriber_count
+      FROM user_baskets b
+      LEFT JOIN (
+        SELECT basket_id, COUNT(*) AS subscribers
+        FROM basket_subscriptions WHERE revoked_at IS NULL GROUP BY basket_id
+      ) s ON s.basket_id = b.basket_id
+      WHERE b.basket_id = ? LIMIT 1`,
+    args: [basketId],
+  });
+  const row = result.rows[0];
+  return row ? toBasket(row as Record<string, unknown>) : null;
+}
+
+export async function subscribeToBasket(args: {
+  basketId: string; subscriber: string; perMarketUsdc: number; at: number;
+}): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO basket_subscriptions (
+      basket_id, subscriber, per_market_usdc, created_at
+    ) VALUES (?, ?, ?, ?)
+    ON CONFLICT(basket_id, subscriber) DO UPDATE SET
+      per_market_usdc = excluded.per_market_usdc,
+      revoked_at = NULL`,
+    args: [args.basketId, args.subscriber.toLowerCase(), args.perMarketUsdc, args.at],
+  });
+}
+
+export async function unsubscribeFromBasket(basketId: string, subscriber: string, at: number): Promise<void> {
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `UPDATE basket_subscriptions SET revoked_at = ?
+      WHERE basket_id = ? AND subscriber = ? AND revoked_at IS NULL`,
+    args: [at, basketId, subscriber.toLowerCase()],
+  });
+}
+
+export async function listBasketSubscriptions(subscriber: string): Promise<string[]> {
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `SELECT basket_id FROM basket_subscriptions
+      WHERE subscriber = ? AND revoked_at IS NULL`,
+    args: [subscriber.toLowerCase()],
+  });
+  return result.rows.map((row) => getString((row as Record<string, unknown>).basket_id));
 }

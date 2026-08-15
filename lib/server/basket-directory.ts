@@ -21,7 +21,7 @@ import {
   computeAgentPerformance, windowSinceMs,
   type AgentPerformance, type AgentTradeResult, type TimeWindow,
 } from "@/lib/agents/performance";
-import { getAgentTradeRows } from "@/lib/db";
+import { getAgentTradeRows, listBaskets } from "@/lib/db";
 import { listDirectoryAgents, type DirectoryAgent } from "./agent-directory";
 
 export interface BasketDefinition {
@@ -31,6 +31,10 @@ export interface BasketDefinition {
   thesis: string;
   /** Agent ids from the directory, with basis-point weights totalling 10000. */
   members: Array<{ agentId: string; weightBps: number }>;
+  /** Set for user-composed baskets; curated ones have no creator to pay. */
+  creatorWallet?: string;
+  subscriberCount?: number;
+  createdAt?: number;
 }
 
 /** Default policy: no agent over 40%, no category over 60%. */
@@ -197,10 +201,45 @@ export async function buildBasketView(
   };
 }
 
+/**
+ * Curated baskets plus everything users have composed.
+ *
+ * Stored baskets are read through the same view builder, so a user's basket gets
+ * the same curve, contribution split and policy check as a curated one — there is
+ * no second, weaker code path for the ones that matter to somebody.
+ */
+export async function allBasketDefinitions(): Promise<BasketDefinition[]> {
+  const stored = await listBaskets().catch(() => []);
+  const userDefined = stored.map((basket): BasketDefinition => {
+    let members: Array<{ agentId: string; weightBps: number }> = [];
+    try {
+      members = JSON.parse(basket.membersJson);
+    } catch {
+      members = [];
+    }
+    return {
+      id: basket.basketId,
+      name: basket.name,
+      emoji: "🧺",
+      thesis: basket.thesis || "Composed by a Mimir user.",
+      members,
+      creatorWallet: basket.creatorWallet,
+      subscriberCount: basket.subscriberCount ?? 0,
+      createdAt: basket.createdAt,
+    };
+  });
+  return [...BASKET_DEFINITIONS, ...userDefined];
+}
+
 export async function listBasketViews(window: TimeWindow = "all", nowMs = Date.now()): Promise<BasketView[]> {
-  return Promise.all(BASKET_DEFINITIONS.map((definition) => buildBasketView(definition, window, nowMs)));
+  const definitions = await allBasketDefinitions();
+  return Promise.all(definitions.map((definition) => buildBasketView(definition, window, nowMs)));
 }
 
 export function findBasketDefinition(id: string): BasketDefinition | null {
   return BASKET_DEFINITIONS.find((definition) => definition.id === id) ?? null;
+}
+
+export async function findAnyBasketDefinition(id: string): Promise<BasketDefinition | null> {
+  return (await allBasketDefinitions()).find((definition) => definition.id === id) ?? null;
 }

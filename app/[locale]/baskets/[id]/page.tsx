@@ -7,14 +7,14 @@ import { AgentAvatar, AgentAvatarStack } from "@/components/agents/AgentAvatar";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { AddressChip } from "@/components/ui/AddressChip";
 import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
-import { buildBasketView, findBasketDefinition } from "@/lib/server/basket-directory";
+import { buildBasketView, findAnyBasketDefinition, findBasketDefinition } from "@/lib/server/basket-directory";
 import { unitsToUsdc } from "@/lib/usdc";
 
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const definition = findBasketDefinition(id);
+  const definition = findBasketDefinition(id) ?? await findAnyBasketDefinition(id).catch(() => null);
   return {
     title: definition ? definition.name : "Basket",
     description: definition?.thesis,
@@ -31,7 +31,7 @@ export default async function BasketDetailPage({
     params,
     searchParams ?? Promise.resolve({} as { window?: string | string[] }),
   ]);
-  const definition = findBasketDefinition(id);
+  const definition = await findAnyBasketDefinition(id).catch(() => null);
   if (!definition) notFound();
 
   const rawWindow = Array.isArray(sp?.window) ? sp.window[0] : sp?.window;
