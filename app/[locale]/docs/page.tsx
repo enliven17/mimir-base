@@ -1,5 +1,7 @@
 "use client";
 
+import { useEffect, useState } from "react";
+
 import { Link } from "@/i18n/navigation";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { openPeepsAvatar } from "@/lib/avatars";
@@ -380,7 +382,7 @@ function JuryDiagram() {
       {/* 03 sequential jury container */}
       <g>
         <rect x="265" y="40" width="455" height="310" rx="18" fill={C.bg} stroke={C.accent} strokeWidth="1.6" strokeDasharray="6 4" />
-        <text x="492" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.accent} letterSpacing="2">03 · SEQUENTIAL JURY — SHUFFLED ORDER</text>
+        <text x="492" y="68" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.accent} letterSpacing="2">03 · SEQUENTIAL JURY: SHUFFLED ORDER</text>
         <text x="492" y="88" textAnchor="middle" fontSize="10" fill={C.muted}>GET /api/council/vote · $0.001 USDC → juror wallet · prior q&#8320; = 0.50</text>
 
         {jurors.map((j) => (
@@ -393,22 +395,22 @@ function JuryDiagram() {
           </g>
         ))}
 
-        {/* history flows between jurors — labels live in the sub-caption below */}
+        {/* history flows between jurors; labels live in the sub-caption below */}
         <line x1="357" y1="170" x2="388" y2="170" stroke={C.accent} strokeWidth="1.5" markerEnd="url(#arrow-e)" />
         <line x1="502" y1="170" x2="533" y2="170" stroke={C.accent} strokeWidth="1.5" markerEnd="url(#arrow-e)" />
 
         {/* q chain */}
         <text x="492" y="262" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.text}>q&#8320; 0.50 → 0.85 → 0.90 → 0.92</text>
-        <text x="492" y="280" textAnchor="middle" fontSize="9" fill={C.muted}>each juror sees the prior reports — beliefs aggregate, parrots add nothing</text>
+        <text x="492" y="280" textAnchor="middle" fontSize="9" fill={C.muted}>each juror sees the prior reports; beliefs aggregate, parrots add nothing</text>
 
         {/* alpha coin */}
         <rect x="300" y="296" width="385" height="40" rx="10" fill={C.surf2} stroke={C.border} strokeWidth="1.3" />
-        <text x="492" y="321" textAnchor="middle" fontSize="10" fill={C.text}>after quorum every further vote flips an α-coin — the market may stop</text>
+        <text x="492" y="321" textAnchor="middle" fontSize="10" fill={C.text}>after quorum every further vote flips an α-coin: the market may stop</text>
       </g>
 
       {/* independent evidence path → terminal (over the jury) */}
       <path d="M 225 150 C 420 -8, 660 -8, 858 84" fill="none" stroke={C.line} strokeWidth="1.4" strokeDasharray="5 4" markerEnd="url(#arrow-e-muted)" />
-      <text x="540" y="-14" textAnchor="middle" fontSize="10" fill={C.muted}>independent evidence — outside juror influence</text>
+      <text x="540" y="-14" textAnchor="middle" fontSize="10" fill={C.muted}>independent evidence, outside juror influence</text>
 
       {/* 04 terminal reference */}
       <g>
@@ -491,7 +493,7 @@ function CouncilNanopaymentMeshDiagram() {
       <text x="516" y="98" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.accent} letterSpacing="2">COUNCIL MARKET</text>
       <text x="516" y="120" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>$0.001 peer reasoning reads</text>
 
-      {/* Peer reads — subtle dashed links between personas */}
+      {/* Peer reads: subtle dashed links between personas */}
       <path d="M438 178 C470 162, 484 162, 516 178" fill="none" stroke={C.line} strokeWidth="1.2" strokeDasharray="4 4" markerEnd="url(#arrow-mesh)" />
       <path d="M646 200 C612 250, 560 264, 516 290" fill="none" stroke={C.line} strokeWidth="1.2" strokeDasharray="4 4" markerEnd="url(#arrow-mesh)" />
       <path d="M503 326 C525 312, 539 312, 561 326" fill="none" stroke={C.line} strokeWidth="1.2" strokeDasharray="4 4" markerEnd="url(#arrow-mesh)" />
@@ -627,7 +629,294 @@ function FeeWaterfallDiagram() {
   );
 }
 
-/* @@MORE-DIAGRAMS@@ */
+/* ── 8. Basket flow diagram ────────────────────────────────────────────────── */
+function BasketFlowDiagram() {
+  return (
+    <svg viewBox="0 0 880 400" className="h-auto w-full" role="img" aria-label="Basket flow diagram">
+      <defs>
+        <marker id="arrow-b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill={C.accent} />
+        </marker>
+      </defs>
+
+      {/* Composer */}
+      <g>
+        <rect x="20" y="46" width="180" height="96" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="110" y="76" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Composer</text>
+        <text x="110" y="96" textAnchor="middle" fontSize="10" fill={C.muted}>anyone: pick agents,</text>
+        <text x="110" y="112" textAnchor="middle" fontSize="10" fill={C.muted}>set weights, state a thesis</text>
+      </g>
+
+      {/* Definition */}
+      <g>
+        <rect x="270" y="30" width="230" height="110" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="385" y="58" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Basket definition</text>
+        <text x="385" y="78" textAnchor="middle" fontSize="10" fill={C.muted}>weights sum to 10,000 bps</text>
+        <text x="385" y="94" textAnchor="middle" fontSize="10" fill={C.muted}>duplicate agents rejected</text>
+        <text x="385" y="110" textAnchor="middle" fontSize="10" fill={C.muted}>public: searchable, named leader</text>
+      </g>
+
+      {/* Policy gate */}
+      <g>
+        <rect x="570" y="30" width="220" height="110" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="680" y="58" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Policy gate</text>
+        <text x="680" y="78" textAnchor="middle" fontSize="10" fill={C.muted}>max single-agent weight</text>
+        <text x="680" y="94" textAnchor="middle" fontSize="10" fill={C.muted}>max category weight</text>
+        <text x="680" y="110" textAnchor="middle" fontSize="10" fill={C.muted}>invalid mixes cannot be created</text>
+      </g>
+
+      {/* Virtual NAV */}
+      <g>
+        <rect x="270" y="190" width="230" height="116" rx="14" fill={C.surf2} stroke={C.accent} strokeWidth="1.6" />
+        <text x="385" y="218" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Virtual NAV engine</text>
+        <text x="385" y="238" textAnchor="middle" fontSize="10" fill={C.muted}>replays what members settled on chain</text>
+        <text x="385" y="254" textAnchor="middle" fontSize="10" fill={C.muted}>stake-weighted daily returns, drawdown</text>
+        <text x="385" y="270" textAnchor="middle" fontSize="10" fill={C.muted}>paused or stale legs sit idle at 0%</text>
+        <text x="385" y="290" textAnchor="middle" fontSize="10" fill={C.muted}>read-only: nothing is pooled</text>
+      </g>
+
+      {/* Followers */}
+      <g>
+        <rect x="570" y="190" width="290" height="116" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="715" y="216" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Followers mirror</text>
+        <text x="715" y="236" textAnchor="middle" fontSize="10" fill={C.muted}>sign a subscription, set a per-market cap</text>
+        <text x="715" y="252" textAnchor="middle" fontSize="10" fill={C.muted}>every real stake is signed by the follower</text>
+        <text x="715" y="268" textAnchor="middle" fontSize="10" fill={C.muted}>unsubscribe is one more signature</text>
+        <text x="715" y="288" textAnchor="middle" fontSize="10" fill={C.muted}>Mimir never holds follower funds</text>
+      </g>
+
+      <line x1="200" y1="94" x2="262" y2="90" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-b)" />
+      <line x1="500" y1="85" x2="562" y2="85" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-b)" />
+      <line x1="680" y1="140" x2="420" y2="182" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-b)" />
+      <line x1="500" y1="248" x2="562" y2="248" stroke={C.accent} strokeWidth="1.8" markerEnd="url(#arrow-b)" />
+
+      {/* Funded vault, disabled */}
+      <g>
+        <rect x="270" y="336" width="590" height="50" rx="10" fill="none" stroke={C.border} strokeWidth="1.4" strokeDasharray="6 6" />
+        <text x="565" y="357" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted}>Funded ERC-4626 vault: designed, deposits disabled (BASKET_DEPOSITS_ENABLED=false)</text>
+        <text x="565" y="375" textAnchor="middle" fontSize="10" fill={C.muted}>high-water-mark performance fee · direct user-to-vault emergency exit · pro-rata claims on unsettled markets</text>
+      </g>
+      <line x1="715" y1="306" x2="715" y2="330" stroke={C.line} strokeWidth="1.3" strokeDasharray="4 4" markerEnd="url(#arrow-b)" />
+    </svg>
+  );
+}
+
+/* ── 9. Copy-trading gate diagram ──────────────────────────────────────────── */
+function CopyGateDiagram() {
+  const checks = [
+    "not globally paused, permission active",
+    "permission not expired",
+    "no self-copy, no copy-of-copy (depth 1)",
+    "no cycle in the signal ancestry",
+    "not already in this market",
+    "signal still fresh, deadline ahead",
+    "market has open slots and liquidity",
+    "category and mode allowlisted",
+    "confidence and payout above floors",
+    "per-position, daily, weekly, exposure caps",
+    "realized-loss limit not breached",
+    "spend permission matches token + spender",
+    "on-chain allowance covers the stake",
+    "transaction simulation passes",
+  ];
+  return (
+    <svg viewBox="0 0 880 420" className="h-auto w-full" role="img" aria-label="Copy trading gate diagram">
+      <defs>
+        <marker id="arrow-cg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill={C.accent} />
+        </marker>
+      </defs>
+
+      {/* Signal */}
+      <g>
+        <rect x="20" y="160" width="170" height="96" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="105" y="190" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Signal</text>
+        <text x="105" y="210" textAnchor="middle" fontSize="10" fill={C.muted}>source agent takes</text>
+        <text x="105" y="226" textAnchor="middle" fontSize="10" fill={C.muted}>a position on chain</text>
+      </g>
+
+      {/* Gate panel */}
+      <g>
+        <rect x="250" y="14" width="330" height="392" rx="14" fill={C.surface} stroke={C.accent} strokeWidth="1.6" />
+        <text x="415" y="42" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>COPY GATE · ALL MUST PASS</text>
+        <line x1="266" y1="54" x2="564" y2="54" stroke={C.border} strokeWidth="1" />
+        {checks.map((check, i) => (
+          <text key={check} x="272" y={80 + i * 23} fontSize="10.5" fill={C.muted}>
+            <tspan fill={C.accent} fontWeight="700">{String(i + 1).padStart(2, "0")}  </tspan>
+            {check}
+          </text>
+        ))}
+      </g>
+
+      {/* Execution */}
+      <g>
+        <rect x="640" y="60" width="220" height="100" rx="14" fill={C.surf2} stroke={C.accent} strokeWidth="1.6" />
+        <text x="750" y="90" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Execution agent</text>
+        <text x="750" y="110" textAnchor="middle" fontSize="10" fill={C.muted}>stakes follower USDC</text>
+        <text x="750" y="126" textAnchor="middle" fontSize="10" fill={C.muted}>within the signed caps,</text>
+        <text x="750" y="142" textAnchor="middle" fontSize="10" fill={C.muted}>signed by the follower wallet</text>
+      </g>
+
+      {/* Audit */}
+      <g>
+        <rect x="640" y="220" width="220" height="110" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="750" y="248" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Audit record</text>
+        <text x="750" y="268" textAnchor="middle" fontSize="10" fill={C.muted}>executed / skipped / failed</text>
+        <text x="750" y="284" textAnchor="middle" fontSize="10" fill={C.muted}>stake, simulation block,</text>
+        <text x="750" y="300" textAnchor="middle" fontSize="10" fill={C.muted}>fee legs, skip reason</text>
+        <text x="750" y="316" textAnchor="middle" fontSize="10" fill={C.muted}>every decision is reconstructable</text>
+      </g>
+
+      <line x1="190" y1="208" x2="242" y2="208" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-cg)" />
+      <line x1="580" y1="140" x2="632" y2="110" stroke={C.accent} strokeWidth="1.8" markerEnd="url(#arrow-cg)" />
+      <text x="606" y="102" textAnchor="middle" fontSize="9.5" fontWeight="700" fill={C.accent}>allowed</text>
+      <line x1="580" y1="280" x2="632" y2="276" stroke={C.line} strokeWidth="1.4" markerEnd="url(#arrow-cg)" />
+      <text x="606" y="262" textAnchor="middle" fontSize="9.5" fontWeight="700" fill={C.muted}>always</text>
+    </svg>
+  );
+}
+
+/* ── 10. BYOA identity diagram ─────────────────────────────────────────────── */
+function ByoaIdentityDiagram() {
+  return (
+    <svg viewBox="0 0 880 360" className="h-auto w-full" role="img" aria-label="BYOA identity model diagram">
+      <defs>
+        <marker id="arrow-id" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill={C.accent} />
+        </marker>
+      </defs>
+
+      {/* Owner wallet */}
+      <g>
+        <rect x="20" y="30" width="250" height="104" rx="14" fill={C.surf2} stroke={C.accent} strokeWidth="1.6" />
+        <text x="145" y="56" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="1.5">OWNER WALLET · COLD</text>
+        <text x="145" y="80" textAnchor="middle" fontSize="10" fill={C.muted}>only party that can rotate</text>
+        <text x="145" y="96" textAnchor="middle" fontSize="10" fill={C.muted}>the operator or revoke the agent</text>
+        <text x="145" y="116" textAnchor="middle" fontSize="10" fill={C.muted}>signs register, keys, spend grants</text>
+      </g>
+
+      {/* Operator wallet */}
+      <g>
+        <rect x="315" y="30" width="250" height="104" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="440" y="56" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="1.5">OPERATOR WALLET · HOT</text>
+        <text x="440" y="80" textAnchor="middle" fontSize="10" fill={C.muted}>signs day-to-day requests and txs</text>
+        <text x="440" y="96" textAnchor="middle" fontSize="10" fill={C.muted}>rotatable by the owner</text>
+        <text x="440" y="116" textAnchor="middle" fontSize="10" fill={C.muted}>compromise = revocation, not loss</text>
+      </g>
+
+      {/* Payout wallet */}
+      <g>
+        <rect x="610" y="30" width="250" height="104" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="735" y="56" textAnchor="middle" fontSize="11" fontWeight="700" fill={C.muted} letterSpacing="1.5">PAYOUT WALLET</text>
+        <text x="735" y="80" textAnchor="middle" fontSize="10" fill={C.muted}>where the 0.50% owner fee lands</text>
+        <text x="735" y="96" textAnchor="middle" fontSize="10" fill={C.muted}>defaults to the owner wallet</text>
+        <text x="735" y="116" textAnchor="middle" fontSize="10" fill={C.muted}>a grabbed hot key cannot redirect it</text>
+      </g>
+
+      {/* Registry record */}
+      <g>
+        <rect x="150" y="190" width="310" height="110" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="305" y="218" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Registry record</text>
+        <text x="305" y="238" textAnchor="middle" fontSize="10" fill={C.muted}>agentId · authority level 0-4 · capabilities</text>
+        <text x="305" y="254" textAnchor="middle" fontSize="10" fill={C.muted}>platform limits · status lifecycle</text>
+        <text x="305" y="270" textAnchor="middle" fontSize="10" fill={C.muted}>pending → active → paused → revoked</text>
+        <text x="305" y="290" textAnchor="middle" fontSize="10" fill={C.muted}>revocation is terminal and clears capabilities</text>
+      </g>
+
+      {/* Policy gate */}
+      <g>
+        <rect x="540" y="190" width="320" height="110" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="700" y="218" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Platform policy</text>
+        <text x="700" y="238" textAnchor="middle" fontSize="10" fill={C.muted}>limits an agent cannot raise itself</text>
+        <text x="700" y="254" textAnchor="middle" fontSize="10" fill={C.muted}>funded actions need an owner-signed</text>
+        <text x="700" y="270" textAnchor="middle" fontSize="10" fill={C.muted}>spend permission on top of the limits</text>
+        <text x="700" y="290" textAnchor="middle" fontSize="10" fill={C.muted}>reputation never grants financial authority</text>
+      </g>
+
+      <line x1="145" y1="134" x2="250" y2="182" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-id)" />
+      <text x="168" y="166" textAnchor="middle" fontSize="9.5" fontWeight="700" fill={C.muted}>owns</text>
+      <line x1="440" y1="134" x2="360" y2="182" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-id)" />
+      <text x="428" y="166" textAnchor="middle" fontSize="9.5" fontWeight="700" fill={C.muted}>proves</text>
+      <line x1="460" y1="245" x2="532" y2="245" stroke={C.accent} strokeWidth="1.8" markerEnd="url(#arrow-id)" />
+      <text x="496" y="232" textAnchor="middle" fontSize="9.5" fontWeight="700" fill={C.accent}>gated by</text>
+
+      {/* Key invariant band */}
+      <g>
+        <rect x="20" y="322" width="840" height="26" rx="8" fill={C.bg} stroke={C.border} strokeWidth="1" />
+        <text x="440" y="339" textAnchor="middle" fontSize="10.5" fill={C.muted}>
+          Mimir never holds an external agent&apos;s key: it verifies signatures and enforces limits, the agent signs its own transactions
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+/* ── 11. BYOA connection sequence ──────────────────────────────────────────── */
+function ByoaSequenceDiagram() {
+  const steps = [
+    {
+      n: "1", title: "register", signer: "owner signature",
+      lines: ["envelope signed by the owner wallet,", "plus an operator self-proof", "→ registry record is created"],
+    },
+    {
+      n: "2", title: "issueKey", signer: "owner signature",
+      lines: ["returns the API key once", "only its SHA-256 is stored", "a leak costs at most the allowance"],
+    },
+    {
+      n: "3", title: "heartbeat + dryRun", signer: "API key or operator",
+      lines: ["liveness, status, positions, earnings", "dryRun simulates policy, fees and", "allowance before any money moves"],
+    },
+    {
+      n: "4", title: "grantSpend", signer: "owner signature",
+      lines: ["Base Account spend permission:", "token, spender, allowance, period,", "start and expiry, shown pre-signature"],
+    },
+    {
+      n: "5", title: "stake / createMarket / vote", signer: "API key or operator",
+      lines: ["permission check, then platform limits,", "then simulation; all three must pass", "before a transaction is built"],
+    },
+    {
+      n: "6", title: "on chain", signer: "operator wallet signs the tx",
+      lines: ["the agent signs its own transaction", "from its own wallet; Mimir never", "custodies keys or funds"],
+    },
+  ];
+  return (
+    <svg viewBox="0 0 880 430" className="h-auto w-full" role="img" aria-label="BYOA connection sequence diagram">
+      <defs>
+        <marker id="arrow-sq" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill={C.accent} />
+        </marker>
+      </defs>
+
+      {steps.map((step, i) => {
+        const col = i < 3 ? 0 : 1;
+        const row = i % 3;
+        const x = 20 + col * 450;
+        const y = 20 + row * 136;
+        return (
+          <g key={step.n}>
+            <rect x={x} y={y} width="410" height="116" rx="14" fill={i === 5 ? C.surf2 : C.surface} stroke={i === 5 ? C.accent : C.border} strokeWidth={i === 5 ? 1.8 : 1.5} />
+            <circle cx={x + 30} cy={y + 30} r="14" fill={C.bg} stroke={C.accent} strokeWidth="1.5" />
+            <text x={x + 30} y={y + 35} textAnchor="middle" fontSize="12" fontWeight="700" fill={C.accent}>{step.n}</text>
+            <text x={x + 54} y={y + 34} fontSize="12.5" fontWeight="700" fill={C.text}>{step.title}</text>
+            <text x={x + 54} y={y + 52} fontSize="9.5" fontWeight="700" fill={C.gold}>{step.signer}</text>
+            {step.lines.map((line, j) => (
+              <text key={j} x={x + 24} y={y + 74 + j * 16} fontSize="10" fill={C.muted}>{line}</text>
+            ))}
+          </g>
+        );
+      })}
+
+      {/* Flow arrows */}
+      <line x1="230" y1="136" x2="230" y2="150" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sq)" />
+      <line x1="230" y1="272" x2="230" y2="286" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sq)" />
+      <line x1="430" y1="350" x2="470" y2="350" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sq)" />
+      <line x1="680" y1="292" x2="680" y2="278" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sq)" />
+      <line x1="680" y1="156" x2="680" y2="142" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sq)" />
+    </svg>
+  );
+}
+
+/* ── Helpers ─────────────────────────────────────────────────────────────── */
 
 function Section({ id, eyebrow, title, children }: { id?: string; eyebrow: string; title: string; children: React.ReactNode }) {
   return (
@@ -659,14 +948,115 @@ function DiagramFrame({ children, caption }: { children: React.ReactNode; captio
   );
 }
 
-function TocLink({ href, label }: { href: string; label: string }) {
+/* ── Contents model: one array feeds both the sidebar and the numbering ────── */
+
+const TOC_SECTIONS = [
+  { id: "what",          eyebrow: "01", title: "What Mimir is" },
+  { id: "why-base",      eyebrow: "02", title: "Why USDC on Base" },
+  { id: "architecture",  eyebrow: "03", title: "Architecture" },
+  { id: "flow",          eyebrow: "04", title: "End-to-end flow" },
+  { id: "lifecycle",     eyebrow: "05", title: "The claim lifecycle" },
+  { id: "fees",          eyebrow: "06", title: "Platform fees" },
+  { id: "baskets",       eyebrow: "07", title: "Agent baskets" },
+  { id: "copy-trading",  eyebrow: "08", title: "Copy trading" },
+  { id: "agents",        eyebrow: "09", title: "The agents" },
+  { id: "byoa",          eyebrow: "10", title: "Bring your own agent" },
+  { id: "connect",       eyebrow: "11", title: "Connect your agent" },
+  { id: "base-stack",    eyebrow: "12", title: "The Base stack" },
+  { id: "lepton",        eyebrow: "13", title: "x402 payments and the council" },
+  { id: "state-machine", eyebrow: "14", title: "State machine" },
+  { id: "contract",      eyebrow: "15", title: "Smart contract terms" },
+  { id: "ops",           eyebrow: "16", title: "Flags and kill switches" },
+  { id: "play",          eyebrow: "17", title: "How to play" },
+  { id: "faq",           eyebrow: "18", title: "FAQ" },
+] as const;
+
+function CodeBlock({ title, children }: { title: string; children: string }) {
   return (
-    <a
-      href={href}
-      className="block border-l-2 border-pv-border/40 py-1 pl-3 text-sm text-pv-text/80 transition-colors hover:border-pv-emerald hover:text-pv-text"
-    >
-      {label}
-    </a>
+    <figure className="overflow-hidden rounded-xl border border-pv-border/40 bg-pv-bg/60">
+      <figcaption className="border-b border-pv-border/30 px-4 py-2 text-[10px] font-bold uppercase tracking-[0.22em] text-pv-muted">
+        {title}
+      </figcaption>
+      <pre className="overflow-x-auto p-4 font-mono text-[11.5px] leading-relaxed text-pv-text/90">
+        <code>{children}</code>
+      </pre>
+    </figure>
+  );
+}
+
+/**
+ * Left-rail table of contents. Sticky on desktop so it stays in view while the
+ * article scrolls; a collapsible panel on mobile. A single IntersectionObserver
+ * highlights the section currently being read.
+ */
+function DocsToc() {
+  const [active, setActive] = useState<string>(TOC_SECTIONS[0].id);
+
+  useEffect(() => {
+    // Smooth anchor scrolling, scoped to this page and restored on unmount.
+    const root = document.documentElement;
+    const previous = root.style.scrollBehavior;
+    root.style.scrollBehavior = "smooth";
+
+    // ponytail: one observer over all sections. The rootMargin narrows the
+    // "active" band to the upper viewport so the highlight tracks reading
+    // position; a scroll-direction state machine would be more code for the
+    // same visible result.
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) setActive(entry.target.id);
+        }
+      },
+      { rootMargin: "-15% 0px -75% 0px" },
+    );
+    for (const { id } of TOC_SECTIONS) {
+      const el = document.getElementById(id);
+      if (el) observer.observe(el);
+    }
+    return () => {
+      root.style.scrollBehavior = previous;
+      observer.disconnect();
+    };
+  }, []);
+
+  const list = (
+    <ul className="space-y-0.5">
+      {TOC_SECTIONS.map(({ id, eyebrow, title }) => (
+        <li key={id}>
+          <a
+            href={`#${id}`}
+            aria-current={active === id ? "true" : undefined}
+            className={`block border-l-2 py-1 pl-3 text-[13px] transition-colors ${
+              active === id
+                ? "border-pv-emerald font-semibold text-pv-text"
+                : "border-pv-border/30 text-pv-muted hover:border-pv-emerald/60 hover:text-pv-text"
+            }`}
+          >
+            <span className="mr-2 font-mono text-[10px] text-pv-emerald/80">{eyebrow}</span>
+            {title}
+          </a>
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <>
+      <details className="mb-8 rounded-2xl border border-pv-border/30 bg-pv-surface/40 p-4 lg:hidden">
+        <summary className="cursor-pointer text-[10px] font-bold uppercase tracking-[0.22em] text-pv-muted">
+          Contents
+        </summary>
+        <div className="mt-3">{list}</div>
+      </details>
+      <nav
+        aria-label="Table of contents"
+        className="sticky top-24 hidden max-h-[calc(100vh-7rem)] overflow-y-auto pb-4 pr-2 lg:block"
+      >
+        <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.22em] text-pv-muted">Contents</p>
+        {list}
+      </nav>
+    </>
   );
 }
 
@@ -675,41 +1065,26 @@ export default function DocsPage() {
   return (
     <div className="pb-10">
       <BlueprintHeading>How Mimir works</BlueprintHeading>
-      <article className="mx-auto max-w-4xl space-y-14 px-4 pt-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 lg:flex lg:items-start lg:gap-10 lg:px-8">
+      <aside className="lg:w-60 lg:shrink-0">
+        <DocsToc />
+      </aside>
+      <article className="min-w-0 flex-1 space-y-14">
       <header>
-        <p className="mx-auto max-w-2xl text-center text-base leading-relaxed text-pv-text/75 sm:text-lg">
-          Mimir is an AI-settled claim market on Base — an Ethereum L2 where ETH pays
+        <p className="max-w-2xl text-base leading-relaxed text-pv-text/75 sm:text-lg">
+          Mimir is an AI-settled claim market on Base, an Ethereum L2 where ETH pays
           gas while every value flow, from market stakes to agent micropayments,
-          settles in USDC. Two parties stake USDC on opposite sides of a verifiable question; when the
-          deadline passes, an off-chain AI oracle reads the agreed-upon evidence
-          source, returns a verdict, and the smart contract pays out the winning side
-          atomically. No committees, no manual disputes.
+          settles in USDC. Two parties stake USDC on opposite sides of a verifiable
+          question; when the deadline passes, an off-chain AI oracle reads the agreed
+          evidence source, returns a verdict, and the smart contract pays out the
+          winning side atomically. No committees, no manual disputes.
         </p>
       </header>
-
-      {/* TOC */}
-      <nav aria-label="Table of contents" className="rounded-2xl border border-pv-border/30 bg-pv-surface/40 p-5">
-        <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.22em] text-pv-muted">Contents</p>
-        <div className="grid gap-1 sm:grid-cols-2">
-          <TocLink href="#what" label="1. What Mimir is" />
-          <TocLink href="#why-base" label="2. Why USDC on Base" />
-          <TocLink href="#architecture" label="3. Architecture" />
-          <TocLink href="#flow" label="4. End-to-end flow" />
-          <TocLink href="#lifecycle" label="5. The claim lifecycle" />
-          <TocLink href="#agents" label="6. The agents" />
-          <TocLink href="#base-stack" label="7. The Base stack" />
-          <TocLink href="#lepton" label="8. Payments and council" />
-          <TocLink href="#state-machine" label="9. State machine" />
-          <TocLink href="#contract" label="10. Smart contract terms" />
-          <TocLink href="#play" label="11. How to play" />
-          <TocLink href="#faq" label="12. FAQ" />
-        </div>
-      </nav>
 
       <Section id="what" eyebrow="01" title="What Mimir is">
         <p>
           A claim in Mimir is a single, verifiable question with a deadline and a
-          designated resolution source — for example,{" "}
+          designated resolution source: for example,{" "}
           <em>&ldquo;Will BTC close above $100,000 on 2026-05-25 according to CoinGecko?&rdquo;</em>
         </p>
         <p>
@@ -730,8 +1105,8 @@ export default function DocsPage() {
 
       <Section id="why-base" eyebrow="02" title="Why USDC on Base">
         <p>
-          Base is an Ethereum L2 where ETH pays gas and USDC — Circle&apos;s
-          dollar stablecoin, native to the chain — carries value. Splitting those
+          Base is an Ethereum L2 where ETH pays gas and USDC, Circle&apos;s
+          dollar stablecoin, native to the chain, carries value. Splitting those
           two jobs changes the economics of a stake-and-settle market enough to be
           worth calling out:
         </p>
@@ -776,12 +1151,12 @@ export default function DocsPage() {
             <strong className="text-pv-text">Workers (Railway).</strong> Three
             long-lived Node processes: the oracle (settler), the market-creator,
             and the ten-persona Mimir Council. Vercel functions time out before
-            a polling cycle can finish — Railway is the right home.
+            a polling cycle can finish, so Railway is the right home.
           </li>
           <li>
             <strong className="text-pv-text">Data (Neon Postgres).</strong> A
             denormalised read-index of on-chain state for the explorer / dashboard
-            feeds. Optional — the contract remains source of truth, and pages that
+            feeds. Optional: the contract remains source of truth, and pages that
             don&apos;t need feeds (stats, claim detail) work without it.
           </li>
         </ul>
@@ -840,18 +1215,236 @@ export default function DocsPage() {
           <li>
             <strong className="text-pv-text">Oracle-only resolution.</strong>{" "}
             <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">resolveClaim</code>{" "}
-            is gated by a single address — a dedicated wallet held by the oracle
+            is gated by a single address: a dedicated wallet held by the oracle
             agent. No human can quietly re-route payouts.
           </li>
         </ul>
       </Section>
 
-      <Section id="agents" eyebrow="06" title="The agents">
+      <Section id="fees" eyebrow="06" title="Platform fees">
+        <p>
+          Every fee in Mimir is charged on <strong className="text-pv-text">profit</strong>,
+          never on the gross payout. Charging the gross is the obvious implementation and
+          it is broken: stake 10 USDC into a crowded side, win 11 back, and a 20% gross
+          fee leaves you with 8.8. You were right and you lost money. No Mimir schedule
+          can produce that outcome, because the fee base is always{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">gross - principal</code>,
+          floored at zero.
+        </p>
+        <DiagramFrame caption="Where a winning payout goes. The principal is never fee-bearing; the three fee legs come out of profit only.">
+          <FeeWaterfallDiagram />
+        </DiagramFrame>
+
+        <h3 className="text-lg font-bold text-pv-text">Rate schedule</h3>
+        <div className="overflow-x-auto rounded-xl border border-pv-border/30">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-pv-border/30 text-[10px] font-bold uppercase tracking-[0.18em] text-pv-muted">
+                <th className="px-4 py-2.5">Leg</th>
+                <th className="px-4 py-2.5">Rate</th>
+                <th className="px-4 py-2.5">Charged on</th>
+                <th className="px-4 py-2.5">Paid to</th>
+              </tr>
+            </thead>
+            <tbody className="text-pv-text/85">
+              <tr className="border-b border-pv-border/20">
+                <td className="px-4 py-2.5 font-semibold text-pv-text">Platform</td>
+                <td className="px-4 py-2.5">50 bps (0.50%)</td>
+                <td className="px-4 py-2.5">winner profit, on chain</td>
+                <td className="px-4 py-2.5">platform recipient, claimable balance</td>
+              </tr>
+              <tr className="border-b border-pv-border/20">
+                <td className="px-4 py-2.5 font-semibold text-pv-text">Agent owner</td>
+                <td className="px-4 py-2.5">50 bps (0.50%)</td>
+                <td className="px-4 py-2.5">winner profit, when the position ran through a registered agent</td>
+                <td className="px-4 py-2.5">the agent&apos;s payout wallet</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2.5 font-semibold text-pv-text">Basket creator</td>
+                <td className="px-4 py-2.5">25 bps (0.25%)</td>
+                <td className="px-4 py-2.5">winner profit, when the position came through a basket</td>
+                <td className="px-4 py-2.5">the basket composer (off-chain accounting today)</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          The combined total can never exceed{" "}
+          <strong className="text-pv-text">1000 bps (10%)</strong>. That cap is enforced
+          in <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">validateFeePolicy</code>,
+          not documented and hoped for. x402 service prices (per-call payments between
+          agents) are a separate surface with per-endpoint pricing, tracked live on{" "}
+          <Link href="/revenue" className="text-pv-emerald underline">/revenue</Link>.
+        </p>
+        <h3 className="text-lg font-bold text-pv-text">Rules the accounting follows</h3>
+        <ul className="list-disc space-y-2 pl-5 text-pv-text/85">
+          <li>
+            <strong className="text-pv-text">Nothing at deposit.</strong> Fees exist only
+            at settlement. A market that never resolves costs its participants nothing.
+          </li>
+          <li>
+            <strong className="text-pv-text">Refunds are full.</strong> Draws, unresolvable
+            outcomes and cancellations return 100% of every stake. There is no profit to
+            charge, and taking a cut of a returned stake would make the protocol the only
+            winner of an ambiguous market.
+          </li>
+          <li>
+            <strong className="text-pv-text">Snapshot at creation.</strong> The fee policy
+            is frozen onto the claim at create time; the economics cannot change under
+            participants who already committed money.
+          </li>
+          <li>
+            <strong className="text-pv-text">Integer math, participant-friendly rounding.</strong>{" "}
+            All amounts are 6-decimal atomic integers, fee division rounds down in the
+            participant&apos;s favor, and the leftover dust is recorded explicitly rather
+            than vanishing into a rounding gap.
+          </li>
+          <li>
+            <strong className="text-pv-text">Pull, not push.</strong> Fees accrue to a
+            claimable balance per recipient. A push transfer to a contract that reverts
+            would take the whole settlement down with it.
+          </li>
+          <li>
+            <strong className="text-pv-text">Nobody pays themselves.</strong> If you profit
+            through your own agent or your own basket, that leg is waived. Charging it
+            would move money from one of your pockets to the other, minus gas.
+          </li>
+          <li>
+            <strong className="text-pv-text">Conservation is invariant.</strong> For every
+            settlement: payouts + fees + dust = escrow inflow. The checks{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">noWinnerLosesPrincipal</code>,{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">refundZeroFee</code> and{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">noCreatedMoney</code>{" "}
+            are tested directly in <code className="rounded bg-pv-surface2 px-1 text-xs">lib/fees.ts</code>.
+          </li>
+        </ul>
+
+        <h3 className="text-lg font-bold text-pv-text">Worked example</h3>
+        <CodeBlock title="winner math, atomic USDC (6 decimals)">
+{`stake:            10 USDC        gross payout:   11 USDC
+profit:            1 USDC  =  1_000_000 atomic
+
+platform    50 bps of profit =     5_000  =  0.0050 USDC
+agent owner 50 bps of profit =     5_000  =  0.0050 USDC
+basket      25 bps of profit =     2_500  =  0.0025 USDC
+winner receives              = 10_987_500  = 10.9875 USDC
+
+same win under a 20% gross fee: 8.80 USDC, a loss for being right.
+that schedule is unrepresentable here.`}
+        </CodeBlock>
+      </Section>
+
+      <Section id="baskets" eyebrow="07" title="Agent baskets">
+        <p>
+          A basket is a weighted mix of agents with a stated thesis. Anyone composes one
+          on <Link href="/baskets/new" className="text-pv-emerald underline">/baskets/new</Link>;
+          the directory on <Link href="/baskets" className="text-pv-emerald underline">/baskets</Link>{" "}
+          makes every basket searchable, shows who leads it, and ranks the top earning
+          (by realized PnL) and top followed (by subscriber count) over selectable time
+          windows. Each published curve is built from what member agents actually settled
+          on chain, not from backfilled promises.
+        </p>
+        <DiagramFrame caption="Composition, validation, the read-only NAV engine, and following by mirroring. The funded vault at the bottom is designed but deliberately disabled.">
+          <BasketFlowDiagram />
+        </DiagramFrame>
+
+        <h3 className="text-lg font-bold text-pv-text">Composition rules</h3>
+        <ul className="list-disc space-y-2 pl-5 text-pv-text/85">
+          <li>
+            Weights are basis points and must sum to exactly{" "}
+            <strong className="text-pv-text">10,000</strong>; anything else fails with{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">weights_must_total_10000_bps</code>.
+          </li>
+          <li>
+            No duplicate agents, no zero or negative weights, no single agent above the
+            policy&apos;s <code className="rounded bg-pv-surface2 px-1 text-xs">maxSingleAgentBps</code>,
+            and no category above{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">maxCategoryBps</code>.
+            Validation lives in{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">lib/baskets.ts</code>{" "}
+            and runs before a basket is stored.
+          </li>
+        </ul>
+
+        <h3 className="text-lg font-bold text-pv-text">Virtual NAV: a backtest, not a pool</h3>
+        <p>
+          The engine replays a hypothetical 1,000 USDC allocated by the basket&apos;s
+          weights through the members&apos; settled markets. Returns are stake-weighted
+          per day, so a 10 USDC decision and a 1 USDC decision are not two equal votes;
+          days with no settlement produce no point, so an idle agent draws a flat line
+          instead of a zero that drags the average down. Paused agents and stale signals
+          earn 0% for that leg: their allocation stays in idle USDC. Drawdown is tracked
+          against the running high. Nothing is deposited and nothing is pooled; the curve
+          is a read-only projection of real settlements.
+        </p>
+        <h3 className="text-lg font-bold text-pv-text">Following is mirroring, never depositing</h3>
+        <p>
+          To follow a basket you sign a message naming the basket, your wallet and a
+          per-market USDC cap. When the basket&apos;s agents take new positions, your copy
+          is staked from your own wallet with your own signature; Mimir cannot move those
+          funds itself. Unfollowing is the same signature with the cap set to zero. The
+          composer earns the 25 bps basket leg on profit you make through their mix, and
+          that leg is waived on your own basket.
+        </p>
+
+        <h3 className="text-lg font-bold text-pv-text">The funded vault, designed and held back</h3>
+        <p>
+          ADR-0008 defines the non-custodial upgrade path: an ERC-4626-compatible vault
+          where the contract, not an agent, is the source of truth for shares and assets.
+          Initial shares equal assets; later conversions round down in the vault&apos;s
+          favor and record dust; a minimum locked seed plus a minimum-deposit rule blunts
+          donation and inflation attacks. Performance fees apply only to realized gains
+          above an atomic high-water mark, and management fees are disabled in v1.
+        </p>
+        <p>
+          Emergency withdrawal is a direct user-to-vault call that cannot depend on any
+          agent, worker or oracle. Funds sitting in unresolved markets come back as a
+          transferable pro-rata claim that becomes redeemable at deterministic
+          settlement. Create, rebalance and copy can each pause independently while exit
+          stays enabled. Until an independent audit and the legal and eligibility review
+          are signed off,{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">BASKET_DEPOSITS_ENABLED</code>{" "}
+          stays false and no UI may call a funded deposit route.
+        </p>
+      </Section>
+
+      <Section id="copy-trading" eyebrow="08" title="Copy trading">
+        <p>
+          Copy trading lets a follower&apos;s execution agent mirror a signal agent&apos;s
+          new positions, inside a policy the follower signed up front. The permission is
+          explicit and narrow: it names the execution agent and the signal agent, caps
+          per-position, daily, weekly and total open exposure, sets a realized-loss
+          ceiling, allowlists categories and settlement modes, floors confidence and
+          payout, and expires. Copy depth is 1: a copy of a copy is refused, cycles are
+          detected through the signal ancestry, and duplicating a position you already
+          hold is refused.
+        </p>
+        <DiagramFrame caption="Every candidate copy passes the same deterministic gate. The first failed check wins, and the skip reason is recorded with the decision.">
+          <CopyGateDiagram />
+        </DiagramFrame>
+        <p>
+          The gate in <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">lib/copy-trading.ts</code>{" "}
+          is deterministic: given the same permission, signal and usage, it always returns
+          the same answer, and the reason enum (<code className="rounded bg-pv-surface2 px-1 text-xs">daily_cap</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">stale_signal</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">spend_permission_mismatch</code>,{" "}
+          and the rest) tells the follower exactly which bound was hit. Two money checks
+          sit at the end on purpose: the spend permission must match the configured USDC
+          token and spender with allowance left on chain, and the transaction must
+          simulate cleanly. Every decision, executed or skipped, lands in a{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">copy_executions</code>{" "}
+          audit row with stake, simulation block, fee legs and transaction hash, so a
+          follower can reconstruct why the agent did or did not act. The surface is gated
+          behind <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_FEATURE_COPY_TRADING</code>.
+        </p>
+      </Section>
+
+      <Section id="agents" eyebrow="09" title="The agents">
         <p>
           Twelve background processes run continuously: the oracle, the
           market-creator, and ten council personas. Each signs with its own
-          private key, provisioned per agent and held only in the worker process
-          — the web server never sees an agent key.
+          private key, provisioned per agent and held only in the worker process;
+          the web server never sees an agent key.
         </p>
         <DiagramFrame caption="Oracle decision tree. The poll loop reads every claim once a minute; ACTIVE+expired claims go to the settler, OPEN+live claims go to the optional Kelly-sized challenger. The council follows the same shape, one persona at a time.">
           <AgentLoopDiagram />
@@ -875,9 +1468,8 @@ export default function DocsPage() {
             commitment, not a free tweet.
           </Card>
           <Card title="The Mimir Council (×10)">
-            Ten AI personas — optimist, pessimist, contrarian, statistician,
-            whale-watcher, crypto maxi, sports pundit, weatherman, doomer, yapper —
-            each with its own wallet and its own way of reading a market.
+            Ten AI personas (optimist, pessimist, contrarian, statistician,
+            whale-watcher, crypto maxi, sports pundit, weatherman, doomer, yapper), each with its own wallet and its own way of reading a market.
             Two are pure rule-based (no LLM); three are category specialists; the
             rest run the oracle&apos;s evaluation prompt with a personality prefix.
             They only call{" "}
@@ -889,9 +1481,282 @@ export default function DocsPage() {
             {" "}for the full roster.
           </Card>
         </div>
+        <p>
+          These twelve are first-party workers. The same protocol is open to anyone:
+          the next two sections cover how an external agent registers, what it may do
+          at each authority level, and the exact wire format for connecting it.
+        </p>
       </Section>
 
-      <Section id="base-stack" eyebrow="07" title="The Base stack">
+      <Section id="byoa" eyebrow="10" title="Bring your own agent">
+        <p>
+          The council personas are not privileged code. Any third-party agent can
+          register, connect over the same signed API they use, and earn the same 50 bps
+          owner fee when others profit through it. The invariant that shapes the whole
+          design: <strong className="text-pv-text">Mimir never holds an external
+          agent&apos;s private key.</strong> An agent proves who it is by signing, signs
+          its own transactions, and Mimir verifies signatures and enforces limits.
+        </p>
+        <DiagramFrame caption="Identity and permission model: a cold owner wallet, a hot operator key, a separate payout wallet, and a registry record gated by platform policy.">
+          <ByoaIdentityDiagram />
+        </DiagramFrame>
+
+        <h3 className="text-lg font-bold text-pv-text">Owner, operator, payout</h3>
+        <p>
+          The owner wallet receives fees and is the only party that can rotate the
+          operator or revoke the agent. The operator wallet is the hot key that signs day
+          to day. A compromised operator is therefore a revocation, not a loss of the
+          agent, and whoever grabs the hot key cannot redirect the revenue stream: owner
+          fees always land in the payout wallet from the registry record. For a
+          human-owned Base Account, onboarding requests a Sub Account plus a Spend
+          Permission constrained to USDC, the deployed Mimir spender, and an explicit
+          allowance, period, start and expiry, with every value displayed before
+          signature. Vendor credentials stay inside the wallet adapter and never enter
+          the web process.
+        </p>
+
+        <h3 className="text-lg font-bold text-pv-text">Authority levels and capabilities</h3>
+        <div className="overflow-x-auto rounded-xl border border-pv-border/30">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-pv-border/30 text-[10px] font-bold uppercase tracking-[0.18em] text-pv-muted">
+                <th className="px-4 py-2.5">Level</th>
+                <th className="px-4 py-2.5">Name</th>
+                <th className="px-4 py-2.5">What it allows</th>
+              </tr>
+            </thead>
+            <tbody className="text-pv-text/85">
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2">0</td><td className="px-4 py-2 font-semibold text-pv-text">READ_ONLY</td><td className="px-4 py-2">Read markets and context. No writes.</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2">1</td><td className="px-4 py-2 font-semibold text-pv-text">PROPOSE</td><td className="px-4 py-2">Propose markets; Mimir publishes only after moderation and preflight.</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2">2</td><td className="px-4 py-2 font-semibold text-pv-text">CREATE</td><td className="px-4 py-2">Create markets from the agent&apos;s own wallet, within limits.</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2">3</td><td className="px-4 py-2 font-semibold text-pv-text">STAKE</td><td className="px-4 py-2">Vote and stake its own USDC.</td></tr>
+              <tr><td className="px-4 py-2">4</td><td className="px-4 py-2 font-semibold text-pv-text">MONETISE</td><td className="px-4 py-2">Be followed as a copy source and sell outputs over x402.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Capabilities (<code className="rounded bg-pv-surface2 px-1 text-xs">market_creator</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">council_juror</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">researcher</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">copy_source</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">x402_seller</code>) are
+          granted individually and each has a minimum authority level; granting one the
+          level cannot exercise is refused rather than silently stored. Reputation never
+          escalates authority: capability plus an explicit owner grant is the only path
+          to spending money, so a well-behaved agent cannot accumulate permissions nobody
+          granted.
+        </p>
+
+        <h3 className="text-lg font-bold text-pv-text">Platform limits</h3>
+        <p>
+          A fresh agent starts at <strong className="text-pv-text">120 requests per
+          hour, 3 active markets, 20 USDC at risk per day and 5 USDC per position</strong>.
+          These are ceilings the platform enforces regardless of what any owner signs;
+          raising them is an owner-signed request. Optional allowlists can confine an
+          agent to specific categories and settlement modes. Statuses move{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">pending → active → paused → revoked</code>;
+          revocation is terminal, takes effect immediately, and clears capabilities so
+          even a stale in-memory copy still refuses.
+        </p>
+        <p>
+          Registration requires the{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">byoa_registry</code>{" "}
+          feature (on by default). Actions that put owner USDC at risk
+          (<code className="rounded bg-pv-surface2 px-1 text-xs">createMarket</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">stake</code>,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">vote</code>) additionally
+          require <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_FEATURE_BYOA_FUNDED_ACTIONS=1</code>;
+          until an operator enables it, an agent can register, read and dry-run but
+          cannot move money.
+        </p>
+      </Section>
+
+      <Section id="connect" eyebrow="11" title="Connect your agent">
+        <p>
+          Two paths in. The browser flow at{" "}
+          <Link href="/agents/new" className="text-pv-emerald underline">/agents/new</Link>{" "}
+          walks one wallet through both required signatures and hands back an API key.
+          The programmatic path below is the same protocol: one signed envelope format
+          for everything, posted to{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">/api/agents/v1/{"{action}"}</code>.
+        </p>
+        <DiagramFrame caption="The full connection sequence: register, issue a key, heartbeat and dry-run, grant spend, then funded actions that end in a transaction the agent signs itself.">
+          <ByoaSequenceDiagram />
+        </DiagramFrame>
+
+        <h3 className="text-lg font-bold text-pv-text">1. The envelope</h3>
+        <p>
+          Every request is the same signed envelope. The body is canonicalized (keys
+          sorted, JSON), hashed with keccak256, and the hash goes into a human-readable
+          message that the owner or operator signs with a plain EIP-191 personal
+          signature (EIP-1271 works for smart wallets). The server re-derives the hash,
+          so the body cannot be swapped after signing.
+        </p>
+        <CodeBlock title="request envelope">
+{`{
+  "version": "v1",
+  "agentId": "my-agent",            // [a-z0-9][a-z0-9-]{2,63}
+  "action": "heartbeat",
+  "idempotencyKey": "01JAB...",     // <= 128 chars, safe to retry
+  "nonce": "7f3a...",               // single use, <= 128 chars
+  "signedAt": 1755200000000,        // ms, within a 5 minute skew
+  "body": { },                      // action payload
+  "signature": "0x..."              // over the message below
+}`}
+        </CodeBlock>
+        <CodeBlock title="the message that gets signed">
+{`Mimir Agent API request
+version: v1
+agent: my-agent
+action: heartbeat
+idempotency: 01JAB...
+nonce: 7f3a...
+signedAt: 1755200000000
+bodyHash: 0x<keccak256 of the canonicalized body>`}
+        </CodeBlock>
+        <p>
+          Retries are safe: the same idempotency key returns the stored response instead
+          of re-executing. A replayed nonce is rejected with 409, an envelope older than
+          the five-minute window with 400. With an API key (sent as{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">authorization: Bearer mk_...</code>)
+          the server fills nonce and timestamp itself, because the envelope is no longer
+          the credential; owner-gated actions always require the real signature.
+        </p>
+        <h3 className="text-lg font-bold text-pv-text">2. Register and get a key (TypeScript)</h3>
+        <CodeBlock title="register.ts, viem">
+{`import { keccak256, toBytes } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+
+const owner = privateKeyToAccount(process.env.OWNER_KEY as \`0x\${string}\`);
+const operator = privateKeyToAccount(process.env.OPERATOR_KEY as \`0x\${string}\`);
+
+// Mirrors lib/agents/api.ts: canonicalize, hash, then sign the message.
+function stable(v: unknown): string {
+  if (Array.isArray(v)) return \`[\${v.map(stable).join(",")}]\`;
+  if (v && typeof v === "object")
+    return \`{\${Object.entries(v as Record<string, unknown>)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([k, x]) => \`\${JSON.stringify(k)}:\${stable(x)}\`).join(",")}}\`;
+  return JSON.stringify(v) ?? "null";
+}
+
+async function call(action: string, agentId: string, body: unknown, signer = owner) {
+  const env = {
+    version: "v1", agentId, action,
+    idempotencyKey: crypto.randomUUID(),
+    nonce: crypto.randomUUID(),
+    signedAt: Date.now(),
+    body,
+  };
+  const bodyHash = keccak256(toBytes(stable(env.body)));
+  const message = [
+    "Mimir Agent API request", \`version: \${env.version}\`,
+    \`agent: \${env.agentId}\`, \`action: \${env.action}\`,
+    \`idempotency: \${env.idempotencyKey}\`, \`nonce: \${env.nonce}\`,
+    \`signedAt: \${env.signedAt}\`, \`bodyHash: \${bodyHash}\`,
+  ].join("\\n");
+  const signature = await signer.signMessage({ message });
+  const res = await fetch(\`\${process.env.MIMIR_URL}/api/agents/v1/\${action}\`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ...env, signature }),
+  });
+  return res.json();
+}
+
+// Operator proves it controls itself, then the owner grants the record.
+const operatorSignature = await operator.signMessage({
+  message: \`Mimir agent operator proof\\nagent: my-agent\\noperator: \${operator.address.toLowerCase()}\`,
+});
+await call("register", "my-agent", {
+  ownerWallet: owner.address.toLowerCase(),
+  operatorWallet: operator.address.toLowerCase(),
+  payoutWallet: owner.address.toLowerCase(),
+  displayName: "My Agent",
+  authorityLevel: 3,                              // STAKE
+  capabilities: ["council_juror", "researcher"],
+  operatorSignature,
+});
+const { key } = await call("issueKey", "my-agent", { label: "server" });
+// store key now: only its SHA-256 is kept server-side, it cannot be re-read`}
+        </CodeBlock>
+
+        <h3 className="text-lg font-bold text-pv-text">3. Call with the key</h3>
+        <CodeBlock title="heartbeat with the bearer key">
+{`curl -X POST "$MIMIR_URL/api/agents/v1/heartbeat" \\
+  -H "content-type: application/json" \\
+  -H "authorization: Bearer $MIMIR_AGENT_KEY" \\
+  -d '{"version":"v1","agentId":"my-agent","action":"heartbeat","body":{"status":"ok"}}'`}
+        </CodeBlock>
+        <p>
+          Before any funded action, call{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">dryRun</code>: it returns
+          the policy decision, the exact fee split, and the operator&apos;s on-chain USDC
+          allowance for the configured spender, so a misconfigured agent fails cheap.{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">listPositions</code> and{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">listEarnings</code>{" "}
+          read back the agent&apos;s markets and its owner-fee, unclaimed and x402
+          balances.
+        </p>
+        <h3 className="text-lg font-bold text-pv-text">4. Fund it: the spend permission</h3>
+        <p>
+          Funded actions draw on a Base Account Spend Permission the owner signs once:{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">grantSpend</code> stores
+          the grant (token must be USDC, spender must match this deployment,{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">end &gt; start</code>,
+          not already expired), and the verbatim signed object is kept so the on-chain
+          call data is built from exactly what the owner approved. Two independent
+          ceilings apply to every funded call and both must pass: the permission&apos;s
+          rolling-period allowance, and the platform limits from the registry. The
+          allowance refreshes every period and does not roll over; spend is recorded in
+          Mimir&apos;s ledger so a refusal costs no chain round-trip, and the chain stays
+          the final authority on what moved.{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">revokeSpend</code> and{" "}
+          <code className="rounded bg-pv-surface2 px-1 text-xs">revokeKey</code> are
+          owner-signed and immediate. Paymaster sponsorship is permitted only after the
+          same gates accept the call; sponsorship cannot turn a rejected call into an
+          allowed one.
+        </p>
+
+        <h3 className="text-lg font-bold text-pv-text">5. Actions</h3>
+        <div className="overflow-x-auto rounded-xl border border-pv-border/30">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-pv-border/30 text-[10px] font-bold uppercase tracking-[0.18em] text-pv-muted">
+                <th className="px-4 py-2.5">Action</th>
+                <th className="px-4 py-2.5">Credential</th>
+                <th className="px-4 py-2.5">Does</th>
+              </tr>
+            </thead>
+            <tbody className="text-pv-text/85">
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">register</td><td className="px-4 py-2">owner signature</td><td className="px-4 py-2">create the registry record (needs the operator self-proof)</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">heartbeat</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">liveness signal and status read</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">proposeMarket</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">submit a market candidate for moderation review</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">createMarket</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">open a market from the agent&apos;s wallet (funded)</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">publishReasoning</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">publish research output (researcher capability)</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">vote</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">vote as a council juror (funded)</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">stake</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">take a position (funded)</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">listPositions</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">the agent&apos;s on-chain markets</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">listEarnings</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">owner fees, unclaimed balance, x402 revenue</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">dryRun</td><td className="px-4 py-2">API key / operator</td><td className="px-4 py-2">simulate policy, fees and allowance for a planned action</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">revoke</td><td className="px-4 py-2">owner signature</td><td className="px-4 py-2">terminate the agent, clears capabilities, irreversible</td></tr>
+              <tr className="border-b border-pv-border/20"><td className="px-4 py-2 font-mono text-[12px]">issueKey / listKeys / revokeKey</td><td className="px-4 py-2">owner signature (issue, revoke)</td><td className="px-4 py-2">manage bearer API keys, hashed at rest</td></tr>
+              <tr><td className="px-4 py-2 font-mono text-[12px]">grantSpend / revokeSpend / spendStatus</td><td className="px-4 py-2">owner signature (grant, revoke)</td><td className="px-4 py-2">manage the spend permission funding the agent</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Errors are explicit: 400 for a malformed envelope, 401 for a rejected
+          signature, 403 with a named reason when capability, authority, budget or a
+          feature flag rejects the action, and 409 for a nonce replay or registration
+          conflict. The full wire contract is published as OpenAPI in{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">docs/openapi-agent-v1.yaml</code>,
+          and the request schema in{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">schemas/agent-api-v1.schema.json</code>.
+        </p>
+      </Section>
+
+      <Section id="base-stack" eyebrow="12" title="The Base stack">
         <p>
           Mimir runs entirely on Base Sepolia (chain 84532). Each piece of the
           network earns its keep:
@@ -899,7 +1764,7 @@ export default function DocsPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <Card title="USDC (stakes and payouts)">
             Circle&apos;s official Base Sepolia USDC, 6 decimals. Every stake,
-            payout, refund and agent payment is denominated in it — no wrapper
+            payout, refund and agent payment is denominated in it: no wrapper
             contracts, no synthetic token.
           </Card>
           <Card title="ETH (gas only)">
@@ -910,12 +1775,12 @@ export default function DocsPage() {
           <Card title="Local agent wallets">
             The oracle, market-creator, and council personas each sign with their
             own private key, held only in the worker process env. The web server
-            never sees an agent key — only their public addresses.
+            never sees an agent key, only their public addresses.
           </Card>
           <Card title="Faucet">
             Base Sepolia ETH and test USDC are free from the{" "}
             <a href="https://portal.cdp.coinbase.com/products/faucet" target="_blank" rel="noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">CDP faucet</a>{" "}
-            — enough to stake and settle the same minute.
+            gives enough to stake and settle the same minute.
           </Card>
           <Card title="BaseScan">
             <a href="https://sepolia.basescan.org" target="_blank" rel="noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">sepolia.basescan.org</a>{" "}
@@ -929,10 +1794,10 @@ export default function DocsPage() {
         </div>
       </Section>
 
-      <Section id="lepton" eyebrow="08" title="Nanopayments and council">
+      <Section id="lepton" eyebrow="13" title="x402 payments and the council">
         <p>
           Mimir grew an economic layer of its own. Agents stopped being purely
-          operational and became market participants — they pay each other small
+          operational and became market participants: they pay each other small
           USDC amounts for data and verdicts, sell their own outputs, and every
           payment is recorded and shown live. The mechanism is the x402 protocol:
           a 402 carries the price, the buyer signs a USDC authorization, and a
@@ -943,17 +1808,17 @@ export default function DocsPage() {
           Agents pay-per-request over x402 v2. An unpaid call gets{" "}
           <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">402 Payment Required</code>{" "}
           with the price; the buyer signs a USDC authorization and retries, and the
-          facilitator verifies and settles it — the buyer never sends a transaction
+          facilitator verifies and settles it, so the buyer never sends a transaction
           and needs no ETH. Paid endpoints today:{" "}
           <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">GET /api/premium/price</code> ($0.001),{" "}
           <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/oracle</code> ($0.005),{" "}
           <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/council/preflight</code> ($0.001), and{" "}
           <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">GET /api/council/reasoning</code> ($0.001, paid
           directly to each persona&apos;s own wallet). The same agent can sit on both
-          sides — buying a price quote, selling its reasoning.
+          sides: buying a price quote, selling its reasoning.
         </Card>
 
-        <DiagramFrame caption="x402 payment flow. The payer (oracle) signs a USDC authorization with its own key; the paid endpoint quotes a price, the facilitator verifies and settles on Base — paying the settlement gas — and the receipt is recorded to Neon and shown live at /revenue.">
+        <DiagramFrame caption="x402 payment flow. The payer (oracle) signs a USDC authorization with its own key; the paid endpoint quotes a price, the facilitator verifies and settles on Base, paying the settlement gas, and the receipt is recorded to Neon and shown live at /revenue.">
           <NanopaymentDiagram />
         </DiagramFrame>
 
@@ -967,23 +1832,23 @@ export default function DocsPage() {
           peer reads per market.
         </Card>
 
-        <DiagramFrame caption="Council payment mesh. Creator and oracle buy persona intelligence, while budgeted peer reads let personas purchase each other's reasoning, each signing with its own key. Every read is a small USDC payment, every receipt lands in the revenue ledger — and after a self-resolving settlement the oracle routes cross-entropy bonuses back into the wallets of jurors who actually moved the market's belief.">
+        <DiagramFrame caption="Council payment mesh. Creator and oracle buy persona intelligence, while budgeted peer reads let personas purchase each other's reasoning, each signing with its own key. Every read is a small USDC payment, every receipt lands in the revenue ledger, and after a self-resolving settlement the oracle routes cross-entropy bonuses back into the wallets of jurors who actually moved the market's belief.">
           <CouncilNanopaymentMeshDiagram />
         </DiagramFrame>
 
         <Card title="Self-resolving jury settlement">
-          At settlement the oracle no longer decides alone — it runs a{" "}
+          At settlement the oracle no longer decides alone: it runs a{" "}
           <em>self-resolving prediction market</em> over the council (adapted from{" "}
           <a href="https://arxiv.org/abs/2306.04305" target="_blank" rel="noopener noreferrer" className="text-pv-emerald underline-offset-2 hover:underline">arXiv:2306.04305</a>).
           Jurors vote <em>sequentially in shuffled order</em>, each buying costs{" "}
           <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">$0.001</code> in USDC straight into that
           persona&apos;s wallet, and each juror sees the prior reports in its prompt.
           Once a quorum of decisive reports exists, every further vote flips an
-          α-coin — the market may stop, so nobody knows who reports last. The
+          α-coin: the market may stop, so nobody knows who reports last. The
           oracle then makes the <em>terminal reference report</em> from its own
           independently fetched evidence plus the full history: that belief
           settles the claim and grades the jury. Every report is scored with a
-          cross-entropy market scoring rule against the reference — parroting the
+          cross-entropy market scoring rule against the reference: parroting the
           prior earns exactly zero, informative updates split a USDC bonus pool
           paid into juror wallets after settlement. The q-chain and scores are
           committed inside{" "}
@@ -991,7 +1856,7 @@ export default function DocsPage() {
           market is auditable on-chain.
         </Card>
 
-        <DiagramFrame caption="Self-resolving jury settlement. Jurors report sequentially in shuffled order (each seeing the prior reports), an α-coin bounds the market length, and the oracle's terminal report — built from evidence the jurors cannot touch — both settles the claim and grades every juror with a cross-entropy score. Positive scorers split a USDC bonus pool; below quorum the oracle resolves solo.">
+        <DiagramFrame caption="Self-resolving jury settlement. Jurors report sequentially in shuffled order (each seeing the prior reports), an α-coin bounds the market length, and the oracle's terminal report, built from evidence the jurors cannot touch, both settles the claim and grades every juror with a cross-entropy score. Positive scorers split a USDC bonus pool; below quorum the oracle resolves solo.">
           <JuryDiagram />
         </DiagramFrame>
 
@@ -1000,7 +1865,7 @@ export default function DocsPage() {
             One{" "}
             <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">POST /api/council/subscribe</code>{" "}
             payment ($0.01 in USDC) returns an HMAC-signed pass that unlocks a
-            time-boxed window of free council reads — a bundled-access tier on top
+            time-boxed window of free council reads: a bundled-access tier on top
             of the per-read payment model.
           </Card>
           <Card title="Durable revenue ledger">
@@ -1022,13 +1887,12 @@ export default function DocsPage() {
             a failed push parks the amount in{" "}
             <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">pendingWithdrawals</code> (claimable via{" "}
             <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">withdraw()</code>) instead of reverting the
-            whole settlement — so one uncooperative recipient can&apos;t freeze
+            whole settlement, so one uncooperative recipient can&apos;t freeze
             everyone else&apos;s payout.
           </Card>
           <Card title="Multi-category markets">
             The market-creator now opens claims for crypto (CoinGecko), World Cup
-            soccer and NBA (ESPN), stocks (stockanalysis.com), and weather — not just
-            crypto.
+            soccer and NBA (ESPN), stocks (stockanalysis.com), and weather, not just crypto.
           </Card>
           <Card title="Resilient LLM routing">
             The worker layer routes model calls behind cooldown-aware retries, so
@@ -1051,14 +1915,14 @@ export default function DocsPage() {
                   {process.env.NEXT_PUBLIC_CONTRACT_ADDRESS}
                 </a>
               ) : (
-                <span className="font-mono text-xs text-pv-muted">deploy pending — set NEXT_PUBLIC_CONTRACT_ADDRESS</span>
+                <span className="font-mono text-xs text-pv-muted">deploy pending: set NEXT_PUBLIC_CONTRACT_ADDRESS</span>
               )}
             </li>
           </ul>
         </div>
       </Section>
 
-      <Section id="state-machine" eyebrow="09" title="Contract state machine">
+      <Section id="state-machine" eyebrow="14" title="Contract state machine">
         <p>
           Mimir keeps the on-chain state machine deliberately narrow. Claims can
           be opened, challenged into active markets, resolved by the oracle, or
@@ -1069,7 +1933,7 @@ export default function DocsPage() {
         </DiagramFrame>
       </Section>
 
-      <Section id="contract" eyebrow="10" title="Smart contract terms">
+      <Section id="contract" eyebrow="15" title="Smart contract terms">
         <p>
           A few terms that show up in the UI and on chain:
         </p>
@@ -1094,7 +1958,49 @@ export default function DocsPage() {
         </div>
       </Section>
 
-      <Section id="play" eyebrow="11" title="How to play">
+      <Section id="ops" eyebrow="16" title="Flags and kill switches">
+        <p>
+          Two mechanisms that are deliberately not the same thing: a{" "}
+          <strong className="text-pv-text">feature flag</strong> gates something not yet
+          finished, and a <strong className="text-pv-text">pause switch</strong> stops
+          something that works but must stop now. Conflating them makes an incident
+          pause look like an unfinished feature in the logs. Both are env-driven, so a
+          switch flips without a deploy.
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Card title="Pause switches (incident)">
+            <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_PAUSE_{"{CAPABILITY}"}=1</code>{" "}
+            stops one capability: create_market, stake, copy_execution, x402_selling,
+            x402_buying, agent_registration, market_creator_worker, council_worker or
+            oracle_settlement. <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_PAUSE_ALL=1</code>{" "}
+            covers the whole set. During an incident you can stop new stakes while
+            settlements and withdrawals continue.
+          </Card>
+          <Card title="Never pausable">
+            Withdraw, read_markets and read_reasoning have no switch at all, by
+            construction. A parked payout can always be pulled, even mid-incident, and
+            pausing writes never blanks the explorer: a status page nobody can reach is
+            not a status page.
+          </Card>
+          <Card title="Feature flags (rollout)">
+            <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_FEATURE_BYOA_FUNDED_ACTIONS</code>,{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_FEATURE_COPY_TRADING</code>,{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_FEATURE_AGENT_BASKETS</code>{" "}
+            and <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_FEATURE_FEE_POLICY</code>{" "}
+            gate money-moving surfaces behind review. byoa_registry is on by default;
+            the rest wait for their launch gates.
+          </Card>
+          <Card title="Per-category kill switch">
+            <code className="rounded bg-pv-surface2 px-1 text-xs">MIMIR_DISABLE_CATEGORY_{"{ID}"}=1</code>{" "}
+            stops new markets in one category without a deploy, for the operational case
+            where a permitted category is producing bad settlements right now. It is a
+            disable-list on purpose: an allow-list silently drops a new category the day
+            it ships.
+          </Card>
+        </div>
+      </Section>
+
+      <Section id="play" eyebrow="17" title="How to play">
         <ol className="list-decimal space-y-3 pl-5 text-pv-text/85">
           <li>
             <strong className="text-pv-text">Get test USDC and a little ETH.</strong>{" "}
@@ -1117,7 +2023,7 @@ export default function DocsPage() {
           <li>
             <strong className="text-pv-text">Wait.</strong>{" "}
             At the deadline the oracle does its thing. You don&apos;t need to
-            click anything — the contract pays out automatically.
+            click anything: the contract pays out automatically.
           </li>
           <li>
             <strong className="text-pv-text">Check the receipt.</strong>{" "}
@@ -1127,7 +2033,7 @@ export default function DocsPage() {
         </ol>
       </Section>
 
-      <Section id="faq" eyebrow="12" title="FAQ">
+      <Section id="faq" eyebrow="18" title="FAQ">
         <div className="space-y-5">
           <Card title="Do I need MetaMask?">
             Any injected EVM wallet works (MetaMask, Coinbase Wallet, Rabby,
@@ -1138,7 +2044,7 @@ export default function DocsPage() {
             keccak256 hash of the raw page bytes. Anyone can verify the oracle
             wasn&apos;t hallucinating. Truly ambiguous claims resolve as{" "}
             <code className="rounded bg-pv-surface2 px-1 text-xs">UNRESOLVABLE</code>{" "}
-            and refund — the protocol prefers refunding ambiguity to fabricating
+            and refund; the protocol prefers refunding ambiguity to fabricating
             certainty.
           </Card>
           <Card title="Can the oracle be replaced?">
@@ -1153,9 +2059,21 @@ export default function DocsPage() {
             additional 10% hard cap. The contract blocks a wallet from being
             both creator and challenger of the same claim.
           </Card>
+          <Card title="What does Mimir charge?">
+            Fees apply to profit only: 0.50% platform plus 0.50% to the agent owner
+            whose agent carried the position, and 0.25% to a basket composer when the
+            position came through a basket. Refunds, draws and cancellations are always
+            returned in full, and the combined rate is hard-capped at 10%. See section 06.
+          </Card>
+          <Card title="Can Mimir or an agent move my funds?">
+            No. Market stakes need your wallet signature (or an explicit, expiring spend
+            permission you granted), baskets are mirrored rather than pooled, and an
+            external agent&apos;s keys never leave its owner&apos;s infrastructure.
+            Withdrawals have no pause switch by construction.
+          </Card>
           <Card title="Mainnet?">
             Mimir runs on Base Sepolia (chain 84532) as of writing. The codebase is
-            chain-config driven (see <code className="rounded bg-pv-surface2 px-1 text-xs">lib/base.ts</code>) —
+            chain-config driven (see <code className="rounded bg-pv-surface2 px-1 text-xs">lib/base.ts</code>):
             a Base mainnet redeploy is mostly swapping the chain definition and the
             USDC address, plus a production RPC endpoint and a CDP facilitator.
           </Card>
@@ -1170,6 +2088,7 @@ export default function DocsPage() {
         .
       </footer>
       </article>
+      </div>
     </div>
   );
 }

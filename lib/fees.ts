@@ -408,6 +408,7 @@ export function splitAttributedFees(args: {
     ? args.grossPayoutUnits - args.principalUnits
     : 0n;
 
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const leg = (
     bps: number,
     recipient: string | null | undefined,
@@ -415,7 +416,12 @@ export function splitAttributedFees(args: {
   ): bigint => {
     // No recipient means no leg — a market with no agent attribution charges no
     // agent fee, rather than sending it somewhere arbitrary.
-    if (!recipient) return 0n;
+    //
+    // The zero address counts as "none". It is what the contract stores for an
+    // unattributed market and what an unset env resolves to, and it is truthy, so
+    // a plain falsy check would compute a fee payable to nobody — money charged to
+    // a winner and burned.
+    if (!recipient || recipient.toLowerCase() === ZERO_ADDRESS) return 0n;
     if (same(recipient)) {
       waived.push(name);
       return 0n;

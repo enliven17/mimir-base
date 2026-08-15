@@ -131,3 +131,18 @@ test("fees can never exceed the profit they are charged on", () => {
     );
   }
 });
+
+test("the zero address counts as no recipient, not as a recipient of nothing", () => {
+  // It is what the contract stores for an unattributed market and what an unset
+  // env resolves to. Charging a fee payable to nobody would take money off a
+  // winner and burn it.
+  const result = split({
+    agentOwnerRecipient: "0x0000000000000000000000000000000000000000",
+    basketCreatorRecipient: "0x0000000000000000000000000000000000000000",
+  });
+  assert.equal(result.agentOwnerFeeUnits, 0n);
+  assert.equal(result.basketCreatorFeeUnits, 0n);
+  assert.equal(result.totalFeeUnits, USDC(0.5), "only the platform leg remains");
+  // Not a waiver: nobody was owed it, so nobody had it waived.
+  assert.deepEqual(result.waived, []);
+});

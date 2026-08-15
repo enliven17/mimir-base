@@ -4,6 +4,7 @@ import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { Bps, SignedUsdc, TimeWindowTabs } from "@/components/agents/AgentStats";
 import { AgentAvatarStack } from "@/components/agents/AgentAvatar";
 import { BasketLeaderboard } from "@/components/baskets/BasketLeaderboard";
+import { PendingMirrors } from "@/components/baskets/PendingMirrors";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
 import { unitsToUsdc } from "@/lib/usdc";
 import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
@@ -87,6 +88,10 @@ export default async function BasketsPage({
             />
           </section>
         )}
+
+        <div className="mb-5">
+          <PendingMirrors />
+        </div>
 
         {/* GET form: a search you can bookmark and share, and one that works with
             JavaScript off. */}

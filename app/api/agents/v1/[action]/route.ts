@@ -305,9 +305,18 @@ export async function POST(req: Request, context: { params: Promise<{ action: st
       });
     } else result = action === "proposeMarket"
       ? { disposition: "review", proposal: body, moderationRequired: true }
-      : { allowed: true, simulated: false, contract: getContractAddress(),
-          chainId: 84532, requiresExternalWalletSignature: true, contractConfigured: isContractConfigured(),
-          preview: { positionUsdc: Number(body.positionUsdc ?? body.stakeUsdc ?? 0) } };
+      : {
+          allowed: true, simulated: false, contract: getContractAddress(),
+          chainId: 84532, requiresExternalWalletSignature: true,
+          contractConfigured: isContractConfigured(),
+          // The contract freezes the fee recipient onto the claim at creation, so a
+          // market opened with the zero address can never pay this agent's owner —
+          // however the policy changes later. Handed back explicitly so a caller
+          // cannot omit it by accident and silently forfeit its own revenue.
+          agentOwnerRecipient: agent.payoutWallet,
+          feeNote: `Pass agentOwnerRecipient=${agent.payoutWallet} in CreateParams to earn the agent-owner fee on this market.`,
+          preview: { positionUsdc: Number(body.positionUsdc ?? body.stakeUsdc ?? 0) },
+        };
   }
   await audit(request, "accepted");
   await saveIdempotentResponse(agent.agentId, action, request.idempotencyKey, result);

@@ -69,6 +69,17 @@ const UNIT_SEPARATOR = String.fromCharCode(0x1f);
 const CRYPTO_MIN_THRESHOLD_RATIO = Number(process.env.CRYPTO_MIN_THRESHOLD_RATIO ?? "0.65");
 const CRYPTO_MAX_THRESHOLD_RATIO = Number(process.env.CRYPTO_MAX_THRESHOLD_RATIO ?? "1.35");
 const CREATE_DELAY_MS = Number(process.env.MARKET_CREATE_DELAY_MS ?? "600000");
+/**
+ * Who collects the agent-owner fee on markets this agent opens.
+ *
+ * The contract FREEZES this onto the claim at creation — a market opened with the
+ * zero address can never pay an owner fee, however the policy changes later. So
+ * this has to be right the first time, which is why it is not left to a default
+ * of "none".
+ */
+const FEE_RECIPIENT = (process.env.MARKET_CREATOR_FEE_RECIPIENT?.trim()
+  || process.env.CREATOR_ADDRESS?.trim()
+  || "0x0000000000000000000000000000000000000000") as `0x${string}`;
 const CANCEL_DELAY_MS = Number(process.env.MARKET_CANCEL_DELAY_MS ?? "60000");
 const PREFLIGHT_ENABLED =
   process.env.MARKET_CREATOR_PREFLIGHT === "1" || Boolean(process.env.MIMIR_BASE_URL?.trim());
@@ -760,7 +771,7 @@ async function createClaim(candidate: ClaimCandidate): Promise<string | null> {
         false,                       // isPrivate
         "",                          // inviteKey
         `0x${"00".repeat(32)}`,      // contextHash — no off-chain context pack
-        "0x0000000000000000000000000000000000000000", // agentOwnerRecipient: none
+        FEE_RECIPIENT,               // agentOwnerRecipient
       ]],
       amountUsdc: String(CREATOR_STAKE_USDC),
     });
