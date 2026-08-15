@@ -46,8 +46,12 @@ export function getBaseRpcUrl(): string {
 }
 
 export function getContractAddress(): `0x${string}` {
+  // Trimmed: a value pasted into a dashboard, or read from a CRLF .env by a shell
+  // that drops the newline but keeps the carriage return, arrives with invisible
+  // whitespace. viem then rejects the address as malformed and every contract read
+  // fails, naming a string that looks perfectly correct in the logs.
   const addr =
-    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS ||
+    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS?.trim() ||
     "0x0000000000000000000000000000000000000000";
   return addr as `0x${string}`;
 }

@@ -7,21 +7,27 @@ import { getExplorerAddressUrl } from "@/lib/base";
 
 /* ───────────────────────────────────────────────────────────────────────────
  * Inline SVG diagrams - hand-drawn in the project's blueprint palette so they
- * inherit the visual language without pulling in Mermaid. Each one is
- * responsive via `viewBox`; tweak only the box/text positions when copy
+ * inherit the visual language without pulling in a diagram runtime. Each one
+ * is responsive via `viewBox`; tweak only the box/text positions when copy
  * changes.
- * Palette tokens mirror tailwind.config.ts > theme.extend.colors.pv.
+ *
+ * Every fill and stroke resolves through the theme tokens in app/globals.css
+ * (`rgb(var(--pv-*)`), so the same markup renders correctly in dark and
+ * light mode: a `data-theme` flip repaints every diagram with no fork in the
+ * drawing code. Never put a literal hex back in here; a hardcoded dark color
+ * is invisible or glaring the moment the light theme is active.
  * ───────────────────────────────────────────────────────────────────────── */
 
 const C = {
-  bg:      "#0A1E3D",
-  surface: "#0E2649",
-  surf2:   "#133057",
-  border:  "rgba(255,255,255,0.22)",
-  line:    "rgba(255,255,255,0.38)",
-  text:    "#FFFFFF",
-  muted:   "#A9C0DE",
-  accent:  "#334FA9",
+  bg:      "rgb(var(--pv-bg))",
+  surface: "rgb(var(--pv-surface))",
+  surf2:   "rgb(var(--pv-surface2))",
+  border:  "rgb(var(--pv-border) / 0.22)",
+  line:    "rgb(var(--pv-border) / 0.4)",
+  text:    "rgb(var(--pv-text))",
+  muted:   "rgb(var(--pv-muted))",
+  accent:  "rgb(var(--pv-accent))",
+  gold:    "rgb(var(--pv-gold))",
 };
 
 /* ── 1. Architecture diagram ─────────────────────────────────────────────── */
@@ -545,6 +551,83 @@ function CouncilNanopaymentMeshDiagram() {
     </svg>
   );
 }
+
+/* ── 7. Fee waterfall diagram ─────────────────────────────────────────────── */
+function FeeWaterfallDiagram() {
+  return (
+    <svg viewBox="0 0 880 330" className="h-auto w-full" role="img" aria-label="Fee waterfall diagram">
+      <defs>
+        <marker id="arrow-f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill={C.accent} />
+        </marker>
+      </defs>
+
+      {/* Gross payout */}
+      <g>
+        <rect x="20" y="105" width="160" height="110" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="100" y="140" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Gross payout</text>
+        <text x="100" y="160" textAnchor="middle" fontSize="10" fill={C.muted}>principal + profit</text>
+        <text x="100" y="180" textAnchor="middle" fontSize="10" fill={C.muted}>integer math, rounds down</text>
+        <text x="100" y="196" textAnchor="middle" fontSize="10" fill={C.muted}>in the winner&apos;s favor</text>
+      </g>
+
+      {/* Principal */}
+      <g>
+        <rect x="260" y="30" width="210" height="64" rx="12" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="365" y="56" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>Principal</text>
+        <text x="365" y="76" textAnchor="middle" fontSize="10" fill={C.muted}>returned untouched, never fee&apos;d</text>
+      </g>
+
+      {/* Profit */}
+      <g>
+        <rect x="260" y="150" width="210" height="80" rx="12" fill={C.surf2} stroke={C.accent} strokeWidth="1.6" />
+        <text x="365" y="178" textAnchor="middle" fontSize="12" fontWeight="700" fill={C.text}>Profit</text>
+        <text x="365" y="198" textAnchor="middle" fontSize="10" fill={C.muted}>the only base fees are charged on</text>
+        <text x="365" y="214" textAnchor="middle" fontSize="10" fill={C.muted}>gross - principal, floored at 0</text>
+      </g>
+
+      <line x1="180" y1="130" x2="252" y2="66" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-f)" />
+      <line x1="180" y1="185" x2="252" y2="190" stroke={C.accent} strokeWidth="1.8" markerEnd="url(#arrow-f)" />
+
+      {/* Four profit legs */}
+      <g>
+        <rect x="540" y="18" width="320" height="56" rx="12" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="556" y="41" fontSize="12" fontWeight="700" fill={C.text}>Winner keeps the net profit</text>
+        <text x="556" y="60" fontSize="10" fill={C.muted}>a winner never receives less than their principal</text>
+      </g>
+      <g>
+        <rect x="540" y="88" width="320" height="56" rx="12" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="556" y="111" fontSize="12" fontWeight="700" fill={C.gold}>Platform: 50 bps (0.50%)</text>
+        <text x="556" y="130" fontSize="10" fill={C.muted}>accrues to a claimable balance, never pushed</text>
+      </g>
+      <g>
+        <rect x="540" y="158" width="320" height="56" rx="12" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="556" y="181" fontSize="12" fontWeight="700" fill={C.gold}>Agent owner: 50 bps (0.50%)</text>
+        <text x="556" y="200" fontSize="10" fill={C.muted}>only when the position came through a registered agent</text>
+      </g>
+      <g>
+        <rect x="540" y="228" width="320" height="56" rx="12" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="556" y="251" fontSize="12" fontWeight="700" fill={C.gold}>Basket creator: 25 bps (0.25%)</text>
+        <text x="556" y="270" fontSize="10" fill={C.muted}>off-chain accounting today, waived on your own basket</text>
+      </g>
+
+      <line x1="470" y1="175" x2="532" y2="48" stroke={C.line} strokeWidth="1.4" markerEnd="url(#arrow-f)" />
+      <line x1="470" y1="183" x2="532" y2="118" stroke={C.line} strokeWidth="1.4" markerEnd="url(#arrow-f)" />
+      <line x1="470" y1="192" x2="532" y2="188" stroke={C.line} strokeWidth="1.4" markerEnd="url(#arrow-f)" />
+      <line x1="470" y1="202" x2="532" y2="258" stroke={C.line} strokeWidth="1.4" markerEnd="url(#arrow-f)" />
+
+      {/* Refund + cap band */}
+      <g>
+        <rect x="20" y="296" width="840" height="26" rx="8" fill={C.bg} stroke={C.border} strokeWidth="1" />
+        <text x="440" y="313" textAnchor="middle" fontSize="10.5" fill={C.muted}>
+          draw / unresolvable / cancelled: full refund, zero fee  ·  policy snapshot at creation  ·  combined fee hard-capped at 1000 bps (10%)
+        </text>
+      </g>
+    </svg>
+  );
+}
+
+/* @@MORE-DIAGRAMS@@ */
 
 function Section({ id, eyebrow, title, children }: { id?: string; eyebrow: string; title: string; children: React.ReactNode }) {
   return (

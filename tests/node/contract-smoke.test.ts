@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { getContractAddress } from "../../lib/base";
 import {
   getVSTotalPot,
   isVSJoinable,
@@ -112,4 +113,23 @@ test("mapClaimToVS preserves fixed-odds winner information", () => {
   assert.equal(vs.winner, "0x00000000000000000000000000000000000000b2");
   assert.equal(vs.odds_mode, "fixed");
   assert.equal(vs.challenger_payout_bps, 18000);
+});
+
+test("a contract address with stray whitespace still resolves", () => {
+  // A CRLF .env, or a value pasted into a dashboard, arrives with invisible
+  // whitespace. viem then rejects it as malformed while the logs print a string
+  // that looks perfectly correct, which is a long way to travel for a carriage
+  // return. Built from a char code so this file has no raw CR in it either.
+  const CR = String.fromCharCode(13);
+  const address = "0x2ae99017a17822f2514fa26dccbade8f2d8beb13";
+  const original = process.env.NEXT_PUBLIC_CONTRACT_ADDRESS;
+  try {
+    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS = address + CR;
+    assert.equal(getContractAddress(), address);
+    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS = `  ${address}
+`;
+    assert.equal(getContractAddress(), address);
+  } finally {
+    process.env.NEXT_PUBLIC_CONTRACT_ADDRESS = original;
+  }
 });
