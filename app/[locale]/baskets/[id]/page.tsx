@@ -5,6 +5,7 @@ import { BlueprintHeading } from "@/components/BlueprintGrid";
 import { Bps, SignedUsdc, StatBlock, TimeWindowTabs, TrackTag } from "@/components/agents/AgentStats";
 import { AgentAvatar, AgentAvatarStack } from "@/components/agents/AgentAvatar";
 import { PerformanceChart } from "@/components/charts/PerformanceChart";
+import { FollowBasket } from "@/components/baskets/FollowBasket";
 import { AddressChip } from "@/components/ui/AddressChip";
 import { isTimeWindow, type TimeWindow } from "@/lib/agents/performance";
 import { buildBasketView, findAnyBasketDefinition, findBasketDefinition } from "@/lib/server/basket-directory";
@@ -71,6 +72,10 @@ export default async function BasketDetailPage({
               {(basket.maxDrawdownBps / 100).toFixed(2)}%
             </span>
           </StatBlock>
+        </section>
+
+        <section className="mt-6">
+          <FollowBasket basketId={definition.id} creatorWallet={definition.creatorWallet} />
         </section>
 
         <section className="mt-6">
