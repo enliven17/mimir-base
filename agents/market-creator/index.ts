@@ -30,6 +30,7 @@ applyWorkerGeminiKey("CREATOR_GEMINI_API_KEY");
 import { formatEther, keccak256, toBytes } from "viem";
 import { requireEnv, requireAnyLLMKey, applyWorkerGeminiKey } from "../../lib/agent-bootstrap";
 import { callLLM, activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint, pickGeminiModel, extractJson } from "../../lib/llm";
+import { fetchLaunchEvents, fetchWeatherEvents, type LaunchEvent, type WeatherEvent } from "./sources";
 import {
   createBasePublicClient,
   baseSepolia,
@@ -484,16 +485,6 @@ function fetchStockEvents(): { text: string; events: StockEvent[] } {
   return { text, events };
 }
 
-async function fetchWeatherEvents(): Promise<string> {
-  // Simple approach: predict temperature/weather for major cities
-  const cities = ["New York", "London", "Tokyo", "Sydney", "Dubai"];
-  const selected = cities[Math.floor(Math.random() * cities.length)];
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const dateStr = tomorrow.toISOString().split("T")[0];
-  return `Weather prediction opportunity: ${selected} on ${dateStr}. Use weather.gov or open-meteo.com for resolution.`;
-}
-
 // ── Claude drafts claims ──────────────────────────────────────────────────────
 
 async function draftClaimCandidates(sourceData: {
@@ -503,7 +494,10 @@ async function draftClaimCandidates(sourceData: {
   sportsEvents: SportEvent[];
   stocksText:   string;
   stocksEvents: StockEvent[];
-  weather:      string;
+  weatherText:   string;
+  weatherEvents: WeatherEvent[];
+  launchText:    string;
+  launchEvents:  LaunchEvent[];
 }): Promise<ClaimCandidate[]> {
   const now = new Date();
 
@@ -514,6 +508,10 @@ async function draftClaimCandidates(sourceData: {
     ...sourceData.cryptoEvents.map((c) =>
       `- [crypto] "${c.name}" (${c.symbol}, current=$${formatUsd(c.priceUsd)}) -> ${c.resolutionUrl}`
     ),
+    ...sourceData.weatherEvents.map((w) =>
+      `- ${w.resolutionUrl}  (weather: ${w.city} high ${w.forecastHighC}C on ${w.targetDate})`),
+    ...sourceData.launchEvents.map((l) =>
+      `- ${l.resolutionUrl}  (launch: ${l.name}, window ${l.windowStart})`),
     ...sourceData.stocksEvents.map((s) =>
       `- [stocks] "${s.name}" (${s.symbol}) → ${s.resolutionUrl}`
     ),
@@ -532,16 +530,19 @@ ${sourceData.sportsText}
 ### Stocks (large-caps — resolve intraday direction from the page)
 ${sourceData.stocksText}
 
-### Weather Opportunity
-${sourceData.weather}
+### Weather (Open-Meteo — resolves to the daily maximum temperature in the JSON)
+${sourceData.weatherText}
+
+### Spaceflight (Launch Library — resolves from the launch record's status and net date)
+${sourceData.launchText}
 
 ## ALLOWED RESOLUTION URLs (CRITICAL — read carefully)
-For sports and crypto candidates you MUST copy one of the URLs below verbatim into
+You MUST copy one of the URLs below verbatim into
 "resolutionUrl". Do NOT invent, modify, shorten, or guess URLs — if no URL matches
 the topic you want, skip that topic. URLs not on this list will be rejected and
 the candidate will be dropped before it reaches the chain.
 
-${allowedUrlsList || "(no allowed URLs available this run — skip sports/crypto candidates)"}
+${allowedUrlsList || "(no allowed URLs available this run — skip every candidate)"}
 
 ## Task
 Create ${MAX_CLAIMS_PER_RUN} prediction market claim candidates. Each must be:
@@ -551,6 +552,14 @@ Create ${MAX_CLAIMS_PER_RUN} prediction market claim candidates. Each must be:
 - **For sports (World Cup / NBA)**: deadlineHours MUST place the deadline AT LEAST 4 hours AFTER the listed start time. Never create a market on a game that has already started or finished. Frame as match outcome (e.g. "Will Brazil beat Scotland?").
 - **For crypto**: use the live CoinGecko price shown above. Create only single-asset USD price threshold markets for the listed coin URL. The threshold MUST be realistic for a 2-72 hour deadline: between ${Math.round(CRYPTO_MIN_THRESHOLD_RATIO * 100)}% and ${Math.round(CRYPTO_MAX_THRESHOLD_RATIO * 100)}% of the current price. Do NOT create stale moonshot targets, total-market-cap claims, or thresholds copied from old examples.
 - **For stocks**: frame as intraday direction resolvable from the page (e.g. "Will AAPL close up on the day?") — do NOT invent a specific price target you can't verify.
+- **For weather**: use the listed forecast high as your anchor and pick a threshold 1-4°C away from it. The JSON at the URL returns the actual daily maximum, so the settlement is a number comparison.
+- **For spaceflight**: ask whether a named launch lifts off before a stated time. The launch record carries its status and current window; a slip is the uncertainty being traded.
+
+## Variety
+Do NOT return five price-threshold claims. Spread the batch across the categories
+above — a set that is all crypto is a worse product than one that is one crypto,
+one weather, one launch and two others, even if the price claims score marginally
+higher. Skip a category rather than forcing a claim its source cannot settle.
 - **Specific**: no vague language like "probably" or "might"
 
 For each candidate, provide:
@@ -596,6 +605,8 @@ Return a JSON array of ${MAX_CLAIMS_PER_RUN} candidates. Output JSON only.`;
   const sportsUrls = new Map(sourceData.sportsEvents.map((e) => [e.resolutionUrl, e]));
   const cryptoUrls = new Map(sourceData.cryptoEvents.map((c) => [c.resolutionUrl, c]));
   const stocksUrls = new Set(sourceData.stocksEvents.map((s) => s.resolutionUrl));
+  const weatherUrls = new Set(sourceData.weatherEvents.map((w) => w.resolutionUrl));
+  const launchUrls = new Map(sourceData.launchEvents.map((l) => [l.resolutionUrl, l]));
   const nowMs      = Date.now();
 
   return candidates.filter((c) => {
@@ -667,8 +678,34 @@ Return a JSON array of ${MAX_CLAIMS_PER_RUN} candidates. Output JSON only.`;
       return true;
     }
 
-    // weather / culture / other: no allowlist — let it through. The oracle's
-    // own evidence fetcher + low-confidence refund path handles these.
+    if (cat === "weather") {
+      if (!weatherUrls.has(url)) {
+        console.warn(`[market-creator] Drop weather candidate — URL not in allowlist: ${url}`);
+        return false;
+      }
+      return true;
+    }
+
+    if (cat === "science" || cat === "technology") {
+      // Launch claims are the only science/technology source wired up. If the URL
+      // is one, hold the deadline past the launch window — a market that closes
+      // before the rocket flies has nothing to settle on.
+      const launch = launchUrls.get(url);
+      if (launch) {
+        const deadlineMs = nowMs + deadlineHours * 3_600_000;
+        if (deadlineMs <= launch.windowStartMs) {
+          console.warn(
+            `[market-creator] Drop launch candidate — deadline precedes the window ` +
+            `(${launch.windowStart}): ${String(c.question ?? "").slice(0, 80)}`
+          );
+          return false;
+        }
+        return true;
+      }
+    }
+
+    // culture / other: no allowlist — let it through. The oracle's own evidence
+    // fetcher + low-confidence refund path handles these.
     return true;
   });
 }
@@ -910,15 +947,17 @@ async function run(): Promise<void> {
 
   // Fetch source data in parallel
   console.log("[market-creator] Fetching market data...");
-  const [crypto, sports, weather] = await Promise.all([
+  const [crypto, sports, weather, launches] = await Promise.all([
     fetchCryptoEvents(),
     fetchSportsEvents(),
     fetchWeatherEvents(),
+    fetchLaunchEvents(),
   ]);
   const stocks = fetchStockEvents();
   console.log(
     `[market-creator] Sources: crypto=${crypto.events.length} pairs, ` +
-    `sports=${sports.events.length} games, stocks=${stocks.events.length} tickers`
+    `sports=${sports.events.length} games, stocks=${stocks.events.length} tickers, ` +
+    `weather=${weather.events.length} cities, launches=${launches.events.length}`
   );
 
   console.log("[market-creator] Drafting claim candidates...");
@@ -929,7 +968,10 @@ async function run(): Promise<void> {
     sportsEvents: sports.events,
     stocksText:   stocks.text,
     stocksEvents: stocks.events,
-    weather,
+    weatherText:   weather.text,
+    weatherEvents: weather.events,
+    launchText:    launches.text,
+    launchEvents:  launches.events,
   });
   const candidates = filterDuplicateCandidates(draftedCandidates, joinableClaims);
 
