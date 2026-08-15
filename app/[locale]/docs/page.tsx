@@ -1037,13 +1037,14 @@ function DocsToc() {
   }, []);
 
   const list = (
-    <ul className="space-y-0.5">
+    <ul>
       {TOC_SECTIONS.map(({ id, title }, index) => (
         <li key={id}>
           <a
             href={`#${id}`}
             aria-current={active === id ? "true" : undefined}
-            className={`block border-l-2 py-1 pl-3 text-[13px] transition-[color,border-color,transform,background-color] duration-200 ease-out ${
+            title={title}
+            className={`block truncate border-l-2 py-[3px] pl-3 text-[12px] transition-[color,border-color,transform,background-color] duration-200 ease-out ${
               active === id
                 ? "translate-x-0.5 border-pv-emerald bg-pv-emerald/[0.06] font-semibold text-pv-text"
                 : "border-pv-border/30 text-pv-muted hover:border-pv-emerald/60 hover:text-pv-text"
@@ -1080,10 +1081,10 @@ function DocsToc() {
       */}
       <nav
         aria-label="Table of contents"
-        className="sticky top-24 hidden max-h-[calc(100vh-7rem)] w-60 overflow-y-auto overflow-x-hidden overscroll-contain pb-4 pl-2
+        className="sticky top-24 hidden max-h-[calc(100vh-7rem)] w-64 overflow-y-auto overflow-x-hidden overscroll-contain pb-4 pl-2
                    animate-[docs-toc-in_400ms_ease-out_both]
                    lg:block
-                   min-[1760px]:fixed min-[1760px]:right-[max(1.5rem,calc((100vw-1200px)/2-16rem))] min-[1760px]:top-52 min-[1760px]:max-h-[calc(100vh-16rem)]"
+                   min-[1760px]:fixed min-[1760px]:right-[max(1.5rem,calc((100vw-1200px)/2-17rem))] min-[1760px]:top-52 min-[1760px]:max-h-[calc(100vh-16rem)]"
       >
         <p className="mb-3 text-[10px] font-bold uppercase tracking-[0.22em] text-pv-muted">Contents</p>
         {list}
@@ -1100,7 +1101,7 @@ export default function DocsPage() {
       <div className="mx-auto max-w-6xl px-4 pt-6 sm:px-6 lg:flex lg:items-start lg:gap-10 lg:px-8">
       {/* order-last: the contents read as a companion to the article, not a
           precondition for it — and a screen reader still meets the prose first. */}
-      <aside className="lg:order-last lg:w-60 lg:shrink-0 min-[1760px]:w-0">
+      <aside className="lg:order-last lg:w-64 lg:shrink-0 min-[1760px]:w-0">
         <DocsToc />
       </aside>
       <article className="min-w-0 flex-1 space-y-14">
