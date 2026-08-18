@@ -16,6 +16,13 @@ export default function RootLayout({
       className={`${fontDisplay.variable} ${fontBody.variable} ${fontMono.variable}`}
     >
       <head>
+        {/*
+          Base app ownership. A public verification token, not a secret — it has
+          to be served in the HTML for Base to read it. Kept in the root layout so
+          it survives the locale redirect off "/": the verifier lands on /en, and a
+          tag scoped to one route would be missing wherever it actually looked.
+        */}
+        <meta name="base:app_id" content="6a84051e6ea1f57fed3336e4" />
         {/**
          * Applies the theme before first paint. In a <script> rather than React
          * state because any render-time decision happens after the browser has
