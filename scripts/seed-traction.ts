@@ -373,12 +373,16 @@ async function placeBets(wallets: Traction[]): Promise<void> {
   const stake = usdcToUnits(BET_USDC);
   let placed = 0, skipped = 0, failed = 0;
 
-  for (const bettor of bettors) {
+  for (const [seat, bettor] of bettors.entries()) {
     let budget = await usdcOf(bettor.wallet.address);
     if (budget < stake) { skipped++; continue; }
     if ((await client.getBalance({ address: bettor.wallet.address })) === 0n) { skipped++; continue; }
 
-    for (const claim of claims) {
+    // Start each bettor at a different claim. Walking the same order every time
+    // means everyone spends their budget on the lowest ids, which left ten fresh
+    // markets at zero challengers while one collected sixty.
+    const rotated = claims.slice(seat % claims.length).concat(claims.slice(0, seat % claims.length));
+    for (const claim of rotated) {
       if (budget < stake) break;
       if (claim.freeSlots <= 0) continue;
       // The contract rejects both of these; checking here saves a reverted tx.
@@ -407,9 +411,19 @@ async function placeBets(wallets: Traction[]): Promise<void> {
         process.stdout.write(".");
       } catch (err) {
         failed++;
-        const message = err instanceof Error ? err.message.split("\n")[0] : String(err);
+        // viem puts "reverted with the following reason:" on its first line and
+        // the reason on the next, so logging line one labels every failure
+        // identically and diagnoses none of them.
+        const raw = err instanceof Error ? err.message : String(err);
+        const message = /reason:\s*\n\s*(.+)/.exec(raw)?.[1]?.trim() ?? raw.split("\n")[0];
+        // Out of USDC: stop this wallet instead of offering it every remaining
+        // claim in turn. The local budget can outrun the real balance — a stake
+        // whose receipt timed out still moved the money — so the chain's refusal
+        // is the authority on when a wallet is finished.
+        if (/exceeds balance|stake too small/.test(message)) break;
         if (/already challenged|self-challenge|full|window closed/.test(message)) continue;
-        console.warn(`\n  ${bettor.label} → #${claim.id}: ${message.slice(0, 90)}`);
+        console.warn(`
+  ${bettor.label} → #${claim.id}: ${message.slice(0, 110)}`);
       }
     }
   }
