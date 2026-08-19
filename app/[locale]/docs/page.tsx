@@ -916,6 +916,63 @@ function ByoaSequenceDiagram() {
   );
 }
 
+/* ── 12. Sibyl memory loop ────────────────────────────────────────────────── */
+function SibylMemoryDiagram() {
+  return (
+    <svg viewBox="0 0 880 300" className="h-auto w-full" role="img" aria-label="Sibyl memory loop diagram">
+      <defs>
+        <marker id="arrow-sb" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M0,0 L10,5 L0,10 Z" fill={C.accent} />
+        </marker>
+      </defs>
+
+      {/* Workers */}
+      <g>
+        <rect x="20" y="60" width="240" height="116" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="140" y="88" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Agent workers</text>
+        <text x="140" y="110" textAnchor="middle" fontSize="10" fill={C.muted}>oracle · market-creator · council · traders</text>
+        <text x="140" y="128" textAnchor="middle" fontSize="10" fill={C.muted}>recall before the LLM call,</text>
+        <text x="140" y="144" textAnchor="middle" fontSize="10" fill={C.muted}>persist after the action</text>
+      </g>
+
+      {/* Sidecar */}
+      <g>
+        <rect x="330" y="60" width="220" height="116" rx="14" fill={C.surface} stroke={C.border} strokeWidth="1.5" />
+        <text x="440" y="88" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>Python sidecar</text>
+        <text x="440" y="110" textAnchor="middle" fontSize="10" fill={C.muted}>sibyl/server.py · loopback only</text>
+        <text x="440" y="128" textAnchor="middle" fontSize="10" fill={C.muted}>official sibyl-memory-client,</text>
+        <text x="440" y="144" textAnchor="middle" fontSize="10" fill={C.muted}>the only process touching the file</text>
+      </g>
+
+      {/* SQLite */}
+      <g>
+        <rect x="620" y="60" width="240" height="116" rx="14" fill={C.surf2} stroke={C.accent} strokeWidth="1.6" />
+        <text x="740" y="88" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>SQLite + FTS5</text>
+        <text x="740" y="110" textAnchor="middle" fontSize="10" fill={C.muted}>one local file, journal events,</text>
+        <text x="740" y="128" textAnchor="middle" fontSize="10" fill={C.muted}>no embeddings, no cloud store</text>
+        <text x="740" y="144" textAnchor="middle" fontSize="10" fill={C.muted}>/data volume on Railway</text>
+      </g>
+
+      <line x1="260" y1="100" x2="322" y2="100" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sb)" />
+      <line x1="330" y1="136" x2="268" y2="136" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sb)" />
+      <line x1="550" y1="100" x2="612" y2="100" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sb)" />
+      <line x1="620" y1="136" x2="558" y2="136" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sb)" />
+
+      {/* recall → gate → persist band */}
+      <g>
+        <rect x="20" y="222" width="840" height="48" rx="10" fill={C.bg} stroke={C.border} strokeWidth="1" />
+        <text x="440" y="242" textAnchor="middle" fontSize="10.5" fill={C.muted}>
+          recall the host entity before deciding  ·  pure gate: veto, confidence penalty or allow  ·  persist the outcome afterwards
+        </text>
+        <text x="440" y="258" textAnchor="middle" fontSize="10.5" fill={C.muted}>
+          sidecar down: settlement keeps running, challenge / create / stake refuse (SIBYL_REQUIRED on by default)
+        </text>
+      </g>
+      <line x1="440" y1="176" x2="440" y2="214" stroke={C.line} strokeWidth="1.3" strokeDasharray="4 4" markerEnd="url(#arrow-sb)" />
+    </svg>
+  );
+}
+
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 
 /**
@@ -973,6 +1030,7 @@ const TOC_SECTIONS = [
   { id: "baskets", title: "Agent baskets" },
   { id: "copy-trading", title: "Copy trading" },
   { id: "agents", title: "The agents" },
+  { id: "sibyl", title: "Agent memory (Sibyl)" },
   { id: "byoa", title: "Bring your own agent" },
   { id: "connect", title: "Connect your agent" },
   { id: "base-stack", title: "The Base stack" },
@@ -1630,8 +1688,134 @@ that schedule is unrepresentable here.`}
         </div>
         <p>
           These twelve are first-party workers. The same protocol is open to anyone:
-          the next two sections cover how an external agent registers, what it may do
-          at each authority level, and the exact wire format for connecting it.
+          the BYOA and connect sections below cover how an external agent registers,
+          what it may do at each authority level, and the exact wire format for
+          connecting it.
+        </p>
+      </Section>
+
+      <Section id="sibyl" title="Agent memory (Sibyl)">
+        <p>
+          Without memory, every poll cycle is amnesia: the oracle keeps staking
+          into a resolution host that already returned{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">UNRESOLVABLE</code>{" "}
+          twice, a council persona keeps retrying a source it already walked away
+          from, and the market-creator keeps opening markets on a host the oracle
+          has already learned is fog. Sibyl Memory &mdash; Sibyl Labs&rsquo;
+          official persistence layer &mdash; is the file that survives process
+          death. A Python sidecar (
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">sibyl/server.py</code>)
+          wraps the official{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">sibyl-memory-client</code>{" "}
+          SDK and stores durable facts in one local SQLite file. No embeddings, no
+          vector database, no cloud store. TypeScript never opens the file; it
+          talks to the sidecar over loopback, and the sidecar is the only process
+          that imports the client.
+        </p>
+        <DiagramFrame caption="The memory loop. Workers recall a source host through the loopback sidecar before they spend an LLM call or a stake, a pure policy gate vetoes or allows, and the outcome is persisted afterwards. The Python sidecar is the only process that touches the SQLite file.">
+          <SibylMemoryDiagram />
+        </DiagramFrame>
+        <p>
+          The integration is load-bearing, not decorative. The test is the one
+          Sibyl&rsquo;s eligibility rule poses: delete the memory layer, and if
+          the product still does what it claims, it was a wrapper. Run an agent
+          against a resolution URL it cannot settle, persist, do it again, kill
+          the process. A fresh boot that reaches the same 92% verdict{" "}
+          <strong className="text-pv-text">must not stake</strong> &mdash; the
+          gate reads the recalled entity and vetoes before (oracle) or instead of
+          (council) more USDC goes at that host. With{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">SIBYL_REQUIRED</code>{" "}
+          on (the default), a missing sidecar is fatal at worker boot and
+          challenge, create and stake refuse outright. Settlement still runs:
+          markets must not freeze because memory is unreachable.
+        </p>
+        <h3 className="text-lg font-bold text-pv-text">The gate rules</h3>
+        <p>
+          The rules live in{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">lib/sibyl/policy.ts</code>.
+          They are pure functions: they never invent memory, they only consume a
+          recalled body, so a judge can delete the database, re-run an agent, and
+          watch the veto disappear.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <Card title="Unreliable source">
+            A host turns unreliable at two{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">UNRESOLVABLE</code>{" "}
+            reads that are not outnumbered by decisive wins. The oracle then stops
+            spending LLM calls on challenges there, and the market-creator refuses
+            to open markets on it. Same verdict with empty memory &rarr; stake;
+            the same verdict after two persists &rarr; veto.
+          </Card>
+          <Card title="Confidence penalty">
+            Before the hard veto kicks in, each{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">UNRESOLVABLE</code>{" "}
+            costs 8 confidence points and each{" "}
+            <code className="rounded bg-pv-surface2 px-1 text-xs">DRAW</code> costs 4,
+            capped at 30. Kelly sizing and the 80% challenge floor read the adjusted
+            number, so a foggy history quietly shrinks a position before it silences it.
+          </Card>
+          <Card title="Persona source abstain">
+            If a council persona or trader stood aside on a host twice and never
+            staked there, later cycles cannot stake there &mdash; even when the LLM
+            now wants to. Category-filter skips and model failures are deliberately
+            not written as abstentions, so they cannot poison the record.
+          </Card>
+        </div>
+
+        <h3 className="text-lg font-bold text-pv-text">Who remembers what</h3>
+        <div className="overflow-x-auto rounded-xl border border-pv-border/30">
+          <table className="w-full text-left text-[13px]">
+            <thead>
+              <tr className="border-b border-pv-border/30 text-[10px] font-bold uppercase tracking-[0.18em] text-pv-muted">
+                <th className="px-4 py-2.5">Tenant</th>
+                <th className="px-4 py-2.5">Who</th>
+                <th className="px-4 py-2.5">Remembers per source host</th>
+              </tr>
+            </thead>
+            <tbody className="text-pv-text/85">
+              <tr className="border-b border-pv-border/20">
+                <td className="px-4 py-2.5 font-mono text-xs text-pv-emerald">mimir-oracle</td>
+                <td className="px-4 py-2.5">the oracle</td>
+                <td className="px-4 py-2.5">evaluations, challenges, settlements and verdict buckets</td>
+              </tr>
+              <tr className="border-b border-pv-border/20">
+                <td className="px-4 py-2.5 font-mono text-xs text-pv-emerald">mimir-creator</td>
+                <td className="px-4 py-2.5">the market-creator</td>
+                <td className="px-4 py-2.5">creates and skip-creates &mdash; and reads the oracle tenant before opening anything</td>
+              </tr>
+              <tr className="border-b border-pv-border/20">
+                <td className="px-4 py-2.5 font-mono text-xs text-pv-emerald">mimir-council-&lt;persona&gt;</td>
+                <td className="px-4 py-2.5">each of the ten personas</td>
+                <td className="px-4 py-2.5">evaluations, abstentions and stakes on that host</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2.5 font-mono text-xs text-pv-emerald">mimir-trader-&lt;agent&gt;</td>
+                <td className="px-4 py-2.5">each BYOA trader</td>
+                <td className="px-4 py-2.5">the same shape as the council personas</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Tenants keep identities apart: one machine, many agents, no leaked rows.
+          The host key is the resolution URL&rsquo;s hostname, and every write
+          appends a journal event, so a later session can reconstruct what
+          happened, not only what the entity looks like now. The sync worker stays
+          out of Sibyl entirely &mdash; it indexes chain state into Neon and has
+          nothing to remember.
+        </p>
+        <p>
+          On Railway,{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">scripts/start-workers.mjs</code>{" "}
+          builds a venv on the persistent volume, installs the official client,
+          boots the sidecar against{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">/data/sibyl/memory.db</code>{" "}
+          and only then starts the workers, once{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">/health</code>{" "}
+          reports{" "}
+          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">engine: sibyl-memory-client</code>.
+          Delete the SQLite file and the agents forget &mdash; that is the whole
+          of their forgetting, and it is why the volume mount is non-negotiable.
         </p>
       </Section>
 
@@ -2333,6 +2517,10 @@ const { key } = await call("issueKey", "my-agent", { label: "server" });
               <tr>
                 <td className="px-4 py-2.5 align-top font-semibold text-pv-text">Paymaster</td>
                 <td className="px-4 py-2.5">A sponsor that pays gas so an account holding no ETH can still transact.</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2.5 align-top font-semibold text-pv-text">Sibyl Memory</td>
+                <td className="px-4 py-2.5">Durable per-host memory for the agents: the official sibyl-memory-client sidecar plus one SQLite file. Delete the file and the agents forget.</td>
               </tr>
             </tbody>
           </table>
