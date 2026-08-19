@@ -3,13 +3,11 @@ import {
   createBasePublicClient,
   getContractAddress,
   getDeployBlock,
-  getExplorerAddressUrl,
   getExplorerTxUrl,
   isContractConfigured,
-  weiToEth,
   paginatedGetLogs,
 } from "@/lib/base";
-import { unitsToUsdc } from "@/lib/usdc";
+import { ERC20_ABI, USDC_ADDRESS, unitsToUsdc } from "@/lib/usdc";
 import {
   getActiveCouncilPersonas,
 } from "@/lib/council-resolver";
@@ -25,7 +23,7 @@ export const revalidate = 30;
 interface PersonaStats {
   persona:         PersonaSpec;
   address:         string;
-  balanceEth:     number;
+  balanceUsdc:     number;
   stakesPlaced:    number;
   totalStakedUsdc: number;
   recentBets:      Array<{
@@ -79,7 +77,12 @@ async function fetchCouncilStats(): Promise<PersonaStats[]> {
 
       let balance = 0n;
       try {
-        balance = await client.getBalance({ address: addr as `0x${string}` });
+        balance = await client.readContract({
+          address: USDC_ADDRESS,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [addr as `0x${string}`],
+        }) as bigint;
       } catch {
         balance = 0n;
       }
@@ -95,7 +98,7 @@ async function fetchCouncilStats(): Promise<PersonaStats[]> {
       return {
         persona,
         address: addr,
-        balanceEth:     weiToEth(balance), // gas wallet (native ETH)
+        balanceUsdc:     unitsToUsdc(balance),
         stakesPlaced:    logs.length,
         totalStakedUsdc: unitsToUsdc(totalStakedUnits), // USDC stakes
         recentBets:      sortedLogs.slice(0, 3).map((log: any) => ({
@@ -119,7 +122,7 @@ const ARCHETYPE_LABEL: Record<PersonaSpec["archetype"], string> = {
 };
 
 function PersonaCard({ stats }: { stats: PersonaStats }) {
-  const { persona, address, balanceEth, stakesPlaced, totalStakedUsdc, recentBets } = stats;
+  const { persona, address, balanceUsdc, stakesPlaced, totalStakedUsdc, recentBets } = stats;
   const active = stakesPlaced > 0;
 
   return (
@@ -165,9 +168,9 @@ function PersonaCard({ stats }: { stats: PersonaStats }) {
 
       <dl className="mt-auto grid grid-cols-3 gap-2 border-t border-pv-border/30 pt-3 text-center">
         <div>
-          <dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-pv-muted">balance</dt>
+          <dt className="font-mono text-[10px] uppercase tracking-[0.16em] text-pv-muted">USDC</dt>
           <dd className="mt-0.5 font-display text-sm font-bold tabular-nums text-pv-text">
-            {balanceEth.toFixed(2)}
+            {balanceUsdc.toFixed(2)}
           </dd>
         </div>
         <div>
@@ -225,7 +228,7 @@ export default async function CouncilPage() {
 
   const totalStakes       = stats.reduce((acc, s) => acc + s.stakesPlaced, 0);
   const totalStakedUsdc   = stats.reduce((acc, s) => acc + s.totalStakedUsdc, 0);
-  const totalBankrollBot = stats.reduce((acc, s) => acc + s.balanceEth, 0);
+  const totalBankrollUsdc = stats.reduce((acc, s) => acc + s.balanceUsdc, 0);
 
   return (
     <div className="pb-10">
@@ -250,7 +253,7 @@ export default async function CouncilPage() {
               <span className="tabular-nums text-pv-text">{totalStakedUsdc.toFixed(2)}</span> USDC at risk
             </span>
             <span className="rounded-md border border-pv-border/40 bg-pv-surface2/40 px-2 py-1 text-pv-muted">
-              bankroll <span className="tabular-nums text-pv-text">{totalBankrollBot.toFixed(2)}</span> ETH gas
+              bankroll <span className="tabular-nums text-pv-text">{totalBankrollUsdc.toFixed(2)}</span> USDC
             </span>
           </div>
         )}
