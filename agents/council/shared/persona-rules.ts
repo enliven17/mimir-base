@@ -9,7 +9,7 @@
  * the creator side because personas can't join the creator pool.
  */
 
-import { unitsToUsdc } from "../../../lib/usdc";
+import { unitsToUsdc, clampStakeUsdc } from "../../../lib/usdc";
 import { MIMIR_ABI } from "../../../lib/mimir-abi";
 import type { PublicClient } from "viem";
 import type { PersonaSpec } from "../personas";
@@ -28,7 +28,7 @@ export function evaluateContrarian(
   persona: PersonaSpec,
   claim: ClaimOnChain,
 ): PersonaDecision {
-  const stakeUsdc = persona.stakeUsdc ?? 2;
+  const stakeUsdc = clampStakeUsdc(persona.stakeUsdc ?? 2);
   const creator   = claim.creatorStake;
   const challenger = claim.totalChallengerStake;
 
@@ -79,7 +79,7 @@ export async function evaluateWhaleWatcher(
   publicClient: PublicClient,
   contractAddress: `0x${string}`,
 ): Promise<PersonaDecision> {
-  const stakeUsdc = persona.stakeUsdc ?? 2;
+  const stakeUsdc = clampStakeUsdc(persona.stakeUsdc ?? 2);
 
   if (claim.totalChallengerStake === 0n) {
     return {

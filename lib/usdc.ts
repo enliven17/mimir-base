@@ -42,6 +42,15 @@ export function formatAtomicUsdc(units: bigint | string, maxFractionDigits = USD
 /** Minimum stake in display USDC — matches Mimir.sol MIN_STAKE = 2 * 10^6 */
 export const MIN_STAKE_USDC = 2;
 
+/**
+ * Floor a planned stake to the on-chain minimum. Agents must never submit
+ * below this: the contract reverts with "Mimir: stake too small".
+ */
+export function clampStakeUsdc(usdc: number): number {
+  if (!Number.isFinite(usdc) || usdc <= 0) return MIN_STAKE_USDC;
+  return Math.max(MIN_STAKE_USDC, Math.round(usdc * 100) / 100);
+}
+
 export const ERC20_ABI = parseAbi([
   "function name() view returns (string)",
   "function symbol() view returns (string)",

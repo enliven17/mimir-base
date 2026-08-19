@@ -34,8 +34,13 @@ import { reportingPoll } from "../../lib/ops/heartbeat";
 import { AUTHORITY_LEVELS, defaultLimits, REGISTRY_SCHEMA_VERSION, type AgentRecord } from "../../lib/agents/registry";
 import { loadAgent, saveAgent } from "../../lib/agents/store";
 import { getClaimsByFilter, getChallengersByClaimId } from "../../lib/db";
-import { unitsToUsdc, usdcToUnits, USDC_ADDRESS, ERC20_ABI } from "../../lib/usdc";
+import { unitsToUsdc, usdcToUnits, clampStakeUsdc, MIN_STAKE_USDC, USDC_ADDRESS, ERC20_ABI } from "../../lib/usdc";
 import { TRADER_PERSONAS, isTraderVerdict, shouldStake, type TraderPersona, type TraderVerdict } from "./personas";
+import {
+  rememberTraderDecision,
+  requireSibyl,
+  traderStakeGateForUrl,
+} from "../../lib/sibyl/memory";
 
 const POLL_INTERVAL_MS = Number(process.env.TRADER_POLL_INTERVAL_MS ?? "900000");
 const MAX_STAKES_PER_CYCLE = Number(process.env.TRADER_MAX_STAKES_PER_CYCLE ?? "1");
@@ -234,11 +239,12 @@ async function runTrader(persona: TraderPersona): Promise<void> {
     createBasePublicClient().getBalance({ address: wallet.address }),
     usdcBalance(wallet.address),
   ]);
-  const stakeUnits = usdcToUnits(persona.stakeUsdc);
+  const stakeUsdc = clampStakeUsdc(persona.stakeUsdc);
+  const stakeUnits = usdcToUnits(stakeUsdc);
   console.log(`[traders] ${persona.emoji} ${persona.displayName} · ${weiToEth(gas).toFixed(4)} ETH · ${unitsToUsdc(usdc).toFixed(2)} USDC`);
 
   if (weiToEth(gas) < MIN_GAS_ETH) return void console.log(`[traders]   out of gas, standing aside`);
-  if (usdc < stakeUnits) return void console.log(`[traders]   below ${persona.stakeUsdc} USDC, standing aside`);
+  if (usdc < stakeUnits) return void console.log(`[traders]   below ${MIN_STAKE_USDC} USDC min stake, standing aside`);
 
   const joinable = await joinableFor(wallet);
   if (joinable.length === 0) return void console.log(`[traders]   nothing joinable this cycle`);
@@ -248,11 +254,49 @@ async function runTrader(persona: TraderPersona): Promise<void> {
     if (staked >= MAX_STAKES_PER_CYCLE) break;
     const secondOpinion = await buyOracleOpinion(wallet, claim);
     const decision = await decide(persona, claim, secondOpinion);
-    const take = shouldStake(decision.verdict, decision.confidence, persona);
+    let take = shouldStake(decision.verdict, decision.confidence, persona);
+    const resolutionUrl = claim.resolution_url ?? "";
+    try {
+      const { gate } = await traderStakeGateForUrl({
+        agentId: persona.agentId,
+        url: resolutionUrl,
+        wantsToStake: take,
+        confidence: decision.confidence,
+      });
+      if (!gate.allow) {
+        take = false;
+        if (gate.veto !== "none") {
+          console.log(`[traders]   #${claim.id} ${gate.reason}`);
+        }
+      }
+    } catch (err) {
+      console.warn(
+        `[traders]   #${claim.id} Sibyl gate failed, standing aside:`,
+        err instanceof Error ? err.message : err,
+      );
+      take = false;
+    }
     console.log(`[traders]   #${claim.id} ${decision.verdict} ${decision.confidence}% ${take ? "→ STAKE" : "→ pass"} · ${decision.reasoning.slice(0, 90)}`);
-    if (!take) continue;
+    if (!take) {
+      try {
+        await rememberTraderDecision({
+          agentId: persona.agentId,
+          url: resolutionUrl,
+          claimId: claim.id,
+          verdict: decision.verdict,
+          staked: false,
+          abstained: true,
+        });
+      } catch (err) {
+        console.warn(
+          `[traders]   Sibyl persist failed:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+      continue;
+    }
     if (DRY_RUN) {
-      console.log(`[traders]   DRY_RUN — would stake ${persona.stakeUsdc} USDC on #${claim.id}`);
+      console.log(`[traders]   DRY_RUN — would stake ${stakeUsdc} USDC on #${claim.id}`);
       staked += 1;
       continue;
     }
@@ -261,10 +305,25 @@ async function runTrader(persona: TraderPersona): Promise<void> {
         wallet, contractAddress: getContractAddress(), abi: MIMIR_ABI,
         functionName: "challengeClaim",
         args: [BigInt(claim.id), stakeUnits, ""],
-        amountUsdc: String(persona.stakeUsdc),
+        amountUsdc: String(stakeUsdc),
       });
-      console.log(`[traders]   ✓ staked ${persona.stakeUsdc} USDC on #${claim.id} — ${getExplorerTxUrl(tx)}`);
+      console.log(`[traders]   ✓ staked ${stakeUsdc} USDC on #${claim.id} — ${getExplorerTxUrl(tx)}`);
       staked += 1;
+      try {
+        await rememberTraderDecision({
+          agentId: persona.agentId,
+          url: resolutionUrl,
+          claimId: claim.id,
+          verdict: decision.verdict,
+          staked: true,
+          abstained: false,
+        });
+      } catch (err) {
+        console.warn(
+          `[traders]   Sibyl persist failed after stake:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
     } catch (err) {
       // A revert is one claim's problem, not the cycle's: keep going.
       console.warn(`[traders]   ✗ #${claim.id} stake failed:`, err instanceof Error ? err.message : err);
@@ -292,6 +351,9 @@ async function main(): Promise<void> {
   console.log(`  Stake      : ${TRADER_PERSONAS[0].stakeUsdc} USDC · max ${MAX_STAKES_PER_CYCLE}/cycle each`);
   console.log(`  Poll every : ${POLL_INTERVAL_MS / 1000}s${DRY_RUN ? " · DRY RUN" : ""}`);
   console.log("═══════════════════════════════════════════════\n");
+
+  await requireSibyl();
+  console.log("[traders] Sibyl Memory sidecar is up.");
 
   void randomUUID; // reserved for per-cycle correlation ids
   const safePoll = () => reportingPoll("traders", "traders", POLL_INTERVAL_MS / 1000, poll);

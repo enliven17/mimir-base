@@ -48,8 +48,16 @@ import {
 import { fetchWithBudget, payingWalletFor } from "../../lib/x402/buyer";
 import { MIMIR_ABI, WINNER_SIDE, STATE, BPS_DIVISOR } from "../../lib/mimir-abi";
 import { reportingPoll } from "../../lib/ops/heartbeat";
-import { unitsToUsdc, usdcToUnits, ERC20_ABI, USDC_ADDRESS } from "../../lib/usdc";
+import { unitsToUsdc, usdcToUnits, clampStakeUsdc, MIN_STAKE_USDC, ERC20_ABI, USDC_ADDRESS } from "../../lib/usdc";
 import { fetchDecodedClaim, type DecodedClaim } from "../../lib/claim-codec";
+import {
+  challengeGateForUrl,
+  loadSource,
+  rememberOracleEvaluation,
+  requireSibyl,
+  sourceIsUnreliable,
+  TENANTS,
+} from "../../lib/sibyl/memory";
 import {
   fetchEvidence as fetchEvidenceShared,
   EvidenceFetchError,
@@ -70,8 +78,8 @@ const POLL_INTERVAL_MS      = Number(process.env.ORACLE_POLL_INTERVAL_MS ?? "600
 const MAX_CONTENT_CHARS     = 8_000;
 const CONTRACT_ADDRESS      = getContractAddress();
 const AUTO_CHALLENGE        = process.env.AUTO_CHALLENGE === "1";
-const CHALLENGE_STAKE_USDC = Number(
-  process.env.CHALLENGE_STAKE_USDC ?? "2"
+const CHALLENGE_STAKE_USDC = clampStakeUsdc(
+  Number(process.env.CHALLENGE_STAKE_USDC ?? String(MIN_STAKE_USDC)),
 );
 const CHALLENGE_CONFIDENCE  = Number(process.env.CHALLENGE_CONFIDENCE ?? "80");
 const LLM_THROTTLE_MS       = Number(process.env.ORACLE_LLM_THROTTLE_MS ?? "8000");
@@ -520,6 +528,24 @@ async function settle(claim: ClaimOnChain): Promise<boolean> {
   });
 
   console.log(`[settle] ✓ Resolved — ${getExplorerTxUrl(txHash)}`);
+  try {
+    const remembered = await rememberOracleEvaluation({
+      url: claim.resolutionUrl,
+      claimId: claim.id,
+      verdict: verdict.verdict,
+      confidence: verdict.confidence,
+      action: "settle",
+    });
+    console.log(
+      `[settle] Sibyl source ${remembered.host}: unresolvable=${remembered.unresolvable} ` +
+        `decisive=${remembered.challengersWin + remembered.creatorWins}`,
+    );
+  } catch (err) {
+    console.warn(
+      `[settle] Sibyl persist failed (settlement already on-chain):`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   // Cross-entropy bonuses AFTER the on-chain settle: informative jurors split
   // the pool, parrots and dissenters-from-evidence get nothing. Best-effort —
@@ -581,6 +607,23 @@ async function challengeIfMispriced(claim: ClaimOnChain): Promise<void> {
   console.log(`\n[challenge] Evaluating claim #${claim.id}: "${claim.question.slice(0, 60)}..."`);
   evaluatedClaimIds.add(claim.id);
 
+  try {
+    const remembered = await loadSource(TENANTS.oracle, claim.resolutionUrl);
+    if (sourceIsUnreliable(remembered)) {
+      console.log(
+        `[challenge] Sibyl memory veto — skipping LLM. ${remembered!.host} has ` +
+          `${remembered!.unresolvable} unresolvable reads.`,
+      );
+      return;
+    }
+  } catch (err) {
+    console.warn(
+      `[challenge] Sibyl recall failed, refusing to stake:`,
+      err instanceof Error ? err.message : err,
+    );
+    return;
+  }
+
   const evidence = await fetchEvidence(claim);
 
   // Short-circuit: with no real evidence the LLM will return UNRESOLVABLE,
@@ -596,17 +639,45 @@ async function challengeIfMispriced(claim: ClaimOnChain): Promise<void> {
 
   console.log(`[challenge] Early verdict: ${verdict.verdict} (${verdict.confidence}%) [fetcher=${evidence.fetcher}]`);
 
-  // Only challenge if highly confident challengers will win
-  if (verdict.verdict !== "CHALLENGERS_WIN" || verdict.confidence < CHALLENGE_CONFIDENCE) {
-    console.log(`[challenge] Not confident enough to stake — skipping`);
+  let memoryConfidence = verdict.confidence;
+  try {
+    const { gate } = await challengeGateForUrl({
+      url: claim.resolutionUrl,
+      verdict: verdict.verdict,
+      confidence: verdict.confidence,
+      minConfidence: CHALLENGE_CONFIDENCE,
+    });
+    memoryConfidence = gate.adjustedConfidence;
+    if (!gate.allow) {
+      await rememberOracleEvaluation({
+        url: claim.resolutionUrl,
+        claimId: claim.id,
+        verdict: verdict.verdict,
+        confidence: verdict.confidence,
+        action: "evaluate",
+      });
+      console.log(`[challenge] ${gate.reason}`);
+      return;
+    }
+  } catch (err) {
+    console.warn(
+      `[challenge] Sibyl gate failed, refusing to stake:`,
+      err instanceof Error ? err.message : err,
+    );
     return;
   }
 
   // Kelly Criterion: size position based on confidence edge (USDC bankroll)
-  const kelly = kellyFraction(verdict.confidence, KELLY_CAP);
+  const kelly = kellyFraction(memoryConfidence, KELLY_CAP);
   const bankroll = unitsToUsdc(usdcBal);
   const kellyStake = Math.max(CHALLENGE_STAKE_USDC, Math.min(bankroll * kelly, bankroll * 0.1));
-  const stakeUsdc = Math.round(kellyStake * 100) / 100;
+  const stakeUsdc = clampStakeUsdc(kellyStake);
+  if (usdcBal < usdcToUnits(stakeUsdc)) {
+    console.log(
+      `[challenge] stake ${stakeUsdc} USDC exceeds balance ${unitsToUsdc(usdcBal).toFixed(2)}, skipping`,
+    );
+    return;
+  }
 
   console.log(`[challenge] Kelly: ${(kelly * 100).toFixed(1)}% of USDC bankroll → ${stakeUsdc} USDC stake`);
   console.log(`[challenge] Staking ${stakeUsdc} USDC on challenger side...`);
@@ -624,6 +695,20 @@ async function challengeIfMispriced(claim: ClaimOnChain): Promise<void> {
   challengedClaimIds.add(claim.id);
   console.log(`[challenge] ✓ Staked ${stakeUsdc} USDC — ${getExplorerTxUrl(txHash)}`);
   console.log(`[challenge] Oracle: "${verdict.explanation.slice(0, 120)}"`);
+  try {
+    await rememberOracleEvaluation({
+      url: claim.resolutionUrl,
+      claimId: claim.id,
+      verdict: verdict.verdict,
+      confidence: memoryConfidence,
+      action: "challenge",
+    });
+  } catch (err) {
+    console.warn(
+      `[challenge] Sibyl persist failed after stake:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 // ── Main poll loop ────────────────────────────────────────────────────────────
@@ -712,6 +797,9 @@ async function main(): Promise<void> {
   console.log(`  Poll every : ${POLL_INTERVAL_MS / 1000}s`);
   console.log(`  Auto-challenge: ${AUTO_CHALLENGE ? `YES (≥${CHALLENGE_CONFIDENCE}% confidence, ${CHALLENGE_STAKE_USDC} USDC/claim)` : "OFF (set AUTO_CHALLENGE=1 to enable)"}`);
   console.log("═══════════════════════════════════════════════\n");
+
+  await requireSibyl();
+  console.log("[oracle] Sibyl Memory sidecar is up.");
 
   // Reports a heartbeat either way, so a crash-looping oracle shows as alive and
   // failing on /api/health rather than merely stale.

@@ -56,7 +56,9 @@ export interface PersonaDecision {
     | "no-pool-imbalance"
     | "no-whale-yet"
     | "no-evidence"
-    | "llm-failed";
+    | "llm-failed"
+    | "memory-veto"
+    | "sibyl-unavailable";
 }
 
 export interface PersonaRunnerContext {

@@ -15,7 +15,7 @@ import { agentContractWrite, getCouncilWallet } from "../../../lib/agent-wallets
 import { MIMIR_ABI } from "../../../lib/mimir-abi";
 import { kellyFraction } from "../../../lib/kelly";
 import { createThrottle } from "../../../lib/agent-bootstrap";
-import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../../lib/usdc";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc, clampStakeUsdc, MIN_STAKE_USDC } from "../../../lib/usdc";
 import {
   type PersonaSpec,
   personaPrivateKeyEnv,
@@ -32,9 +32,41 @@ import type {
   PersonaRunnerContext,
   PersonaStakeReceipt,
 } from "./types";
+import {
+  personaStakeGateForUrl,
+  rememberPersonaDecision,
+} from "../../../lib/sibyl/memory";
 
 const DEFAULT_MIN_CONFIDENCE = 75;
 const DEFAULT_STAKE_USDC     = 2;
+
+async function gatePersonaMemory(
+  slug: string,
+  url: string,
+  wantsToStake: boolean,
+  confidence?: number,
+): Promise<(PersonaDecision & { verdict?: PersonaVerdict }) | null> {
+  try {
+    const { gate } = await personaStakeGateForUrl({ slug, url, wantsToStake, confidence });
+    if (!gate.allow && gate.veto === "persona-source-abstain") {
+      return {
+        shouldStake: false,
+        stakeUsdc:   0,
+        rationale:   gate.reason,
+        confidence,
+        skipReason:  "memory-veto",
+      };
+    }
+    return null;
+  } catch (err) {
+    return {
+      shouldStake: false,
+      stakeUsdc:   0,
+      rationale:   `Sibyl Memory unavailable (${err instanceof Error ? err.message : "unknown"}).`,
+      skipReason:  "sibyl-unavailable",
+    };
+  }
+}
 
 /**
  * Gemini free tier is 15 req/min. We chain LLM calls serially inside a
@@ -80,6 +112,9 @@ export async function evaluatePersonaForClaim(
 
   // Rule-based personas: no LLM call.
   if (persona.archetype === "rule-based") {
+    const remembered = await gatePersonaMemory(persona.slug, claim.resolutionUrl, true);
+    if (remembered) return remembered;
+
     if (persona.ruleEvaluator === "contrarian") {
       return evaluateContrarian(persona, claim);
     }
@@ -93,6 +128,9 @@ export async function evaluatePersonaForClaim(
       skipReason:  "abstain-low-confidence",
     };
   }
+
+  const priorMemory = await gatePersonaMemory(persona.slug, claim.resolutionUrl, true);
+  if (priorMemory) return priorMemory;
 
   // LLM-based path (llm-biased, specialist, micro).
   const evidence = await getOrFetchEvidence(claim.id, claim.resolutionUrl, ctx.evidenceCache);
@@ -150,6 +188,23 @@ export async function evaluatePersonaForClaim(
   // Confident enough to stake. Size with Kelly, capped at 10% of bankroll.
   // Note: the bankroll cap is enforced inside runPersonaForClaim where the
   // wallet balance is read. Here we surface the base stake from the spec.
+  const stakeGate = await personaStakeGateForUrl({
+    slug: persona.slug,
+    url: claim.resolutionUrl,
+    wantsToStake: true,
+    confidence: verdict.confidence,
+  }).catch(() => null);
+  if (!stakeGate || !stakeGate.gate.allow) {
+    return {
+      shouldStake: false,
+      stakeUsdc:   0,
+      rationale:   `${persona.displayName}: ${stakeGate?.gate.reason ?? "Sibyl Memory unavailable"}`,
+      confidence:  verdict.confidence,
+      skipReason:  stakeGate ? "memory-veto" : "sibyl-unavailable",
+      verdict,
+    };
+  }
+
   return {
     shouldStake: true,
     stakeUsdc:   persona.stakeUsdc ?? DEFAULT_STAKE_USDC,
@@ -204,11 +259,11 @@ export async function runPersonaForClaim(
     functionName: "balanceOf",
     args: [address as `0x${string}`],
   })) as bigint;
-  const baseStakeUsdc = persona.stakeUsdc ?? DEFAULT_STAKE_USDC;
-  const minRequired = usdcToUnits(baseStakeUsdc * 2);
+  const baseStakeUsdc = clampStakeUsdc(persona.stakeUsdc ?? DEFAULT_STAKE_USDC);
+  const minRequired = usdcToUnits(MIN_STAKE_USDC);
   if (usdcBal < minRequired) {
     console.log(
-      `[council:${persona.slug}] insufficient USDC (${unitsToUsdc(usdcBal).toFixed(2)}), skipping`,
+      `[council:${persona.slug}] insufficient USDC (${unitsToUsdc(usdcBal).toFixed(2)}), need ≥${MIN_STAKE_USDC}, skipping`,
     );
     return null;
   }
@@ -216,12 +271,35 @@ export async function runPersonaForClaim(
   // Decide.
   const decision = await evaluatePersonaForClaim(persona, claim, ctx);
   if (!decision.shouldStake) {
+    const judged =
+      decision.skipReason === "abstain-low-confidence" ||
+      decision.skipReason === "abstain-agrees-with-creator" ||
+      decision.skipReason === "no-pool-imbalance" ||
+      decision.skipReason === "no-whale-yet" ||
+      decision.skipReason === "no-evidence";
+    if (judged) {
+      try {
+        await rememberPersonaDecision({
+          slug: persona.slug,
+          url: claim.resolutionUrl,
+          claimId: claim.id,
+          verdict: decision.verdict?.verdict ?? null,
+          staked: false,
+          abstained: true,
+        });
+      } catch (err) {
+        console.warn(
+          `[council:${persona.slug}] Sibyl persist failed:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
+    }
     return null;
   }
 
   // For LLM personas, apply Kelly sizing on top of the base stake.
   // Rule personas don't have a confidence score — they use the base stake as-is.
-  let stakeUsdc = decision.stakeUsdc;
+  let stakeUsdc = clampStakeUsdc(decision.stakeUsdc);
   if (decision.confidence && decision.confidence >= (persona.minConfidence ?? DEFAULT_MIN_CONFIDENCE)) {
     const kelly = kellyFraction(decision.confidence, KELLY_CAP);
     const bankroll = unitsToUsdc(usdcBal);
@@ -229,7 +307,13 @@ export async function runPersonaForClaim(
       baseStakeUsdc,
       Math.min(bankroll * kelly, bankroll * 0.10),
     );
-    stakeUsdc = Math.round(kellyStake * 100) / 100;
+    stakeUsdc = clampStakeUsdc(kellyStake);
+  }
+  if (usdcBal < usdcToUnits(stakeUsdc)) {
+    console.log(
+      `[council:${persona.slug}] stake ${stakeUsdc} USDC exceeds balance ${unitsToUsdc(usdcBal).toFixed(2)}, skipping`,
+    );
+    return null;
   }
 
   // Submit (approve + challengeClaim — USDC ERC-20).
@@ -247,6 +331,21 @@ export async function runPersonaForClaim(
     `[council:${persona.slug}] ✓ Staked ${stakeUsdc} USDC on claim #${claim.id} — ${getExplorerTxUrl(txHash)}`,
   );
   console.log(`[council:${persona.slug}]   ${decision.rationale.slice(0, 160)}`);
+  try {
+    await rememberPersonaDecision({
+      slug: persona.slug,
+      url: claim.resolutionUrl,
+      claimId: claim.id,
+      verdict: decision.verdict?.verdict ?? "CHALLENGERS_WIN",
+      staked: true,
+      abstained: false,
+    });
+  } catch (err) {
+    console.warn(
+      `[council:${persona.slug}] Sibyl persist failed after stake:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 
   return {
     persona,

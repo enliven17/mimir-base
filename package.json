@@ -2,7 +2,7 @@
   "name": "mimir",
   "version": "0.1.0",
   "private": true,
-  "license": "AGPL-3.0-or-later",
+  "license": "MIT",
   "engines": {
     "node": ">=22.0.0"
   },
@@ -26,7 +26,9 @@
     "agents:distribute": "tsx --env-file-if-exists=.env.local scripts/fund-from-oracle.ts",
     "agents:funding-plan": "tsx --env-file-if-exists=.env.local scripts/fund-from-oracle.ts --dry-run",
     "agents:balances": "tsx --env-file-if-exists=.env.local scripts/check-agent-balances.ts",
+    "sibyl": "python sibyl/server.py",
     "workers": "concurrently --names oracle,creator,council,sync,traders --kill-others-on-fail -c blue,magenta,green,cyan,yellow \"npm:oracle\" \"npm:market-creator\" \"npm:council\" \"npm:sync\" \"npm:traders\"",
+    "workers:start": "node scripts/start-workers.mjs",
     "demo:cycle": "tsx --env-file-if-exists=.env.local scripts/demo-full-cycle.ts",
     "seed": "npx tsx scripts/seed-claims.ts",
     "seed:dry": "DRY_RUN=1 npx tsx scripts/seed-claims.ts",

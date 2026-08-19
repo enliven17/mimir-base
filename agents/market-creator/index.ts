@@ -45,16 +45,17 @@ import {
 import { payingWalletFor } from "../../lib/x402/buyer";
 import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
 import { reportingPoll } from "../../lib/ops/heartbeat";
-import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc } from "../../lib/usdc";
+import { ERC20_ABI, USDC_ADDRESS, usdcToUnits, unitsToUsdc, clampStakeUsdc, MIN_STAKE_USDC } from "../../lib/usdc";
 import { gatherCouncilPreflight } from "./council-preflight";
 import { insertMarketProposal } from "../../lib/db";
 import { toCanonicalMode } from "../../lib/market-modes";
 import { dimensionsReported } from "../../lib/market-creator/preflight-score";
+import { createGateForUrl, rememberCreate, requireSibyl } from "../../lib/sibyl/memory";
 
 // ── Config ────────────────────────────────────────────────────────────────────
 const CONTRACT_ADDRESS    = getContractAddress();
-const CREATOR_STAKE_USDC = Number(
-  process.env.CREATOR_STAKE_USDC ?? "2"
+const CREATOR_STAKE_USDC = clampStakeUsdc(
+  Number(process.env.CREATOR_STAKE_USDC ?? String(MIN_STAKE_USDC)),
 );
 const MAX_CLAIMS_PER_RUN  = Number(process.env.MAX_CLAIMS_PER_RUN ?? "5");
 const MAX_ACTIVE_CLAIMS   = Number(process.env.MAX_ACTIVE_CLAIMS ?? "30");
@@ -1008,6 +1009,25 @@ async function run(): Promise<void> {
   for (let i = 0; i < selected.length; i++) {
     const candidate = selected[i];
 
+    try {
+      const { gate } = await createGateForUrl(candidate.resolutionUrl);
+      if (!gate.allow) {
+        console.log(`[market-creator] ${gate.reason} — "${candidate.question.slice(0, 50)}..."`);
+        await rememberCreate({
+          url: candidate.resolutionUrl,
+          question: candidate.question,
+          allowed: false,
+        });
+        continue;
+      }
+    } catch (err) {
+      console.warn(
+        `[market-creator] Sibyl gate failed, refusing to create:`,
+        err instanceof Error ? err.message : err,
+      );
+      continue;
+    }
+
     // Record the decision in the canonical schema BEFORE acting on it (§10.4), so
     // a run that dies mid-create still leaves the proposal it was acting on.
     const proposalId = await recordProposal(candidate, SHADOW_MODE ? "shadow" : "create");
@@ -1027,6 +1047,18 @@ async function run(): Promise<void> {
     if (txHash) {
       console.log(`[market-creator] ✓ Created — ${getExplorerTxUrl(txHash)}`);
       created++;
+      try {
+        await rememberCreate({
+          url: candidate.resolutionUrl,
+          question: candidate.question,
+          allowed: true,
+        });
+      } catch (err) {
+        console.warn(
+          `[market-creator] Sibyl persist failed after create:`,
+          err instanceof Error ? err.message : err,
+        );
+      }
     }
     if (i < selected.length - 1 && CREATE_DELAY_MS > 0) {
       console.log(`[market-creator] Cooling down ${(CREATE_DELAY_MS / 60000).toFixed(1)} min before next market...`);
@@ -1063,6 +1095,9 @@ async function main(): Promise<void> {
   console.log(`  Cancel gap : ${CANCEL_DELAY_MS / 1000}s`);
   console.log(`  Interval   : every ${RUN_INTERVAL_HOURS}h`);
   console.log("═══════════════════════════════════════════════\n");
+
+  await requireSibyl();
+  console.log("[market-creator] Sibyl Memory sidecar is up.");
 
   const safeRun = () =>
     reportingPoll("market_creator", "market-creator", RUN_INTERVAL_HOURS * 3600, run);

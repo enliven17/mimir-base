@@ -411,7 +411,7 @@ export const PHILOSOPHER_PERSONAS: PhilosopherSpec[] = [
     ],
     // Deliberately the strictest bar in the jury.
     minConfidence: 88,
-    stakeUsdc: 1,
+    stakeUsdc: 2,
     maxX402BudgetUsdc: 0.003,
     accent: NEUTRAL_ACCENT,
   }),

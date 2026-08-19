@@ -44,6 +44,7 @@ import {
 import { unitsToUsdc } from "../../lib/usdc";
 import { MIMIR_ABI, STATE } from "../../lib/mimir-abi";
 import { reportingPoll } from "../../lib/ops/heartbeat";
+import { requireSibyl } from "../../lib/sibyl/memory";
 import { fetchDecodedClaim } from "../../lib/claim-codec";
 import { activeLLMProvider, activeLLMModel, activeLLMKeyFingerprint } from "../../lib/llm";
 import {
@@ -307,6 +308,9 @@ async function main(): Promise<void> {
     );
   }
   console.log("═══════════════════════════════════════════════\n");
+
+  await requireSibyl();
+  console.log("[council] Sibyl Memory sidecar is up.");
 
   const safePoll = () => reportingPoll("council", "council", POLL_INTERVAL_MS / 1000, poll);
 

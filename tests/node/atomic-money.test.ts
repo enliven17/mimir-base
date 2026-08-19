@@ -1,7 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { authorizeAction, defaultLimits, type AgentRecord } from "../../lib/agents/registry";
-import { formatAtomicUsdc, parseUsdcAtomic } from "../../lib/usdc";
+import { clampStakeUsdc, formatAtomicUsdc, MIN_STAKE_USDC, parseUsdcAtomic } from "../../lib/usdc";
+
+test("agent stakes never go below the on-chain minimum", () => {
+  assert.equal(MIN_STAKE_USDC, 2);
+  assert.equal(clampStakeUsdc(0.5), 2);
+  assert.equal(clampStakeUsdc(1.5), 2);
+  assert.equal(clampStakeUsdc(0), 2);
+  assert.equal(clampStakeUsdc(Number.NaN), 2);
+  assert.equal(clampStakeUsdc(2), 2);
+  assert.equal(clampStakeUsdc(3.141), 3.14);
+});
 
 test("USDC parsing and rendering is exact at six decimals", () => {
   assert.equal(parseUsdcAtomic("9007199254740993.123456"), 9007199254740993123456n);
