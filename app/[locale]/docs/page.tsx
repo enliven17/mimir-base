@@ -950,7 +950,7 @@ function SibylMemoryDiagram() {
         <text x="740" y="88" textAnchor="middle" fontSize="13" fontWeight="700" fill={C.text}>SQLite + FTS5</text>
         <text x="740" y="110" textAnchor="middle" fontSize="10" fill={C.muted}>one local file, journal events,</text>
         <text x="740" y="128" textAnchor="middle" fontSize="10" fill={C.muted}>no embeddings, no cloud store</text>
-        <text x="740" y="144" textAnchor="middle" fontSize="10" fill={C.muted}>/data volume on Railway</text>
+        <text x="740" y="144" textAnchor="middle" fontSize="10" fill={C.muted}>delete it and the agents forget</text>
       </g>
 
       <line x1="260" y1="100" x2="322" y2="100" stroke={C.line} strokeWidth="1.5" markerEnd="url(#arrow-sb)" />
@@ -1803,19 +1803,6 @@ that schedule is unrepresentable here.`}
           happened, not only what the entity looks like now. The sync worker stays
           out of Sibyl entirely &mdash; it indexes chain state into Neon and has
           nothing to remember.
-        </p>
-        <p>
-          On Railway,{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">scripts/start-workers.mjs</code>{" "}
-          builds a venv on the persistent volume, installs the official client,
-          boots the sidecar against{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">/data/sibyl/memory.db</code>{" "}
-          and only then starts the workers, once{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">/health</code>{" "}
-          reports{" "}
-          <code className="rounded bg-pv-surface2 px-1.5 py-0.5 text-xs">engine: sibyl-memory-client</code>.
-          Delete the SQLite file and the agents forget &mdash; that is the whole
-          of their forgetting, and it is why the volume mount is non-negotiable.
         </p>
       </Section>
 
