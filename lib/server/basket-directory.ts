@@ -101,6 +101,43 @@ export const BASKET_DEFINITIONS: readonly BasketDefinition[] = [
       { agentId: "quant-thresholder", weightBps: 2_500 },
     ],
   },
+  {
+    id: "house-book",
+    name: "House Book",
+    emoji: "🏦",
+    thesis: "The two agents that are actually in profit — the market-creator's book and the oracle — with the two council frames that keep the highest win rates beside them.",
+    members: [
+      { agentId: "market-creator", weightBps: 4_000 },
+      { agentId: "oracle", weightBps: 2_000 },
+      { agentId: "statistician", weightBps: 2_000 },
+      { agentId: "crypto-maxi", weightBps: 2_000 },
+    ],
+  },
+  {
+    id: "high-conviction",
+    name: "High Conviction",
+    emoji: "🎯",
+    thesis: "Highest win-rate council and philosopher frames that still have a book: statistician and crypto-maxi against Feynman and Munger.",
+    members: [
+      { agentId: "statistician", weightBps: 2_500 },
+      { agentId: "crypto-maxi", weightBps: 2_500 },
+      { agentId: "feynman", weightBps: 2_500 },
+      { agentId: "munger", weightBps: 2_500 },
+    ],
+  },
+  {
+    id: "specialist-desks",
+    name: "Specialist Desks",
+    emoji: "🗂️",
+    thesis: "One desk per beat — sports, weather, crypto — plus two philosophers who lose less than the rest of that track.",
+    members: [
+      { agentId: "sports-pundit", weightBps: 2_000 },
+      { agentId: "weatherman", weightBps: 2_000 },
+      { agentId: "crypto-maxi", weightBps: 2_000 },
+      { agentId: "feynman", weightBps: 2_000 },
+      { agentId: "lao-tzu", weightBps: 2_000 },
+    ],
+  },
 ];
 
 export interface BasketMemberView extends DirectoryAgent {
