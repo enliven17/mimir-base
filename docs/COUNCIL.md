@@ -192,7 +192,7 @@ npm run workers
 
 ## Production deploy
 
-`railway.json` points at `npm run workers`. Add the council env vars below on Railway; the worker starts a third process alongside the oracle and market-creator.
+`railway.json` / `scripts/start-workers.mjs` boot Sibyl Memory first, then `npm run workers`. Add the council env vars below on Railway; the worker starts a third process alongside the oracle and market-creator. Persona stakes are gated on recalled Sibyl source history — see [`SIBYL.md`](./SIBYL.md).
 
 To scale the council down temporarily, leave some `COUNCIL_<SLUG>_PRIVATE_KEY` vars unset — the worker skips any persona missing its key at boot and warns once.
 

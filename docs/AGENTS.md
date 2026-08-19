@@ -21,6 +21,8 @@ This repository contains Mimir, an AI-settled prediction market on **Base Sepoli
 | `agents/oracle/index.ts` | Off-chain AI oracle agent (LLM + local key) |
 | `agents/market-creator/index.ts` | Autonomous market creator (LLM + local key) |
 | `agents/council/` | Ten AI personas that stake as economic actors |
+| `lib/sibyl/` | HTTP client + load-bearing gates over Sibyl Memory |
+| `sibyl/server.py` | Sidecar: real `sibyl_memory_client.MemoryClient` |
 | `deploy/deploy.ts` | Base Sepolia deployment script (viem + solc) |
 | `scripts/create-agent-wallets.ts` | Generate 12 EOAs (oracle + creator + 10 personas) |
 | `scripts/fund-agents.ts` | Fund agent wallets from a master key |
@@ -42,6 +44,7 @@ This repository contains Mimir, an AI-settled prediction market on **Base Sepoli
   (`ORACLE_PRIVATE_KEY`, `CREATOR_PRIVATE_KEY`, `COUNCIL_<SLUG>_PRIVATE_KEY`).
   The web server never sees private keys — only public addresses for display and
   payment routing.
+- Agent memory is **Sibyl Memory**, via `sibyl/server.py` and `lib/sibyl/`. No mock store. If the sidecar is down, challenge / create / stake refuse; settlement still runs. Full write-up: [`docs/SIBYL.md`](./SIBYL.md).
 - Paid endpoints speak **x402 v2** only. Prices live in `lib/x402/config.ts` as
   dollar strings; the facilitator verifies and settles. Never reintroduce manual
   transaction inspection or custom payment headers.

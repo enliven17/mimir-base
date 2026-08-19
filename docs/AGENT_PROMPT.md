@@ -15,7 +15,7 @@ Mimir is an **AI-settled prediction market** built on **Base Sepolia** (Chain ID
 
 **One-liner:** "An AI-settled claim market supporting head-to-head, 1-v-many, pool-odds, fixed-odds, and rivalry-linked rematches — settled in USDC on Base."
 
-**License:** AGPL-3.0-or-later  
+**License:** MIT  
 **Default locale:** English (en)
 
 ---
@@ -35,6 +35,7 @@ Mimir is an **AI-settled prediction market** built on **Base Sepolia** (Chain ID
 | i18n | next-intl (English default) |
 | Auth | wagmi v3 connector picker (Base Account, MetaMask, Coinbase, WC, injected) |
 | Database | Neon Postgres (optional read-index cache) |
+| Agent memory | Sibyl Memory (`sibyl-memory-client` via `sibyl/server.py`) |
 | Deployment | Vercel (frontend), Railway (workers), viem deploy (contract) |
 
 ---
@@ -50,6 +51,7 @@ mimir-base/
 │   ├── oracle/                 # Settler + optional auto-challenge
 │   ├── market-creator/         # Autonomous market creation
 │   └── council/                # 10 personas
+├── sibyl/                      # Memory sidecar (real sibyl-memory-client)
 ├── components/                 # UI
 ├── contracts/Mimir.sol
 ├── deploy/deploy.ts            # Base Sepolia deploy (viem + solc)
@@ -59,6 +61,7 @@ mimir-base/
 │   ├── mimir-abi.ts
 │   ├── contract.ts
 │   ├── agent-wallets.ts        # Local key wallets for workers
+│   ├── sibyl/                  # Memory client + load-bearing gates (docs/SIBYL.md)
 │   ├── x402/                   # config.ts (prices) / server.ts / buyer.ts
 │   ├── paid-revenue.ts         # atomic USDC ledger
 │   ├── wallet.tsx / wagmi-config.ts

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="License: AGPL-3.0" /></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="License: MIT" /></a>
   <a href="https://nextjs.org"><img src="https://img.shields.io/badge/Next.js-16-black?logo=nextdotjs" alt="Next.js 16" /></a>
   <a href="https://react.dev"><img src="https://img.shields.io/badge/React-18-149ECA?logo=react&logoColor=white" alt="React 18" /></a>
   <a href="https://www.typescriptlang.org"><img src="https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white" alt="TypeScript" /></a>
@@ -45,6 +45,7 @@ The agents that run Mimir each sign with their own locally held private key, pro
 - [Platform fees](#platform-fees)
 - [Agent baskets](#agent-baskets)
 - [Copy trading](#copy-trading)
+- [Persistent memory (Sibyl)](#persistent-memory-sibyl)
 - [Agents as economic actors](#agents-as-economic-actors)
 - [Bring your own agent (BYOA)](#bring-your-own-agent-byoa)
 - [Connect your agent](#connect-your-agent)
@@ -380,6 +381,23 @@ flowchart LR
 The gate is deterministic: given the same permission, signal and usage, it always returns the same answer, and the skip reason enum (`daily_cap`, `stale_signal`, `spend_permission_mismatch`, and the rest) says exactly which bound was hit. The ordered checks: not globally paused, permission active and unexpired, no self-copy, depth 1, no cycle, no duplicate position, fresh signal, open slots and liquidity, category and mode allowlisted, confidence and payout floors, per-position/daily/weekly/exposure caps, realized-loss limit, spend permission matching the configured token and spender with allowance left on chain, and a clean transaction simulation. The surface is gated behind `MIMIR_FEATURE_COPY_TRADING`.
 
 ---
+
+## Persistent memory (Sibyl)
+
+Agent decisions are load-bearing on [Sibyl Memory](https://github.com/Sibyl-Labs/Sibyl-Memory), the local SQLite memory SDK. There is no in-process stand-in: workers talk to `sibyl/server.py`, which only calls `sibyl_memory_client.MemoryClient`.
+
+- Oracle and council **recall a resolution source before they stake**. Two or more unresolvable reads on a host veto a later challenge in a fresh process.
+- Market-creator **will not open a market** on a host the oracle has already marked unreliable.
+- Delete the Sibyl database and those vetoes disappear — that is the eligibility test.
+
+```bash
+pip install -r sibyl/requirements.txt
+npm run sibyl                  # http://127.0.0.1:8788
+```
+
+Workers start the sidecar themselves if it is not already up. Set `SIBYL_MEMORY_DB` to point at a file; default is `~/.sibyl-memory/memory.db`.
+
+> **Deep dive:** see [`docs/SIBYL.md`](docs/SIBYL.md) for tenants, veto rules, the sidecar RPC, local setup, and how Railway keeps the SQLite file on a volume.
 
 ## Agents as economic actors
 
@@ -773,6 +791,7 @@ mimir-base/
 ### Prerequisites
 
 - Node.js 22+
+- Python 3.10+ with `pip install -r sibyl/requirements.txt` (real Sibyl Memory sidecar)
 - A wallet with Base Sepolia ETH (gas) and test USDC (stakes) from the [CDP faucet](https://portal.cdp.coinbase.com/products/faucet), free
 - At least one LLM API key configured in `.env.local`
 - Optional: a Neon account at [console.neon.tech](https://console.neon.tech) for the read-index
@@ -908,7 +927,7 @@ flowchart LR
    - `COUNCIL_<SLUG>_PRIVATE_KEY` x10
    - at least one LLM API key from `.env.example`
    - `AUTO_CHALLENGE=1` (optional: enables Kelly auto-staking)
-3. `railway.json` selects the NIXPACKS builder and runs `npm run workers`, which boots the agents in parallel via `concurrently` and restarts on failure. Logs are prefixed `oracle:`, `creator:`, and `council:`.
+3. `railway.json` selects the NIXPACKS builder and starts `node scripts/start-workers.mjs`. That process installs `sibyl-memory-client` if needed, boots the Sibyl sidecar against `SIBYL_MEMORY_DB` (a Railway volume at `/data/sibyl/memory.db`), then runs `npm run workers`. Logs are prefixed `oracle:`, `creator:`, and `council:`. Without the volume, memory dies on every redeploy and the load-bearing gate is gone.
 
 ### Neon Postgres (optional)
 
@@ -1051,9 +1070,4 @@ These show up in PR review and shape what we accept:
 
 ## License
 
-AGPL-3.0: see [`LICENSE`](./LICENSE).
-
-Mimir is source-available. You can use, study, modify, and share it freely.
-The catch (the *A* in AGPL): if you run a modified version as a hosted
-service, you must publish your changes under the same license. That keeps
-oracle-side modifications visible to users staking USDC against the agent.
+MIT: see [`LICENSE`](./LICENSE).
