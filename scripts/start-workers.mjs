@@ -144,12 +144,24 @@ try {
 console.log("[sibyl] sidecar healthy — starting workers");
 
 const workers = spawn("npm", ["run", "workers"], { stdio: "inherit", shell: true });
+const acpEnabled = process.env.VIRTUALS_ACP_ENABLED === "1";
+const acp = acpEnabled
+  ? spawn("npm", ["run", "virtuals:acp"], { stdio: "inherit", shell: true })
+  : null;
+if (acp) console.log("[virtuals-acp] worker enabled");
 const shutdown = (signal) => {
   workers.kill(signal);
+  acp?.kill(signal);
   sidecar.kill(signal);
 };
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
+acp?.on("exit", (code, signal) => {
+  if (code !== 0 && signal === null) {
+    console.error(`[virtuals-acp] worker exited code=${code}; stopping worker service`);
+    workers.kill("SIGTERM");
+  }
+});
 workers.on("exit", (code) => {
   sidecar.kill();
   process.exit(code ?? 1);

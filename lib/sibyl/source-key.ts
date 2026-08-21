@@ -21,6 +21,7 @@ export function sourceKeyFromUrl(url: string): { host: string; key: string } {
 export const TENANTS = {
   oracle: "mimir-oracle",
   creator: "mimir-creator",
+  virtuals: "mimir-virtuals",
   council: (slug: string) => `mimir-council-${slug}`,
   trader: (id: string) => `mimir-trader-${id}`,
 } as const;

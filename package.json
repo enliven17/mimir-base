@@ -21,6 +21,8 @@
     "council": "tsx --env-file-if-exists=.env.local agents/council/index.ts",
     "sync": "tsx --env-file-if-exists=.env.local agents/sync/index.ts",
     "traders": "tsx --env-file-if-exists=.env.local agents/traders/index.ts",
+    "virtuals:acp": "tsx --env-file-if-exists=.env.local agents/virtuals/acp-seller.ts",
+    "virtuals:acp:demo": "tsx --env-file-if-exists=.env.local scripts/virtuals-acp-demo-buyer.ts",
     "agents:create-wallets": "tsx scripts/create-agent-wallets.ts --write",
     "agents:fund": "tsx --env-file-if-exists=.env.local scripts/fund-agents.ts",
     "agents:distribute": "tsx --env-file-if-exists=.env.local scripts/fund-from-oracle.ts",
@@ -44,6 +46,7 @@
     "warm:vs-index": "tsx scripts/warm-vs-index.ts"
   },
   "dependencies": {
+    "@account-kit/infra": "^4.88.5",
     "@anthropic-ai/sdk": "^0.52.0",
     "@base-org/account": "^2.5.9",
     "@fontsource/maple-mono": "^5.2.6",
@@ -52,6 +55,7 @@
     "@privy-io/wagmi": "^4.0.16",
     "@tanstack/react-query": "^5.100.10",
     "@types/ws": "^8.18.1",
+    "@virtuals-protocol/acp-node-v2": "^0.1.12",
     "@wagmi/connectors": "^8.0.25",
     "@wagmi/core": "^3.6.4",
     "@x402/core": "^2.21.0",

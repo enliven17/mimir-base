@@ -21,6 +21,7 @@ This repository contains Mimir, an AI-settled prediction market on **Base Sepoli
 | `agents/oracle/index.ts` | Off-chain AI oracle agent (LLM + local key) |
 | `agents/market-creator/index.ts` | Autonomous market creator (LLM + local key) |
 | `agents/council/` | Ten AI personas that stake as economic actors |
+| `agents/virtuals/` | Virtuals ACP v2 seller, buyer demo, and Sibyl-backed assessment |
 | `lib/sibyl/` | HTTP client + load-bearing gates over Sibyl Memory |
 | `sibyl/server.py` | Sidecar: real `sibyl_memory_client.MemoryClient` |
 | `deploy/deploy.ts` | Base Sepolia deployment script (viem + solc) |

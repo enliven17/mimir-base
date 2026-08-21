@@ -28,6 +28,7 @@ export {
   applyChallengeMemory,
   applyCreateMemory,
   applyPersonaStakeMemory,
+  confidencePenalty,
   sourceIsUnreliable,
 } from "./policy";
 
@@ -95,6 +96,41 @@ export async function rememberOracleEvaluation(input: {
       claimId: input.claimId,
       host,
       verdict: input.verdict,
+      confidence: input.confidence,
+    },
+    acted: [input.action],
+    extra: next,
+  });
+  return next;
+}
+
+/** Persist a Virtuals ACP assessment in its own Sibyl tenant. */
+export async function rememberVirtualsEvaluation(input: {
+  url: string;
+  jobId: string;
+  verdict: string;
+  decision: string;
+  confidence: number;
+  action: "evaluate" | "veto" | "error";
+}): Promise<SourceMemory> {
+  const { host } = sourceKeyFromUrl(input.url);
+  const previous = await loadSource(TENANTS.virtuals, input.url);
+  const next = recordSourceVerdict(previous, host, {
+    claimId: Number.isSafeInteger(Number(input.jobId)) ? Number(input.jobId) : 0,
+    verdict: input.verdict,
+    action: `acp-${input.action}`,
+    increment: {
+      evaluations: 1,
+      ...incrementsForVerdict(input.verdict),
+    },
+  });
+  await saveSource(TENANTS.virtuals, next);
+  await writeEvent(TENANTS.virtuals, {
+    evaluated: {
+      jobId: input.jobId,
+      host,
+      verdict: input.verdict,
+      decision: input.decision,
       confidence: input.confidence,
     },
     acted: [input.action],

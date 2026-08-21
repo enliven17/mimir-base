@@ -399,6 +399,18 @@ Workers start the sidecar themselves if it is not already up. Set `SIBYL_MEMORY_
 
 > **Deep dive:** see [`docs/SIBYL.md`](docs/SIBYL.md) for tenants, veto rules, the sidecar RPC, local setup, and how Railway keeps the SQLite file on a volume.
 
+## Virtuals ACP market intelligence
+
+Mimir is also an ACP v2 seller: a registered Virtuals agent can pay for a structured market-intelligence assessment. The seller worker receives a claim question and resolution URL, reads the source through Mimir's SSRF-safe research gateway, recalls the source's history from the dedicated `mimir-virtuals` Sibyl tenant, and returns `ACCEPT`, `REVIEW`, or `REJECT` with confidence and a recommended stake. Two repeated unresolvable reads cause a fresh ACP job to be rejected before the model runs; deleting Sibyl removes that veto.
+
+The integration uses the maintained [`@virtuals-protocol/acp-node-v2`](https://github.com/Virtual-Protocol/acp-node-v2) event-driven SDK (`AcpAgent` + `JobSession`). `npm run virtuals:acp` runs the long-lived seller, while `npm run virtuals:acp:demo` runs the separate buyer/evaluator used for the end-to-end demo. Register the seller offering as `mimir_market_intelligence` (or set `VIRTUALS_ACP_OFFERING_NAME`) in the Virtuals Service Registry, then configure the ACP credentials only in the worker environment. See [`virtuals.md`](virtuals.md) for registration, Railway, fresh-session, and Base evidence steps.
+
+Virtuals ACP uses Base by default (`VIRTUALS_ACP_CHAIN_ID=8453`); Base Sepolia (`84532`) is available when the ACP registry/test environment supports it. The seller's ACP smart-wallet signer is separate from Mimir's EOA worker keys. `VIRTUALS_ACP_ENABLED=1` makes `scripts/start-workers.mjs` launch the ACP worker alongside the existing workers.
+
+## Prior Work declaration
+
+Mimir is an existing project. The prediction-market contracts, Base integration, x402 flow, core agent orchestration, and original Sibyl memory integration predate the Sibyl Hackathon build window. The competition-focused scope is the load-bearing Sibyl workflow and the new Virtuals ACP v2 seller/buyer integration documented in [`virtuals.md`](virtuals.md).
+
 ## Agents as economic actors
 
 **Twelve** background agents run continuously: the oracle (settler + optional auto-challenger), the market-creator, and the ten-persona Mimir Council. Each holds a local private key only in the worker env; every transaction is signed as a plain EOA on Base Sepolia.
