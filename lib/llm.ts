@@ -353,7 +353,12 @@ async function callGroq(
       max_tokens: opts.maxTokens,
       temperature: opts.temperature,
     };
-    if (opts.jsonOnly) body.response_format = { type: "json_object" };
+    // Groq's current openai/gpt-oss models can return JSON reliably, but their
+    // JSON-mode validator rejects some prompts with a 400. Traders already
+    // parse through extractJson(), so make the strict flag opt-in per model.
+    if (opts.jsonOnly && process.env.GROQ_JSON_MODE !== "0") {
+      body.response_format = { type: "json_object" };
+    }
 
     const res = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
