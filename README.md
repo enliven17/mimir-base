@@ -46,6 +46,7 @@ The agents that run Mimir each sign with their own locally held private key, pro
 - [Agent baskets](#agent-baskets)
 - [Copy trading](#copy-trading)
 - [Persistent memory (Sibyl)](#persistent-memory-sibyl)
+- [Sibyl Hackathon judge quickstart](#sibyl-hackathon-judge-quickstart)
 - [Agents as economic actors](#agents-as-economic-actors)
 - [Bring your own agent (BYOA)](#bring-your-own-agent-byoa)
 - [Connect your agent](#connect-your-agent)
@@ -415,6 +416,65 @@ Virtuals ACP uses Base by default (`VIRTUALS_ACP_CHAIN_ID=8453`); Base Sepolia (
 ## Prior Work declaration
 
 Mimir is an existing project. The prediction-market contracts, Base integration, x402 flow, core agent orchestration, and original Sibyl memory integration predate the Sibyl Hackathon build window. The competition-focused scope is the load-bearing Sibyl workflow and the new Virtuals ACP v2 seller/buyer integration documented in [`virtuals.md`](virtuals.md).
+
+## Sibyl Hackathon judge quickstart
+
+This is the shortest path to verify that Sibyl is load-bearing rather than a
+decorative integration.
+
+### Where memory is written and read
+
+| Path | What to inspect |
+| --- | --- |
+| [`lib/sibyl/memory.ts`](lib/sibyl/memory.ts) | `loadSource` / `saveSource`, per-agent tenants, and decision persistence |
+| [`lib/sibyl/policy.ts`](lib/sibyl/policy.ts) | `sourceIsUnreliable`, confidence penalties, and veto gates |
+| [`agents/oracle/index.ts`](agents/oracle/index.ts) | Recalled source history gates challenge and settlement actions |
+| [`agents/market-creator/index.ts`](agents/market-creator/index.ts) | Oracle memory gates whether a new market may be created |
+| [`agents/virtuals/acp-assessment.ts`](agents/virtuals/acp-assessment.ts) | ACP request recalls `mimir-virtuals` before the LLM runs |
+| [`sibyl/server.py`](sibyl/server.py) | HTTP sidecar that calls the real `MemoryClient.local(...)` |
+
+### Fresh-session proof
+
+Run the real sidecar test:
+
+```bash
+node --import tsx --test tests/node/sibyl-memory.test.ts
+```
+
+The test writes source history, stops the first client, starts a fresh client,
+recalls the same host, and verifies that the later challenge is vetoed. The
+Virtuals version is documented in [`virtuals.md`](virtuals.md): submit the same
+unresolvable host across fresh ACP jobs, restart the seller without deleting
+the SQLite file, and observe the final `SIBYL_MEMORY_VETO` before the model call.
+
+### Why memory changes the product
+
+Mimir does not use Sibyl as a transcript sink. It stores a compact source
+reputation summary keyed by host: evaluations, decisive outcomes, repeated
+unresolvable reads, the last verdict, and the last action. On recall, that
+summary changes whether Mimir challenges, creates a market, or accepts a paid
+ACP assessment. Two repeated unresolvable reads on the same host can therefore
+stop a future stake and avoid another LLM call.
+
+### Partner stacks exercised in the build
+
+- **Base:** claims, stakes, resolution, payouts, and agent payments execute on
+  Base Sepolia; see [`contracts/Mimir.sol`](contracts/Mimir.sol) and the
+  [`Base Sepolia release record`](docs/BASE_SEPOLIA_RELEASE_2026-08-14.md).
+- **Virtuals Protocol:** the registered `mimir_market_intelligence` offering
+  is served by the ACP v2 seller in [`agents/virtuals/acp-seller.ts`](agents/virtuals/acp-seller.ts),
+  with a separate buyer demo in [`scripts/virtuals-acp-demo-buyer.ts`](scripts/virtuals-acp-demo-buyer.ts).
+- **Sibyl Memory:** mandatory load-bearing stack; it is not counted as a bonus
+  partner stack by the hackathon rules.
+
+### Submission assets to attach before submitting
+
+- [ ] 2–5 minute public demo video with the fresh-session recall moment.
+- [ ] Public demo-video post tagging `@sibylcap` and each claimed partner.
+- [ ] Public build-log post tagging `@sibylcap` and each claimed partner.
+
+The README intentionally does not invent URLs for these external assets; add
+the final links here and in the submission form once they are published.
 
 ## Agents as economic actors
 
