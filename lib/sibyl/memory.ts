@@ -6,6 +6,7 @@ import {
   SibylUnavailableError,
   writeEvent,
 } from "./client";
+import { archiveSibylMemoryEvent, archiveSibylMemorySnapshot } from "../db";
 import {
   applyChallengeMemory,
   applyCreateMemory,
@@ -20,7 +21,6 @@ import {
   type SourceMemory,
 } from "./policy";
 import { SOURCE_CATEGORY, sourceKeyFromUrl, TENANTS } from "./source-key";
-import { archiveSibylMemoryEvent } from "../db";
 
 export { TENANTS, sourceKeyFromUrl };
 export type { MemoryGate, PersonaSourceMemory, SourceMemory };
@@ -36,6 +36,51 @@ export {
 const EVENT_LOG_ENABLED = process.env.SIBYL_EVENT_LOG !== "0";
 let sibylEventWarningLogged = false;
 let neonArchiveWarningLogged = false;
+let sibylCapacityWarningLogged = false;
+
+function isSibylCapacityError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return message.includes("5 MB free-tier cap") || message.includes("free-tier cap");
+}
+
+async function archiveSnapshotBestEffort(
+  tenant: string,
+  name: string,
+  body: unknown,
+): Promise<void> {
+  try {
+    await archiveSibylMemorySnapshot({
+      tenant,
+      category: SOURCE_CATEGORY,
+      name,
+      body,
+    });
+  } catch (err) {
+    if (!neonArchiveWarningLogged) {
+      neonArchiveWarningLogged = true;
+      console.warn("[sibyl] Neon snapshot archive unavailable; continuing with Sibyl:", err instanceof Error ? err.message : err);
+    }
+  }
+}
+
+async function saveEntityWithCapacityFallback(
+  tenant: string,
+  name: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await setEntity(tenant, SOURCE_CATEGORY, name, body);
+  } catch (err) {
+    if (!isSibylCapacityError(err)) throw err;
+    // The existing COLD journal may already have filled the free tier. Keep the
+    // last known-good WARM summary (it is safer than replacing it with nothing)
+    // and rely on Neon snapshots until the operator activates/compacts Sibyl.
+    if (!sibylCapacityWarningLogged) {
+      sibylCapacityWarningLogged = true;
+      console.warn("[sibyl] free-tier cap reached; keeping the last source summary and Neon snapshots");
+    }
+  }
+}
 
 async function persistEvent(
   tenant: string,
@@ -83,7 +128,8 @@ export async function loadSource(tenant: string, url: string): Promise<SourceMem
 
 export async function saveSource(tenant: string, memory: SourceMemory): Promise<void> {
   const { key } = sourceKeyFromUrl(memory.host);
-  await setEntity(tenant, SOURCE_CATEGORY, key, { ...memory });
+  await archiveSnapshotBestEffort(tenant, key, memory);
+  await saveEntityWithCapacityFallback(tenant, key, { ...memory });
 }
 
 export async function loadPersonaSource(
@@ -100,7 +146,8 @@ export async function savePersonaSource(
   memory: PersonaSourceMemory,
 ): Promise<void> {
   const { key } = sourceKeyFromUrl(memory.host);
-  await setEntity(tenant, SOURCE_CATEGORY, key, { ...memory });
+  await archiveSnapshotBestEffort(tenant, key, memory);
+  await saveEntityWithCapacityFallback(tenant, key, { ...memory });
 }
 
 export async function rememberOracleEvaluation(input: {

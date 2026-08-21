@@ -256,6 +256,15 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   )` },
   { sql: "CREATE INDEX IF NOT EXISTS idx_sibyl_memory_events_tenant_time ON sibyl_memory_events(tenant_id, created_at DESC)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_sibyl_memory_events_host_time ON sibyl_memory_events(source_host, created_at DESC)" },
+  { sql: `CREATE TABLE IF NOT EXISTS sibyl_memory_snapshots (
+    snapshot_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    category TEXT NOT NULL,
+    entity_name TEXT NOT NULL,
+    body_json TEXT NOT NULL DEFAULT '{}',
+    created_at BIGINT NOT NULL
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_sibyl_memory_snapshots_entity ON sibyl_memory_snapshots(tenant_id, category, entity_name, created_at DESC)" },
   { sql: `CREATE TABLE IF NOT EXISTS agent_registry (
     agent_id TEXT PRIMARY KEY,
     schema_version SMALLINT NOT NULL,
@@ -2450,6 +2459,30 @@ export async function archiveSibylMemoryEvent(input: SibylMemoryEventInput): Pro
   });
 }
 
+export async function archiveSibylMemorySnapshot(input: {
+  tenant: string;
+  category: string;
+  name: string;
+  body: unknown;
+  createdAt?: number;
+}): Promise<void> {
+  if (!sibylNeonArchiveEnabled()) return;
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO sibyl_memory_snapshots (
+      snapshot_id, tenant_id, category, entity_name, body_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?)`,
+    args: [
+      randomUUID(),
+      input.tenant,
+      input.category,
+      input.name,
+      boundedJson(input.body),
+      input.createdAt ?? Date.now(),
+    ],
+  });
+}
+
 /**
  * Explicit, bounded retention for the Neon archive. It is intentionally not
  * called from decision paths; operators choose the retention window first.
@@ -2479,5 +2512,20 @@ export async function pruneSibylMemoryEvents(args: {
     RETURNING e.event_id`,
     args: [args.olderThanMs, limit],
   });
-  return result.rows.length;
+  const remaining = Math.max(0, limit - result.rows.length);
+  if (remaining === 0) return result.rows.length;
+  const snapshots = await execute(pool, {
+    sql: `WITH doomed AS (
+      SELECT snapshot_id FROM sibyl_memory_snapshots
+      WHERE created_at < ?
+      ORDER BY created_at ASC, snapshot_id ASC
+      LIMIT ?
+    )
+    DELETE FROM sibyl_memory_snapshots s
+    USING doomed d
+    WHERE s.snapshot_id = d.snapshot_id
+    RETURNING s.snapshot_id`,
+    args: [args.olderThanMs, remaining],
+  });
+  return result.rows.length + snapshots.rows.length;
 }

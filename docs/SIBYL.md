@@ -221,8 +221,9 @@ Without the volume, every redeploy wipes the SQLite file and the load-bearing ga
 ### Two-tier retention
 
 Sibyl remains the load-bearing hot memory: the source entity keeps compact counters,
-last verdict, and veto-relevant history. Detailed decision payloads are copied to the
-`sibyl_memory_events` table in Neon when `SIBYL_NEON_ARCHIVE=1`. Railway keeps
+last verdict, and veto-relevant history. Detailed decision payloads and source snapshots
+are copied to the `sibyl_memory_events` and `sibyl_memory_snapshots` tables in Neon when
+`SIBYL_NEON_ARCHIVE=1`. Railway keeps
 `SIBYL_EVENT_LOG=0`, so the append-only Sibyl journal does not consume the 5 MB free
 tier while the entity summary remains available to every worker.
 
@@ -233,7 +234,7 @@ Neon retention is deliberately explicit and bounded. Set both
 npm run sibyl:retention
 ```
 
-This removes only old Neon archive rows, in batches of at most
+This removes only old Neon event/snapshot archive rows, in batches of at most
 `SIBYL_NEON_RETENTION_BATCH`. It never deletes the active Sibyl source summaries.
 
 ---

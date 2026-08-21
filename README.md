@@ -387,7 +387,8 @@ The gate is deterministic: given the same permission, signal and usage, it alway
 Agent decisions are load-bearing on [Sibyl Memory](https://github.com/Sibyl-Labs/Sibyl-Memory), the local SQLite memory SDK. There is no in-process stand-in: workers talk to `sibyl/server.py`, which only calls `sibyl_memory_client.MemoryClient`.
 
 Sibyl keeps the compact source summary used by veto gates. When `SIBYL_NEON_ARCHIVE=1`,
-the detailed decision payload is also copied to Neon’s `sibyl_memory_events` archive;
+the detailed decision payload and source snapshots are also copied to Neon’s
+`sibyl_memory_events` / `sibyl_memory_snapshots` archive;
 this is best-effort and does not replace Sibyl as the gate’s source of truth.
 
 - Oracle and council **recall a resolution source before they stake**. Two or more unresolvable reads on a host veto a later challenge in a fresh process.
