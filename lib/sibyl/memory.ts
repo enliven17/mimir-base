@@ -20,6 +20,7 @@ import {
   type SourceMemory,
 } from "./policy";
 import { SOURCE_CATEGORY, sourceKeyFromUrl, TENANTS } from "./source-key";
+import { archiveSibylMemoryEvent } from "../db";
 
 export { TENANTS, sourceKeyFromUrl };
 export type { MemoryGate, PersonaSourceMemory, SourceMemory };
@@ -33,13 +34,36 @@ export {
 } from "./policy";
 
 const EVENT_LOG_ENABLED = process.env.SIBYL_EVENT_LOG !== "0";
+let sibylEventWarningLogged = false;
+let neonArchiveWarningLogged = false;
 
 async function persistEvent(
   tenant: string,
   event: { evaluated?: unknown; acted?: unknown; extra?: unknown },
 ): Promise<void> {
-  if (!EVENT_LOG_ENABLED) return;
-  await writeEvent(tenant, event);
+  let eventId: string | undefined;
+  if (EVENT_LOG_ENABLED) {
+    try {
+      eventId = await writeEvent(tenant, event);
+    } catch (err) {
+      // Event history is optional. A full/temporarily unavailable COLD tier
+      // must not block the load-bearing entity summary or an agent decision.
+      if (!sibylEventWarningLogged) {
+        sibylEventWarningLogged = true;
+        console.warn("[sibyl] event history unavailable; continuing with entity memory:", err instanceof Error ? err.message : err);
+      }
+    }
+  }
+
+  try {
+    await archiveSibylMemoryEvent({ eventId, tenant, ...event });
+  } catch (err) {
+    // Neon is the detailed archive, never the source of truth for the gate.
+    if (!neonArchiveWarningLogged) {
+      neonArchiveWarningLogged = true;
+      console.warn("[sibyl] Neon archive unavailable; continuing with Sibyl entity memory:", err instanceof Error ? err.message : err);
+    }
+  }
 }
 
 export async function requireSibyl(): Promise<void> {

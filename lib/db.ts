@@ -1,4 +1,5 @@
 import { Pool, neonConfig, type PoolConfig } from "@neondatabase/serverless";
+import { randomUUID } from "node:crypto";
 import ws from "ws";
 
 import type { ChallengeOpportunity } from "@/lib/claimDrafts";
@@ -239,6 +240,22 @@ const SCHEMA_STATEMENTS: SqlStatement[] = [
   { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_agent ON agent_reasoning_events(agent_id)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_track ON agent_reasoning_events(track)" },
   { sql: "CREATE INDEX IF NOT EXISTS idx_reasoning_visibility ON agent_reasoning_events(visibility)" },
+  // Detailed Sibyl history lives in Neon. Sibyl keeps the compact, load-bearing
+  // source entity; this table is the replayable archive for analytics/debugging.
+  { sql: `CREATE TABLE IF NOT EXISTS sibyl_memory_events (
+    event_id TEXT PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    source_host TEXT,
+    claim_id BIGINT,
+    job_id TEXT,
+    verdict TEXT,
+    action TEXT,
+    confidence INTEGER,
+    payload_json TEXT NOT NULL DEFAULT '{}',
+    created_at BIGINT NOT NULL
+  )` },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_sibyl_memory_events_tenant_time ON sibyl_memory_events(tenant_id, created_at DESC)" },
+  { sql: "CREATE INDEX IF NOT EXISTS idx_sibyl_memory_events_host_time ON sibyl_memory_events(source_host, created_at DESC)" },
   { sql: `CREATE TABLE IF NOT EXISTS agent_registry (
     agent_id TEXT PRIMARY KEY,
     schema_version SMALLINT NOT NULL,
@@ -2366,4 +2383,101 @@ export async function listBasketSubscriptions(subscriber: string): Promise<strin
     args: [subscriber.toLowerCase()],
   });
   return result.rows.map((row) => getString((row as Record<string, unknown>).basket_id));
+}
+
+export interface SibylMemoryEventInput {
+  eventId?: string;
+  tenant: string;
+  evaluated?: unknown;
+  acted?: unknown;
+  extra?: unknown;
+  createdAt?: number;
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {};
+}
+
+function boundedJson(value: unknown, maxChars = 24_000): string {
+  const full = JSON.stringify(value ?? {});
+  if (full.length <= maxChars) return full;
+
+  const event = asRecord(value);
+  const compact = {
+    evaluated: asRecord(event.evaluated),
+    acted: Array.isArray(event.acted) ? event.acted.slice(0, 8) : event.acted,
+    extra: "[omitted: payload exceeded archive limit]",
+  };
+  const compactJson = JSON.stringify(compact);
+  return compactJson.length <= maxChars ? compactJson : JSON.stringify({ truncated: true });
+}
+
+function sibylNeonArchiveEnabled(): boolean {
+  return process.env.SIBYL_NEON_ARCHIVE === "1" && isDbConfigured();
+}
+
+/**
+ * Store the detailed event in Neon without making Neon a prerequisite for the
+ * Sibyl gate. The active Sibyl entity remains the compact source summary.
+ */
+export async function archiveSibylMemoryEvent(input: SibylMemoryEventInput): Promise<void> {
+  if (!sibylNeonArchiveEnabled()) return;
+  const evaluated = asRecord(input.evaluated);
+  const acted = Array.isArray(input.acted) ? input.acted : [];
+  const claimId = Number(evaluated.claimId);
+  const confidence = Number(evaluated.confidence);
+  const pool = await getDb();
+  await execute(pool, {
+    sql: `INSERT INTO sibyl_memory_events (
+      event_id, tenant_id, source_host, claim_id, job_id, verdict, action,
+      confidence, payload_json, created_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ON CONFLICT(event_id) DO NOTHING`,
+    args: [
+      input.eventId ?? randomUUID(),
+      input.tenant,
+      typeof evaluated.host === "string" ? evaluated.host : null,
+      Number.isSafeInteger(claimId) ? claimId : null,
+      typeof evaluated.jobId === "string" ? evaluated.jobId : null,
+      typeof evaluated.verdict === "string" ? evaluated.verdict : null,
+      acted.length > 0 && typeof acted[0] === "string" ? acted[0] : null,
+      Number.isFinite(confidence) ? Math.max(0, Math.min(100, Math.round(confidence))) : null,
+      boundedJson({ evaluated: input.evaluated, acted: input.acted, extra: input.extra }),
+      input.createdAt ?? Date.now(),
+    ],
+  });
+}
+
+/**
+ * Explicit, bounded retention for the Neon archive. It is intentionally not
+ * called from decision paths; operators choose the retention window first.
+ */
+export async function pruneSibylMemoryEvents(args: {
+  olderThanMs: number;
+  limit?: number;
+}): Promise<number> {
+  if (!sibylNeonArchiveEnabled()) return 0;
+  if (!Number.isFinite(args.olderThanMs) || args.olderThanMs <= 0) {
+    throw new Error("olderThanMs must be a positive finite number");
+  }
+  const limit = Number.isFinite(args.limit) && (args.limit ?? 0) > 0
+    ? Math.min(Math.floor(args.limit as number), 5000)
+    : 1000;
+  const pool = await getDb();
+  const result = await execute(pool, {
+    sql: `WITH doomed AS (
+      SELECT event_id FROM sibyl_memory_events
+      WHERE created_at < ?
+      ORDER BY created_at ASC, event_id ASC
+      LIMIT ?
+    )
+    DELETE FROM sibyl_memory_events e
+    USING doomed d
+    WHERE e.event_id = d.event_id
+    RETURNING e.event_id`,
+    args: [args.olderThanMs, limit],
+  });
+  return result.rows.length;
 }

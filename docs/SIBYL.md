@@ -30,7 +30,10 @@ Without memory, every poll cycle is amnesia. The oracle can keep staking into a 
 
 Sibyl is the file that survives process death. A fresh worker boots, recalls the host, and **does something different** — refuse the stake, skip the market, skip the LLM call.
 
-Neon Postgres is not this. Neon is a read-index of on-chain claims. Contract state is the source of truth for money. Sibyl is the source of truth for *what this agent has already learned about a source*.
+Neon Postgres is not this. Neon remains a read-index of on-chain claims and now also
+holds an optional detailed archive of Sibyl decisions. Contract state is the source
+of truth for money. Sibyl is the source of truth for *what this agent has already
+learned about a source*.
 
 ---
 
@@ -210,7 +213,28 @@ Without the volume, every redeploy wipes the SQLite file and the load-bearing ga
 | `SIBYL_START_WAIT_MS` | `12000` / `25000` on Railway | How long to wait for `/health` |
 | `SIBYL_VENV` | next to the DB file, `venv/` | Railway venv path |
 | `SIBYL_EVENT_LOG` | on locally, off on Railway | Optional append-only event history; entity memory remains enabled |
+| `SIBYL_NEON_ARCHIVE` | off locally, on Railway | Copies detailed decision events to the existing Neon archive; failures are best-effort |
+| `SIBYL_NEON_RETENTION_DAYS` | unset | Required by the explicit Neon retention command; unset means no deletion |
+| `SIBYL_NEON_RETENTION_BATCH` | `1000` | Maximum Neon archive rows removed by one retention run |
 | `PYTHON` | `python3` | Interpreter used to spawn the sidecar |
+
+### Two-tier retention
+
+Sibyl remains the load-bearing hot memory: the source entity keeps compact counters,
+last verdict, and veto-relevant history. Detailed decision payloads are copied to the
+`sibyl_memory_events` table in Neon when `SIBYL_NEON_ARCHIVE=1`. Railway keeps
+`SIBYL_EVENT_LOG=0`, so the append-only Sibyl journal does not consume the 5 MB free
+tier while the entity summary remains available to every worker.
+
+Neon retention is deliberately explicit and bounded. Set both
+`SIBYL_NEON_ARCHIVE=1` and `SIBYL_NEON_RETENTION_DAYS`, then run:
+
+```bash
+npm run sibyl:retention
+```
+
+This removes only old Neon archive rows, in batches of at most
+`SIBYL_NEON_RETENTION_BATCH`. It never deletes the active Sibyl source summaries.
 
 ---
 

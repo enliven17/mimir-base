@@ -386,6 +386,10 @@ The gate is deterministic: given the same permission, signal and usage, it alway
 
 Agent decisions are load-bearing on [Sibyl Memory](https://github.com/Sibyl-Labs/Sibyl-Memory), the local SQLite memory SDK. There is no in-process stand-in: workers talk to `sibyl/server.py`, which only calls `sibyl_memory_client.MemoryClient`.
 
+Sibyl keeps the compact source summary used by veto gates. When `SIBYL_NEON_ARCHIVE=1`,
+the detailed decision payload is also copied to Neon’s `sibyl_memory_events` archive;
+this is best-effort and does not replace Sibyl as the gate’s source of truth.
+
 - Oracle and council **recall a resolution source before they stake**. Two or more unresolvable reads on a host veto a later challenge in a fresh process.
 - Market-creator **will not open a market** on a host the oracle has already marked unreliable.
 - Delete the Sibyl database and those vetoes disappear — that is the eligibility test.
@@ -971,7 +975,7 @@ Every env var lives in `.env.example`. Quick reference:
 | `MIMIR_PAUSE_<CAPABILITY>`        | ops                      | `1` pauses one capability (`stake`, `create_market`, `copy_execution`, `x402_selling`, ...); `MIMIR_PAUSE_ALL=1` for all. Withdrawals are never pausable |
 | `MIMIR_DISABLE_CATEGORY_<ID>`     | ops                      | `1` stops new markets in one category without a deploy                              |
 | `SPEND_PERMISSION_SPENDER`        | agent API                | Mimir's spender address for BYOA spend permissions; unset means funded actions cannot be delegated |
-| `DATABASE_URL`                    | optional (Neon)          | Read-index cache. Pages that need it fail gracefully if absent                     |
+| `DATABASE_URL`                    | optional (Neon)          | Read-index cache plus optional Sibyl detail archive; pages/workers fail gracefully if absent |
 | `CRON_SECRET`                     | optional                 | Vercel cron shared secret                                                          |
 | `NEXT_PUBLIC_FEATURE_XMTP`        | optional                 | Toggle the XMTP inbox feature                                                      |
 
@@ -1007,6 +1011,9 @@ Every env var lives in `.env.example`. Quick reference:
 | `COUNCIL_DECISION_DELAY_MS`       | council (worker)         | Delay between persona decisions/stakes; default `30000`                            |
 | `COUNCIL_LLM_THROTTLE_MS`         | council (worker)         | Min ms between LLM calls (default 8000)                                             |
 | `SIBYL_EVENT_LOG`                 | workers                  | `0` keeps entity memory but disables duplicate append-only event writes             |
+| `SIBYL_NEON_ARCHIVE`              | workers                  | `1` archives detailed Sibyl decision events in Neon; failures never block decisions |
+| `SIBYL_NEON_RETENTION_DAYS`       | maintenance              | Retention window for the explicit `npm run sibyl:retention` command                 |
+| `SIBYL_NEON_RETENTION_BATCH`      | maintenance              | Max rows removed per retention run (default `1000`)                                 |
 | `COUNCIL_PEER_READS`              | council (worker)         | `1` lets personas buy other personas' reasoning over x402 before deciding          |
 | `COUNCIL_PEER_READS_PER_PERSONA`  | council (worker)         | Peer reads bought before each persona decision; default `2`                         |
 | `COUNCIL_PEER_READ_DELAY_MS`      | council (worker)         | Delay between peer-read nanopayments; default `15000`                               |
