@@ -35,13 +35,18 @@ export function requireAnyLLMKey(): void {
  * least `ms` apart, so a burst of claims doesn't trip free-tier RPM limits.
  */
 export function createThrottle(ms: number): () => Promise<void> {
-  let lastAt = 0;
+  let nextAllowedAt = 0;
+  let queue = Promise.resolve();
   return async () => {
-    if (ms > 0) {
-      const wait = ms - (Date.now() - lastAt);
+    // Queue concurrent callers too. A timestamp-only gate lets simultaneous
+    // calls pass together and defeats the RPM protection during bursts.
+    const turn = queue.then(async () => {
+      const wait = nextAllowedAt - Date.now();
       if (wait > 0) await new Promise((r) => setTimeout(r, wait));
-    }
-    lastAt = Date.now();
+      nextAllowedAt = Date.now() + Math.max(0, ms);
+    });
+    queue = turn.catch(() => undefined);
+    await turn;
   };
 }
 
@@ -53,5 +58,9 @@ export function createThrottle(ms: number): () => Promise<void> {
  */
 export function applyWorkerGeminiKey(envVar: string): void {
   const k = process.env[envVar]?.trim();
-  if (k) process.env.GEMINI_API_KEY = k;
+  if (k) {
+    process.env.GEMINI_API_KEY = k;
+    // Do not let a worker-scoped key fall back into the shared ring.
+    process.env.GEMINI_WORKER_SCOPED = "1";
+  }
 }

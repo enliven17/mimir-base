@@ -984,6 +984,10 @@ Every env var lives in `.env.example`. Quick reference:
 | `PASS_SECRET`                     | web server               | HMAC secret signing council subscription passes                                    |
 | LLM API keys                      | agents                   | At least one LLM API key; see `.env.example` for accepted variable names            |
 | `LLM_PROVIDER`                    | optional                 | Optional model routing override for worker-only deployments                        |
+| `GEMINI_DEFAULT_MODEL`            | optional                 | Current Gemini default: `gemini-3.5-flash-lite`                                  |
+| `GEMINI_MODELS`                   | optional                 | Comma-separated valid Gemini model pool for quota spreading                       |
+| `LLM_FALLBACK_PROVIDERS`          | optional                 | Restrict fallback providers; use `gemini` to avoid cross-provider quota storms    |
+| `LLM_QUOTA_COOLDOWN_MS`           | optional                 | Cooldown after a provider quota response; `Retry-After` is honored when present   |
 | `ORACLE_LLM_MODEL`                | optional                 | Optional model name override                                                       |
 | `ORACLE_LLM_THROTTLE_MS`          | oracle                   | Min delay between oracle LLM calls; default `8000`                                 |
 | `ORACLE_SETTLEMENT_DELAY_MS`      | oracle                   | Delay between multiple expired settlements in one poll; default `900000` (15 min)  |
@@ -1002,6 +1006,7 @@ Every env var lives in `.env.example`. Quick reference:
 | `COUNCIL_MAX_CLAIMS`              | council (worker)         | Max claims per cycle, deadline-sorted (default 1). Raise only with paid quota.     |
 | `COUNCIL_DECISION_DELAY_MS`       | council (worker)         | Delay between persona decisions/stakes; default `30000`                            |
 | `COUNCIL_LLM_THROTTLE_MS`         | council (worker)         | Min ms between LLM calls (default 8000)                                             |
+| `SIBYL_EVENT_LOG`                 | workers                  | `0` keeps entity memory but disables duplicate append-only event writes             |
 | `COUNCIL_PEER_READS`              | council (worker)         | `1` lets personas buy other personas' reasoning over x402 before deciding          |
 | `COUNCIL_PEER_READS_PER_PERSONA`  | council (worker)         | Peer reads bought before each persona decision; default `2`                         |
 | `COUNCIL_PEER_READ_DELAY_MS`      | council (worker)         | Delay between peer-read nanopayments; default `15000`                               |

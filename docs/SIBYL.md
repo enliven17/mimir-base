@@ -209,6 +209,7 @@ Without the volume, every redeploy wipes the SQLite file and the load-bearing ga
 | `SIBYL_REQUIRED` | on (`0` to disable) | If on, missing sidecar is fatal at worker boot; challenge/create/stake refuse |
 | `SIBYL_START_WAIT_MS` | `12000` / `25000` on Railway | How long to wait for `/health` |
 | `SIBYL_VENV` | next to the DB file, `venv/` | Railway venv path |
+| `SIBYL_EVENT_LOG` | on locally, off on Railway | Optional append-only event history; entity memory remains enabled |
 | `PYTHON` | `python3` | Interpreter used to spawn the sidecar |
 
 ---

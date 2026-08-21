@@ -46,7 +46,7 @@ const LOCAL_BLOCK_PATTERNS: Array<{
 ];
 
 const DEFAULT_GEMINI_MODEL =
-  process.env.CLAIM_MODERATION_MODEL || "gemini-2.5-flash";
+  process.env.CLAIM_MODERATION_MODEL || "gemini-3.5-flash-lite";
 
 export type ClaimModerationInput = {
   question: string;
@@ -158,7 +158,7 @@ async function callGemini(prompt: string) {
           temperature: 0,
           maxOutputTokens: 800,
           responseMimeType: "application/json",
-          responseJsonSchema: getModerationSchema(),
+          responseSchema: getModerationSchema(),
         },
       }),
       signal: AbortSignal.timeout(20000),
@@ -267,4 +267,3 @@ export async function moderateClaim(args: {
   const raw = await callGemini(prompt);
   return sanitizeModerationResult({ raw, policyVersion, locale });
 }
-

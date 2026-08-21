@@ -35,7 +35,8 @@ export interface CallLLMOptions {
   model?: string;
 }
 
-const DEFAULT_GEMINI_MODEL = process.env.ORACLE_LLM_MODEL || "gemini-2.5-flash";
+const DEFAULT_GEMINI_MODEL =
+  process.env.GEMINI_DEFAULT_MODEL || process.env.ORACLE_LLM_MODEL || "gemini-3.5-flash-lite";
 
 /**
  * Gemini model pool for load-spreading. Free-tier limits are per-model, so
@@ -117,6 +118,7 @@ let openrouterCooldownUntil = 0;
 const groqCooldownByKey = new Map<string, number>();
 // Keyed by `${keyFingerprint}|${model}` — rate limits are per project (key) per model.
 const geminiCooldownByCombo = new Map<string, number>();
+const geminiUnavailableModels = new Set<string>();
 
 function cooldownRemaining(until: number): number {
   const remaining = until - Date.now();
@@ -129,9 +131,10 @@ function keyFingerprint(key: string): string {
 
 /** Primary Gemini key (possibly per-agent overridden) plus backup keys from GEMINI_API_KEYS. */
 function geminiKeyList(): string[] {
+  const workerScoped = process.env.GEMINI_WORKER_SCOPED === "1";
   const raw = [
     process.env.GEMINI_API_KEY,
-    ...(process.env.GEMINI_API_KEYS ?? "").split(/[,\s]+/),
+    ...(workerScoped ? [] : (process.env.GEMINI_API_KEYS ?? "").split(/[,\s]+/)),
   ];
   const keys: string[] = [];
   const seen = new Set<string>();
@@ -198,8 +201,24 @@ function groqKeyFingerprint(key: string): string {
   return `...${key.slice(-6)}`;
 }
 
-function tripGeminiCooldown(key: string, model: string): void {
-  geminiCooldownByCombo.set(`${keyFingerprint(key)}|${model}`, Date.now() + GEMINI_QUOTA_COOLDOWN_MS);
+function retryAfterMs(res: Response, body: string): number {
+  const header = res.headers.get("retry-after");
+  const headerSeconds = header ? Number(header) : NaN;
+  const bodySeconds = Number(
+    body.match(/(?:retryDelay|retry in)[^0-9]*(\d+(?:\.\d+)?)\s*s/i)?.[1] ?? NaN,
+  );
+  const seconds = Number.isFinite(headerSeconds)
+    ? headerSeconds
+    : Number.isFinite(bodySeconds)
+    ? bodySeconds
+    : NaN;
+  return Number.isFinite(seconds) && seconds > 0
+    ? Math.ceil(seconds * 1000)
+    : GEMINI_QUOTA_COOLDOWN_MS;
+}
+
+function tripGeminiCooldown(key: string, model: string, cooldownMs = GEMINI_QUOTA_COOLDOWN_MS): void {
+  geminiCooldownByCombo.set(`${keyFingerprint(key)}|${model}`, Date.now() + cooldownMs);
 }
 
 function tripOpenRouterCooldown(): void {
@@ -221,6 +240,17 @@ function providerCooldown(provider: LLMProvider): number {
 }
 
 function fallbackProviders(primary: LLMProvider): LLMProvider[] {
+  const configured = (process.env.LLM_FALLBACK_PROVIDERS ?? "")
+    .split(/[,\s]+/)
+    .map((value) => value.trim().toLowerCase())
+    .filter((value): value is LLMProvider =>
+      value === "gemini" || value === "anthropic" || value === "groq" || value === "openrouter",
+    );
+  if (configured.length > 0) {
+    return [primary, ...configured].filter((provider, index, all) =>
+      all.indexOf(provider) === index && hasProviderKey(provider),
+    );
+  }
   const preferred: LLMProvider[] = primary === "openrouter"
     ? [primary, "groq", "anthropic", "gemini"]
     : [primary, "groq", "anthropic", "gemini", "openrouter"];
@@ -427,6 +457,7 @@ async function callGemini(
 
   let lastError: unknown = null;
   for (const model of models) {
+    if (geminiUnavailableModels.has(model)) continue;
     for (const key of keys) {
       if (geminiComboCooldown(key, model) > 0) {
         lastError = new Error(`${model}@${keyFingerprint(key)} cooldown`);
@@ -496,9 +527,14 @@ async function callGeminiModel(
     if (res.ok) break;
 
     lastBody = (await res.text()).slice(0, 500);
+    if (res.status === 404) {
+      geminiUnavailableModels.add(model);
+      throw new Error(`Gemini ${model} 404: model unavailable`);
+    }
     if (res.status === 429) {
-      tripGeminiCooldown(apiKey, model);
-      console.warn(`[llm] Gemini ${model}@${keyFingerprint(apiKey)} 429 - ${Math.round(GEMINI_QUOTA_COOLDOWN_MS / 1000)}s cooldown`);
+      const cooldownMs = retryAfterMs(res, lastBody);
+      tripGeminiCooldown(apiKey, model, cooldownMs);
+      console.warn(`[llm] Gemini ${model}@${keyFingerprint(apiKey)} 429 - ${Math.round(cooldownMs / 1000)}s cooldown`);
       throw new Error(`Gemini ${model} 429: ${lastBody}`);
     }
     if (!transient.has(res.status) || attempt === maxAttempts) {

@@ -32,6 +32,16 @@ export {
   sourceIsUnreliable,
 } from "./policy";
 
+const EVENT_LOG_ENABLED = process.env.SIBYL_EVENT_LOG !== "0";
+
+async function persistEvent(
+  tenant: string,
+  event: { evaluated?: unknown; acted?: unknown; extra?: unknown },
+): Promise<void> {
+  if (!EVENT_LOG_ENABLED) return;
+  await writeEvent(tenant, event);
+}
+
 export async function requireSibyl(): Promise<void> {
   try {
     await ensureSibyl();
@@ -91,7 +101,7 @@ export async function rememberOracleEvaluation(input: {
     },
   });
   await saveSource(TENANTS.oracle, next);
-  await writeEvent(TENANTS.oracle, {
+  await persistEvent(TENANTS.oracle, {
     evaluated: {
       claimId: input.claimId,
       host,
@@ -125,7 +135,7 @@ export async function rememberVirtualsEvaluation(input: {
     },
   });
   await saveSource(TENANTS.virtuals, next);
-  await writeEvent(TENANTS.virtuals, {
+  await persistEvent(TENANTS.virtuals, {
     evaluated: {
       jobId: input.jobId,
       host,
@@ -168,7 +178,7 @@ export async function rememberCreate(input: {
   allowed: boolean;
 }): Promise<void> {
   const { host } = sourceKeyFromUrl(input.url);
-  await writeEvent(TENANTS.creator, {
+  await persistEvent(TENANTS.creator, {
     evaluated: { host, question: input.question },
     acted: [input.allowed ? "create" : "skip-create"],
   });
@@ -218,7 +228,7 @@ export async function rememberPersonaDecision(input: {
     staked: input.staked,
   });
   await savePersonaSource(tenant, next);
-  await writeEvent(tenant, {
+  await persistEvent(tenant, {
     evaluated: { claimId: input.claimId, host, verdict: input.verdict ?? null },
     acted: [input.staked ? "stake" : "abstain"],
     extra: next,
@@ -262,7 +272,7 @@ export async function rememberTraderDecision(input: {
     staked: input.staked,
   });
   await savePersonaSource(tenant, next);
-  await writeEvent(tenant, {
+  await persistEvent(tenant, {
     evaluated: { claimId: input.claimId, host, verdict: input.verdict ?? null },
     acted: [input.staked ? "stake" : "abstain"],
     extra: next,
