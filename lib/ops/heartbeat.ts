@@ -39,6 +39,20 @@ function windowKey(dependency: TrackedDependency): string {
   return `failures:${dependency}`;
 }
 
+const started = new Set<MonitoredWorker>();
+
+/** True the first time it sees a worker, false forever after. */
+export function markStarted(worker: MonitoredWorker): boolean {
+  if (started.has(worker)) return false;
+  started.add(worker);
+  return true;
+}
+
+/** Test seam — the module-level set outlives a single test otherwise. */
+export function resetStarted(): void {
+  started.clear();
+}
+
 /**
  * Record a heartbeat. `error` marks the worker as alive but failing, which a
  * staleness check alone would report as healthy.
@@ -80,6 +94,13 @@ export async function reportingPoll(
   intervalSec: number,
   poll: () => Promise<unknown>,
 ): Promise<void> {
+  // A restarted worker beats once before its first cycle. Otherwise a cycle
+  // that legitimately runs for minutes — council walks ten personas, the market
+  // creator buys a preflight per candidate — leaves the pre-restart heartbeat
+  // standing, and the evaluator reads a working worker as hours dead. The
+  // "dead worker is loud" invariant survives: a worker that hangs after this
+  // beat still goes stale on schedule.
+  if (markStarted(worker)) await beat(worker, { intervalSec });
   try {
     await poll();
     await beat(worker, { intervalSec });

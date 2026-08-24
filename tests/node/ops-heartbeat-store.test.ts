@@ -3,7 +3,9 @@ import test from "node:test";
 
 import {
   FAILURE_WINDOW_MS,
+  markStarted,
   parseWindow,
+  resetStarted,
   windowToFailureWindow,
 } from "../../lib/ops/heartbeat";
 
@@ -49,4 +51,14 @@ test("the window rolls over hourly", () => {
   // Long enough that a ratio means something, short enough that one bad hour does
   // not poison the signal for a day.
   assert.equal(FAILURE_WINDOW_MS, 3_600_000);
+});
+
+test("a worker beats once at startup, then only on cycle completion", () => {
+  // Guards the restart window: without the first-call beat a long first cycle
+  // leaves the pre-restart heartbeat standing and health reads a live worker
+  // as dead.
+  resetStarted();
+  assert.equal(markStarted("council"), true);
+  assert.equal(markStarted("council"), false);
+  assert.equal(markStarted("oracle"), true);
 });
