@@ -30,7 +30,7 @@
     "agents:balances": "tsx --env-file-if-exists=.env.local scripts/check-agent-balances.ts",
     "sibyl": "python sibyl/server.py",
     "sibyl:retention": "tsx --env-file-if-exists=.env.local scripts/sibyl-retention.ts",
-    "workers": "concurrently --names oracle,creator,council,sync,traders --kill-others-on-fail -c blue,magenta,green,cyan,yellow \"npm:oracle\" \"npm:market-creator\" \"npm:council\" \"npm:sync\" \"npm:traders\"",
+    "workers": "tsx --env-file-if-exists=.env.local agents/all.ts",
     "workers:start": "node scripts/start-workers.mjs",
     "demo:cycle": "tsx --env-file-if-exists=.env.local scripts/demo-full-cycle.ts",
     "seed": "npx tsx scripts/seed-claims.ts",
