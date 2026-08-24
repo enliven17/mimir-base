@@ -116,6 +116,17 @@ const python = ensureClient();
 process.env.PYTHON = python;
 console.log(`[sibyl] starting sidecar with ${python} db=${dbPath}`);
 
+// Railway stops a deployment with SIGTERM. Exiting non-zero on that path is
+// what mailed "deployment crashed" after every redeploy, so a deliberate stop
+// exits 0 and only an unasked-for child death stays a failure.
+//
+// The signal goes to the whole process group, so a child can report its exit
+// before this process runs its own handler — hence checking the child's signal
+// too rather than trusting the flag alone.
+let shuttingDown = false;
+const stoppedOnPurpose = (signal) =>
+  shuttingDown || signal === "SIGTERM" || signal === "SIGINT";
+
 const sidecar = spawn(
   python,
   ["sibyl/server.py"],
@@ -130,6 +141,7 @@ const sidecar = spawn(
   },
 );
 sidecar.on("exit", (code, signal) => {
+  if (stoppedOnPurpose(signal)) process.exit(0);
   console.error(`[sibyl] sidecar exited code=${code} signal=${signal ?? ""}`);
   process.exit(code ?? 1);
 });
@@ -155,12 +167,13 @@ const workers = spawn(
 if (process.env.VIRTUALS_ACP_ENABLED === "1") console.log("[virtuals-acp] worker enabled");
 
 const shutdown = (signal) => {
+  shuttingDown = true;
   workers.kill(signal);
   sidecar.kill(signal);
 };
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT", () => shutdown("SIGINT"));
-workers.on("exit", (code) => {
+workers.on("exit", (code, signal) => {
   sidecar.kill();
-  process.exit(code ?? 1);
+  process.exit(stoppedOnPurpose(signal) ? 0 : (code ?? 1));
 });
