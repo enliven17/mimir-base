@@ -29,7 +29,7 @@ Hello, I am going to introduce Mimir.
 
 Mimir is an agentic prediction-market platform for verifiable future claims.
 Users create a claim, participants stake USDC on opposing sides, and an AI
-oracle evaluates the agreed resolution source when the deadline passes.
+oracle evaluates the agreed source when the deadline passes.
 
 But Mimir is not only about generating predictions. Its agents remember what they
 have learned, and that memory changes what they do later.
@@ -43,16 +43,16 @@ creator and counter positions, and a designated resolution source.
 
 **[SCREEN: Claim detail page]**
 
-On the claim page we can inspect the stakes, deadline, current state, settlement
-information, confidence, and evidence hash.
+On the claim page we can inspect the stakes, deadline, settlement information,
+confidence, and evidence hash.
 
 Mimir does not keep the financial truth in an off-chain database. Stakes,
 challenges, resolutions, and payouts execute on Base. The oracle’s result is
 written to the contract, so the decision and the payout can be audited.
 
-The evidence hash commits to what the oracle actually saw, while the confidence
-value communicates how certain the system was. Ambiguous outcomes can be marked
-unresolvable and refunded instead of forcing a fabricated winner.
+The evidence hash commits to what the oracle saw, while confidence communicates
+certainty. Ambiguous outcomes can be marked unresolvable and refunded instead of
+forcing a fabricated winner.
 
 ### 0:55–1:25 — Multiple autonomous agents
 
@@ -65,10 +65,9 @@ The oracle can purchase opinions from these agents through x402 USDC payments.
 That means the agents are not just model calls. They are economic participants
 that buy and sell analysis.
 
-In council settlement mode, the oracle can collect several independent opinions,
-combine them into a verdict, and record the reasoning and confidence behind the
-final settlement. Each persona can stake, abstain, or reject a decision according
-to its own rules.
+In council settlement mode, the oracle collects independent opinions, combines
+them into a verdict, and records the reasoning and confidence behind settlement.
+Each persona can stake, abstain, or reject according to its own rules.
 
 ### 1:25–2:15 — Sibyl Memory is load-bearing
 
@@ -83,17 +82,15 @@ unresolvable reads, last verdict, and last action.
 When an agent encounters a source for the first time, it can evaluate it. But if
 the same source repeatedly returns unusable evidence, Sibyl remembers that fact.
 
-For example, after two unresolvable evaluations on the same host, a later oracle
-challenge is stopped before another LLM call or stake is made. The agent recalls
-the source history, applies the deterministic veto policy, and refuses to risk
-money on that source.
+After two unresolvable evaluations on the same host, a later challenge is stopped
+before another LLM call or stake is made. The agent recalls the source history,
+applies a deterministic veto, and refuses to risk money on that source.
 
 This is not logging. Memory changes the decision on the critical path.
 
-The test shown here writes source history, reads it back through the real Sibyl
-sidecar from a fresh client, and verifies that the later challenge is vetoed.
-If the Sibyl layer is removed, that veto disappears. The core agent behavior is
-materially degraded, which is why memory is load-bearing in Mimir.
+The test writes source history, reads it back through the real Sibyl sidecar from
+a fresh client, and verifies the veto. If Sibyl is removed, that veto disappears;
+memory is therefore load-bearing in Mimir.
 
 ### 2:15–3:00 — Virtuals ACP service
 
@@ -107,16 +104,15 @@ validates the requirements, fetches the source through an SSRF-safe research
 gateway, recalls the source history from the `mimir-virtuals` Sibyl tenant, and
 then asks the LLM for an assessment.
 
-The result is returned as a structured ACP deliverable containing `ACCEPT`,
-`REVIEW`, or `REJECT`, together with confidence, explanation, and a recommended
-stake.
+The result is a structured ACP deliverable containing `ACCEPT`, `REVIEW`, or
+`REJECT`, together with confidence, explanation, and a recommended stake.
 
 The strongest case is a repeated bad source. Once Sibyl has seen two unresolvable
 reads from the same host, a new ACP request can be rejected with
 `SIBYL_MEMORY_VETO` before the model runs.
 
-So Sibyl is not only connected to the market creator and oracle. It also controls
-the behavior of Mimir’s external agent-commerce service.
+Sibyl therefore controls not only the market creator and oracle, but also Mimir’s
+external agent-commerce service.
 
 ### 3:00–3:35 — The agent economy
 
@@ -127,9 +123,9 @@ private key in the Railway worker environment. The web server never receives
 those keys. Agents sign their own transactions, while Mimir enforces permissions,
 limits, and payment rules.
 
-The revenue screen shows services sold through x402, including oracle and council
-resources. External agents can register through the same API, participate in
-baskets, and be followed through non-custodial copy-trading permissions.
+The revenue screen shows x402 services sold by oracle and council agents.
+External agents can register through the same API, participate in baskets, and
+be followed through non-custodial copy-trading permissions.
 
 Mimir is therefore more than a prediction-market interface. It is a small economy
 where autonomous agents remember, transact, coordinate, and take responsibility
