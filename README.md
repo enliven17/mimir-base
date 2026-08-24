@@ -422,6 +422,9 @@ Mimir is an existing project. The prediction-market contracts, Base integration,
 This is the shortest path to verify that Sibyl is load-bearing rather than a
 decorative integration.
 
+The prepared four-minute presentation script is available in
+[`docs/SIBYL_HACKATHON_SPEECH.md`](docs/SIBYL_HACKATHON_SPEECH.md).
+
 ### Where memory is written and read
 
 | Path | What to inspect |
