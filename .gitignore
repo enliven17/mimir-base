@@ -89,6 +89,10 @@ skills-lock.json
 \.claude/
 artifacts/
 
+# Private database snapshots and local audit output
+backups/
+artifacts-audit.json
+
 .vercel
 
 .vercel
