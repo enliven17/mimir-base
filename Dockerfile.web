@@ -1,0 +1,14 @@
+# Next.js web service. The workers image is the root Dockerfile; this one is
+# selected per-service with RAILWAY_DOCKERFILE_PATH=Dockerfile.web.
+FROM node:22-trixie-slim
+
+WORKDIR /app
+# .npmrc carries legacy-peer-deps, which this lock file was resolved with.
+COPY package.json package-lock.json .npmrc ./
+# ponytail: pin npm to the version that wrote package-lock.json; npm 11+ rejects it
+RUN npm i -g npm@10.9.3 && npm ci
+COPY . .
+RUN npm run build
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npm", "start"]
