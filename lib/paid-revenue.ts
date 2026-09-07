@@ -12,6 +12,7 @@ import {
   getMarketRevenueSummary,
   insertPayment,
   getPaymentsRevenueSummary,
+  isDbConfigured,
   type PaymentsRevenueSummary,
 } from "./db";
 import { USDC_DECIMALS, USDC_SYMBOL, unitsToUsdc } from "./usdc";
@@ -222,7 +223,7 @@ function inMemorySummary(limit: number): RevenueSummary {
   };
 }
 
-/** Durable summary from Neon; falls back to the in-memory buffer on any error. */
+/** A configured ledger must never be replaced by a partial in-memory total. */
 export async function getRevenueSummary(limit = 25): Promise<RevenueSummary> {
   const withBaseline = (s: RevenueSummary): RevenueSummary => {
     const calls = baselineCalls();
@@ -253,7 +254,8 @@ export async function getRevenueSummary(limit = 25): Promise<RevenueSummary> {
         unclaimedUsdc: unitsToUsdc(market.unclaimedAtomic),
       },
     };
-  } catch {
+  } catch (error) {
+    if (isDbConfigured()) throw error;
     return withBaseline(inMemorySummary(limit));
   }
 }

@@ -84,7 +84,10 @@ export default function RevenuePage() {
         const res = await fetch("/api/payments/revenue");
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json = (await res.json()) as RevenueSummary;
-        if (alive) setData(json);
+        if (alive) {
+          setData(json);
+          setErr(null);
+        }
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : "failed to load");
       }

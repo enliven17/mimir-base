@@ -8,11 +8,22 @@
  */
 
 import { getRevenueSummary } from "@/lib/paid-revenue";
+import { cachedFor } from "@/lib/server/ttl-cache";
 
 export const dynamic = "force-dynamic";
+// Coalesce polling even on hosts without a CDN that honors s-maxage.
+const readSummary = cachedFor(() => getRevenueSummary(25), 10_000);
 
 export async function GET(): Promise<Response> {
-  const summary = await getRevenueSummary(25);
+  let summary;
+  try {
+    summary = await readSummary();
+  } catch {
+    return Response.json({ error: "Revenue ledger temporarily unavailable" }, {
+      status: 503,
+      headers: { "cache-control": "no-store", "retry-after": "10" },
+    });
+  }
   return new Response(JSON.stringify(summary), {
     headers: {
       "content-type": "application/json",
