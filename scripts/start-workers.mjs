@@ -1,5 +1,5 @@
 /**
- * Railway entrypoint: install/verify real Sibyl Memory, start the sidecar,
+ * Worker entrypoint (Render / Railway): verify real Sibyl Memory, start the sidecar,
  * then boot the agent workers. Workers refuse to stake if this sidecar is down.
  *
  * Nixpacks Python is PEP 668 locked (no system pip). Install into a venv on
@@ -8,6 +8,14 @@
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { superviseProcesses } from "./worker-supervisor.mjs";
+
+if (process.env.WORKERS_START_PAUSED === "1") {
+  console.log("[workers] migration hold: restore Sibyl memory and stop the old fleet, then set WORKERS_START_PAUSED=0 and redeploy");
+  process.on("SIGTERM", () => process.exit(0));
+  process.on("SIGINT", () => process.exit(0));
+  await new Promise(() => { setInterval(() => {}, 60_000); });
+}
 
 const dbPath = process.env.SIBYL_MEMORY_DB ?? "/data/sibyl/memory.db";
 const venvDir = process.env.SIBYL_VENV ?? path.join(path.dirname(dbPath), "venv");
@@ -116,16 +124,7 @@ const python = ensureClient();
 process.env.PYTHON = python;
 console.log(`[sibyl] starting sidecar with ${python} db=${dbPath}`);
 
-// Railway stops a deployment with SIGTERM. Exiting non-zero on that path is
-// what mailed "deployment crashed" after every redeploy, so a deliberate stop
-// exits 0 and only an unasked-for child death stays a failure.
-//
-// The signal goes to the whole process group, so a child can report its exit
-// before this process runs its own handler — hence checking the child's signal
-// too rather than trusting the flag alone.
-let shuttingDown = false;
-const stoppedOnPurpose = (signal) =>
-  shuttingDown || signal === "SIGTERM" || signal === "SIGINT";
+const supervisor = superviseProcesses();
 
 const sidecar = spawn(
   python,
@@ -140,18 +139,14 @@ const sidecar = spawn(
     stdio: ["ignore", "inherit", "inherit"],
   },
 );
-sidecar.on("exit", (code, signal) => {
-  if (stoppedOnPurpose(signal)) process.exit(0);
-  console.error(`[sibyl] sidecar exited code=${code} signal=${signal ?? ""}`);
-  process.exit(code ?? 1);
-});
+supervisor.add(sidecar, "sibyl");
 
 try {
   await waitHealthy();
 } catch (err) {
   console.error("[sibyl]", err instanceof Error ? err.message : err);
-  sidecar.kill();
-  process.exit(1);
+  supervisor.stop(1);
+  await new Promise(() => {});
 }
 console.log("[sibyl] sidecar healthy — starting workers");
 
@@ -166,14 +161,4 @@ const workers = spawn(
 );
 if (process.env.VIRTUALS_ACP_ENABLED === "1") console.log("[virtuals-acp] worker enabled");
 
-const shutdown = (signal) => {
-  shuttingDown = true;
-  workers.kill(signal);
-  sidecar.kill(signal);
-};
-process.on("SIGTERM", () => shutdown("SIGTERM"));
-process.on("SIGINT", () => shutdown("SIGINT"));
-workers.on("exit", (code, signal) => {
-  sidecar.kill();
-  process.exit(stoppedOnPurpose(signal) ? 0 : (code ?? 1));
-});
+supervisor.add(workers, "workers");
