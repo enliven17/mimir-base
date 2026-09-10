@@ -22,7 +22,11 @@ import { BlueprintHeading } from "@/components/BlueprintGrid";
 // getLogs history from the deploy block). That's fine once per 30s, not
 // once per page view — cache each so concurrent/rapid visits share one
 // chain round-trip instead of each paying the full scan cost.
-export const revalidate = 30;
+// Prerendering this at build time is worse than useless: the build container
+// pays the whole chain scan, the public RPC rate-limits it, and the build fails
+// - and a page baked from build-time chain state is stale on arrival anyway.
+// Render per request; the cachedFor wrappers below keep the 30s cost ceiling.
+export const dynamic = "force-dynamic";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
