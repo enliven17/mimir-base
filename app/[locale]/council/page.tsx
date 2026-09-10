@@ -13,10 +13,14 @@ import {
 } from "@/lib/council-resolver";
 import type { PersonaSpec } from "@/agents/council/personas";
 import { BlueprintHeading } from "@/components/BlueprintGrid";
+import { cachedFor } from "@/lib/server/ttl-cache";
 import { openPeepsAvatar } from "@/lib/avatars";
 import { AddressChip } from "@/components/ui/AddressChip";
 
-export const revalidate = 30;
+// Persona addresses come from the runtime env, which a build container does not
+// have: prerendering this page at build time bakes "no personas" into the HTML.
+// Render per request and keep the 30s cost ceiling in the TTL cache below.
+export const dynamic = "force-dynamic";
 
 // ── Data ─────────────────────────────────────────────────────────────────────
 
@@ -34,7 +38,7 @@ interface PersonaStats {
   }>;
 }
 
-async function fetchCouncilStats(): Promise<PersonaStats[]> {
+async function fetchCouncilStatsUncached(): Promise<PersonaStats[]> {
   if (!isContractConfigured()) return [];
   const client    = createBasePublicClient();
   const address   = getContractAddress();
@@ -111,6 +115,9 @@ async function fetchCouncilStats(): Promise<PersonaStats[]> {
     }),
   );
 }
+
+const fetchCouncilStats = cachedFor(fetchCouncilStatsUncached, 30_000);
+
 
 // ── UI ───────────────────────────────────────────────────────────────────────
 
