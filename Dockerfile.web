@@ -8,6 +8,31 @@ COPY package.json package-lock.json .npmrc ./
 # ponytail: pin npm to the version that wrote package-lock.json; npm 11+ rejects it
 RUN npm i -g npm@10.9.3 && npm ci
 COPY . .
+
+# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so a
+# build container without them ships a site that does not know its own contract:
+# no wallet connect, no chain reads, every page rendering its empty state. The
+# platform passes service variables as build args, but only for ARGs declared
+# here. These six are public by definition - nothing secret belongs in this list,
+# which is why DATABASE_URL and the keys stay runtime-only.
+#
+# The defaults exist because this platform does not forward service variables
+# into declared ARGs: without them the build silently produces a site that
+# renders every empty state. A passed build arg still wins over the default,
+# so pointing at a new deployment means overriding, not editing this file.
+ARG NEXT_PUBLIC_CONTRACT_ADDRESS=0x2ae99017a17822f2514fa26dccbade8f2d8beb13
+ARG NEXT_PUBLIC_USDC_ADDRESS=0x036CbD53842c5426634e7929541eC2318f3dCF7e
+ARG NEXT_PUBLIC_DEPLOY_BLOCK=45476119
+ARG NEXT_PUBLIC_BASE_RPC_URL=https://base-sepolia-rpc.publicnode.com
+ARG NEXT_PUBLIC_PRIVY_APP_ID=cmstjz4kv00ny0bl1h2oejvgr
+ARG NEXT_PUBLIC_PAYMASTER_URL=https://api.developer.coinbase.com/rpc/v1/base-sepolia/0mEt9iYGv0umAAAcxZbVebZ7hNZXnyDi
+ENV NEXT_PUBLIC_CONTRACT_ADDRESS=$NEXT_PUBLIC_CONTRACT_ADDRESS \
+    NEXT_PUBLIC_USDC_ADDRESS=$NEXT_PUBLIC_USDC_ADDRESS \
+    NEXT_PUBLIC_DEPLOY_BLOCK=$NEXT_PUBLIC_DEPLOY_BLOCK \
+    NEXT_PUBLIC_BASE_RPC_URL=$NEXT_PUBLIC_BASE_RPC_URL \
+    NEXT_PUBLIC_PRIVY_APP_ID=$NEXT_PUBLIC_PRIVY_APP_ID \
+    NEXT_PUBLIC_PAYMASTER_URL=$NEXT_PUBLIC_PAYMASTER_URL
+
 RUN npm run build
 ENV NODE_ENV=production
 EXPOSE 3000
